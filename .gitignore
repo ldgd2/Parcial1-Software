@@ -16,6 +16,8 @@ __pycache__/
 
 # Variables de entorno
 .env
+backend/.env
+frontend/.env
 .env.*
 !.env.example
 
