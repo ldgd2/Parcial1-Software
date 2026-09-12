@@ -1,0 +1,32 @@
+import os
+from pydantic_settings import BaseSettings
+
+env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))
+
+class Settings(BaseSettings):
+    PROJECT_NAME: str = "Diagramador Real-Time API"
+    SECRET_KEY: str = "supersecretkey_change_in_production"
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    
+    # Base de datos
+    DB_IP: str = "localhost"
+    DB_PORT: str = "5432"
+    DB_USER: str = "postgres"
+    DB_PASSWORD: str = "postgres"
+    DB_NAME: str = "diagramador"
+    
+    # Configuración de Correo para OTP
+    GMAIL_USER: str = ""
+    GMAIL_APP_PASSWORD: str = ""
+
+    @property
+    def DATABASE_URL(self) -> str:
+        from urllib.parse import quote_plus
+        encoded_password = quote_plus(self.DB_PASSWORD)
+        return f"postgresql+asyncpg://{self.DB_USER}:{encoded_password}@{self.DB_IP}:{self.DB_PORT}/{self.DB_NAME}"
+
+    class Config:
+        env_file = env_path
+
+settings = Settings()

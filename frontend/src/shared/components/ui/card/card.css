@@ -1,0 +1,25 @@
+.widget-card {
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  overflow: hidden;
+}
+
+/* Primary Variant */
+.widget-card-primary {
+  /* Default static card styles apply */
+}
+
+/* Interactive Variant (Hover Effects) */
+.widget-card-interactive {
+  transition: all 0.2s ease-out;
+  cursor: pointer;
+}
+
+.widget-card-interactive:hover {
+  transform: translateY(-5px);
+  border-color: var(--primary);
+  background: var(--bg-color);
+}

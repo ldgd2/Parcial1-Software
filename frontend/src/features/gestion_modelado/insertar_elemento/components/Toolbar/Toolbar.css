@@ -1,0 +1,109 @@
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 56px;
+  background: #16191f;
+  border-right: 1px solid var(--border-color);
+  padding: 0.5rem 0;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+
+.toolbar__section-label {
+  font-size: 0.4rem;
+  color: #4a5568;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 0;
+  width: 100%;
+  text-align: center;
+  font-weight: 700;
+}
+
+.toolbar__group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 0 4px;
+}
+
+.toolbar__btn {
+  width: 100%;
+  aspect-ratio: 1;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.toolbar__btn:hover {
+  background: rgba(223, 208, 184, 0.08);
+  border-color: var(--border-color);
+  color: var(--primary);
+}
+.toolbar__btn--active {
+  background: rgba(120, 170, 255, 0.15);
+  border-color: #4a7fd4;
+  color: #7aaeff;
+}
+
+.toolbar__sep {
+  width: 60%;
+  height: 1px;
+  background: var(--border-color);
+  margin: 0.25rem 0;
+}
+
+.toolbar__status {
+  font-size: 0.38rem;
+  padding: 2px 4px;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.toolbar__status--connecting {
+  color: #f5a623;
+  font-weight: 700;
+  animation: pulse 1s infinite;
+}
+
+.toolbar__status--idle {
+  color: #4a5568;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.toolbar__hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 0.15rem 0;
+}
+
+.toolbar__hint span:first-child {
+  font-size: 0.44rem;
+  color: var(--primary);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+.toolbar__hint span:last-child {
+  font-size: 0.38rem;
+  color: rgba(148, 137, 121, 0.5);
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+

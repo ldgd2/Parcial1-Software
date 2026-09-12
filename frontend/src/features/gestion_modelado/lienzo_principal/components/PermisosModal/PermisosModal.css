@@ -1,0 +1,158 @@
+.modal-backdrop {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.modal-content h2 {
+  margin-top: 0;
+  color: #222;
+}
+
+.permisos-tabs {
+  display: flex;
+  border-bottom: 2px solid #eee;
+  margin-bottom: 15px;
+}
+
+.permisos-tab {
+  background: none;
+  border: none;
+  padding: 10px 15px;
+  cursor: pointer;
+  font-weight: 500;
+  color: #777;
+  transition: all 0.2s;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+}
+
+.permisos-tab:hover {
+  color: #333;
+}
+
+.permisos-tab.active {
+  color: #1a73e8;
+  border-bottom-color: #1a73e8;
+}
+
+.permisos-body {
+  min-height: 200px;
+  max-height: 350px;
+  overflow-y: auto;
+  margin-bottom: 15px;
+}
+
+.permisos-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.permisos-empty {
+  color: #888;
+  text-align: center;
+  margin-top: 30px;
+}
+
+.permisos-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #eee;
+}
+
+.permisos-user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.permisos-status {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.permisos-status.online {
+  background: #34a853;
+  box-shadow: 0 0 4px #34a853;
+}
+
+.permisos-status.offline {
+  background: #ea4335;
+}
+
+.permisos-name {
+  font-weight: 500;
+  color: #444;
+}
+
+.permisos-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn-approve {
+  background: #34a853;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-reject {
+  background: #ea4335;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-kick {
+  background: #ffebee;
+  color: #d32f2f;
+  border: 1px solid #ffcdd2;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85em;
+}
+
+.permisos-role-select {
+  padding: 4px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: white;
+  font-size: 0.85em;
+}
+
+.btn-close-modal {
+  width: 100%;
+  padding: 10px;
+  background: #f1f3f4;
+  border: none;
+  border-radius: 4px;
+  font-weight: 600;
+  color: #444;
+  cursor: pointer;
+}

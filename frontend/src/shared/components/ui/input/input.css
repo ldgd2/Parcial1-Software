@@ -1,0 +1,85 @@
+.widget-input-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.widget-input-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.widget-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  transition: all 0.2s ease-in-out;
+  outline: none;
+}
+
+/* Primary Variant: Solid / Slightly glass */
+.widget-input-primary {
+  background-color: var(--surface-color);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.widget-input-primary:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+/* Secondary Variant: Ghost / Transparent */
+.widget-input-secondary {
+  background-color: transparent;
+  border: 1px solid var(--secondary);
+  color: var(--text-primary);
+}
+
+.widget-input-secondary:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+.widget-input-error {
+  border-color: #ef4444;
+}
+
+.widget-input-error-msg {
+  font-size: 0.75rem;
+  color: #ef4444;
+}
+
+/* OTP Input Specifics */
+.widget-otp-container {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.widget-otp-input {
+  width: 3rem;
+  height: 4rem;
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 800;
+  border-radius: 0;
+  outline: none;
+  transition: all 0.2s ease-in-out;
+}
+
+.flat-mockup-window-small {
+  background: var(--bg-color);
+  border: 4px solid var(--border-color);
+  box-shadow: 4px 4px 0 var(--border-color);
+  color: var(--text-primary);
+}
+
+.widget-otp-input:focus {
+  border-color: var(--primary);
+  box-shadow: 4px 4px 0 var(--primary);
+}

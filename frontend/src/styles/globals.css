@@ -1,0 +1,81 @@
+:root {
+  /* Color Palette - Requested Theme */
+  --bg-color: #222831;
+  --surface-color: #393E46;
+  --surface-hover: rgba(57, 62, 70, 0.8);
+  
+  --text-primary: #ffffff;
+  --text-secondary: #DFD0B8;
+  
+  /* Vibrant Accents */
+  --primary: #DFD0B8; 
+  --primary-hover: #eaddcb;
+  
+  --secondary: #948979;
+  --secondary-hover: #a39989;
+  
+  --accent: #948979; 
+  --border-color: #393E46;
+  
+  /* Radii - Minimalist hard/slight curves */
+  --radius-sm: 0px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-full: 9999px;
+  
+  /* Shadows - Minimalist/Flat */
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  
+  --glass-bg: var(--surface-color);
+  --glass-border: var(--border-color);
+  
+  /* Gradients - Removed in favor of solid colors */
+  --gradient-text: var(--primary);
+  
+  /* Typography */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Global Utilities */
+.app-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  width: 100%;
+}

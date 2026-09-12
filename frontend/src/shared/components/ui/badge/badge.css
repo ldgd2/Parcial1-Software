@@ -1,0 +1,25 @@
+.widget-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.widget-badge-primary {
+  background-color: var(--primary);
+  color: #fff;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+}
+
+.widget-badge-outline {
+  background-color: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  box-shadow: inset 0 0 5px rgba(16, 185, 129, 0.2);
+}

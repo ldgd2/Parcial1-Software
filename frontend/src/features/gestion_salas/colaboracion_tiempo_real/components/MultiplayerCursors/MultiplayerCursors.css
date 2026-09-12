@@ -1,0 +1,29 @@
+.multiplayer-cursors {
+  pointer-events: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+}
+
+.multiplayer-cursor {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  transition: left 0.05s linear, top 0.05s linear;
+}
+
+.multiplayer-cursor__name {
+  background: #FF5722;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  position: absolute;
+  top: 20px;
+  left: 10px;
+  white-space: nowrap;
+  font-weight: bold;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}

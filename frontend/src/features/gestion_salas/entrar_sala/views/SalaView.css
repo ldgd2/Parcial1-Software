@@ -1,0 +1,112 @@
+.sala-view {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #1a1e24;
+  overflow: hidden;
+}
+
+.sala-view__workspace {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Loading */
+.sala-view--loading,
+.sala-view--error {
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+}
+
+.sala-loading__spinner {
+  width: 40px;
+  height: 40px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Error */
+.sala-error__icon {
+  font-size: 2.5rem;
+  color: var(--primary);
+  animation: pulse 2s ease infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.sala-view--error h2 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.sala-view--error p {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  max-width: 400px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.sala-view--error button {
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  padding: 0.5rem 1.25rem;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: border-color 0.2s, color 0.2s;
+  margin-top: 0.5rem;
+}
+.sala-view--error button:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* Save toast */
+.sala-view__save-toast {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 0.625rem 1.5rem;
+  font-family: var(--font-sans);
+  animation: toastIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  z-index: 9999;
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.sala-view__save-toast--saved {
+  border-left: 3px solid #a3e6a3;
+  color: #a3e6a3;
+}
+.sala-view__save-toast--error {
+  border-left: 3px solid #e6a3a3;
+  color: #e6a3a3;
+}

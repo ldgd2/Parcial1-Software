@@ -1,0 +1,35 @@
+.widget-shape {
+  display: block;
+}
+
+/* Animations */
+.shape-anim-none {
+  /* No animation */
+}
+
+.shape-anim-spin {
+  animation: spinShape 20s linear infinite;
+}
+
+.shape-anim-float {
+  animation: floatShape 6s ease-in-out infinite;
+}
+
+.shape-anim-pulse {
+  animation: pulseShape 4s ease-in-out infinite;
+}
+
+@keyframes spinShape {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes floatShape {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-20px); }
+}
+
+@keyframes pulseShape {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}

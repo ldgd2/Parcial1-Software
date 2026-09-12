@@ -1,0 +1,61 @@
+.connect-picker__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+}
+
+.connect-picker {
+  position: fixed;
+  z-index: 100;
+  background: #1a1f2e;
+  border: 1px solid #2d3548;
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  min-width: 180px;
+  animation: connect-picker-in 0.15s ease;
+}
+
+@keyframes connect-picker-in {
+  from { opacity: 0; transform: scale(0.9) translateY(-4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.connect-picker__title {
+  font-size: 10px;
+  font-weight: 600;
+  color: #6b7a99;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 4px 8px 6px;
+  border-bottom: 1px solid #2d3548;
+  margin-bottom: 4px;
+}
+
+.connect-picker__option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: none;
+  border: none;
+  color: #c8d0dc;
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  text-align: left;
+  transition: background 0.12s;
+}
+
+.connect-picker__option:hover {
+  background: #252c3f;
+  color: #fff;
+}
+
+.connect-picker__icon {
+  font-size: 12px;
+  font-family: monospace;
+  color: #7c9fc9;
+  min-width: 36px;
+}

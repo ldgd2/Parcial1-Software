@@ -1,0 +1,90 @@
+.compartir-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.compartir-modal__desc {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.compartir-modal__proyecto-name {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--border-color);
+  background: var(--bg-color);
+}
+
+.compartir-modal__icon {
+  color: var(--primary);
+}
+
+.compartir-modal__link-box {
+  display: flex;
+  gap: 0;
+}
+
+.compartir-modal__link-input {
+  flex: 1;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-right: none;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  padding: 0.75rem 1rem;
+  font-family: monospace;
+  outline: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.compartir-modal__copy-btn {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  padding: 0 1.25rem;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  white-space: nowrap;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  min-width: 90px;
+}
+
+.compartir-modal__copy-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.compartir-modal__copy-btn--copiado {
+  background: rgba(163, 230, 163, 0.1);
+  border-color: rgba(163, 230, 163, 0.4);
+  color: #a3e6a3;
+}
+
+.compartir-modal__info {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--secondary);
+  line-height: 1.5;
+}
+
+.compartir-modal__info-icon {
+  flex-shrink: 0;
+  color: var(--secondary);
+  margin-top: 1px;
+}

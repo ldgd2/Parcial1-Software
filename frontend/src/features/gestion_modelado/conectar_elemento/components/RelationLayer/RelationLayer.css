@@ -1,0 +1,14 @@
+.relation-layer__label {
+  font-size: 11px;
+  fill: #c8d0dc;
+  font-family: 'Inter', sans-serif;
+  cursor: default;
+  user-select: none;
+}
+
+.relation-layer__label-small {
+  font-size: 10px;
+  fill: #8a95a3;
+  font-family: 'Inter', sans-serif;
+  user-select: none;
+}

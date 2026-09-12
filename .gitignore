@@ -1,0 +1,40 @@
+# Entornos virtuales de Python
+venv/
+env/
+.venv/
+
+# Caché y archivos compilados de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Base de datos local (SQLite, si aplica)
+*.sqlite
+*.db
+
+# Variables de entorno
+.env
+.env.*
+!.env.example
+
+# Node.js y Frontend
+node_modules/
+dist/
+build/
+.npm/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Archivos de sistema y editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Agentes / Configuración local de Gemini (opcional pero recomendado)
+.agents/
+.gemini/
