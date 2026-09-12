@@ -15,7 +15,8 @@ class ConnectionManager:
                 "pending_guests": {},
                 "approved_guests": set(),
                 "readonly_guests": set(), # Set of guest_ids that can only view
-                "guest_nicknames": {} # Store mapping of guest_id -> nickname for active users
+                "guest_nicknames": {}, # Store mapping of guest_id -> nickname for active users
+                "locked_elements": {} # element_id -> username
             }
 
     async def connect_host(self, websocket: WebSocket, sala_id: str):

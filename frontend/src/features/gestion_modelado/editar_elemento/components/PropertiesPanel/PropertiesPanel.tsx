@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useDiagram } from '@/features/gestion_modelado/shared/context/DiagramContext';
-import { X, ChevronRight, ChevronLeft, MessageSquarePlus, CheckCircle2 } from 'lucide-react';
+import { useRealTimeSync } from '@/features/gestion_concurrencia/sincronizacion_tiempo_real/context/RealTimeSyncContext';
+import { X, ChevronRight, ChevronLeft, MessageSquarePlus, CheckCircle2, Lock } from 'lucide-react';
 import './PropertiesPanel.css';
 
 function getCurrentUser() {
@@ -23,9 +24,34 @@ function getCurrentUser() {
 
 export const PropertiesPanel: React.FC = () => {
   const { nodes, relations, correcciones, selectedId, updateNode, updateRelation, setSelectedId, addCorreccion, resolveCorreccion } = useDiagram();
+  const realTimeSync = useRealTimeSync();
+  const lockElement = realTimeSync?.lockElement;
+  const refreshLock = realTimeSync?.refreshLock;
+  const unlockElement = realTimeSync?.unlockElement;
+  const lockedElements = realTimeSync?.lockedElements || {};
+
   const [isMinimized, setIsMinimized] = useState(false);
   const [newCorr, setNewCorr] = useState('');
   const [userName, setUserName] = useState(getCurrentUser());
+
+  const handleFocus = (subId: string) => {
+    if (lockElement && selectedId) lockElement(`${selectedId}:${subId}`);
+  };
+
+  const handleBlur = (subId: string) => {
+    if (unlockElement && selectedId) unlockElement(`${selectedId}:${subId}`);
+  };
+
+  const handleChangeLock = (subId: string) => {
+    if (refreshLock && selectedId) refreshLock(`${selectedId}:${subId}`);
+  };
+
+  const lockedBy = (subId: string) => { return lockedElements[`${selectedId}:${subId}`]; };
+  const isLocked = (subId: string) => {
+    if (!selectedId) return false;
+    const lock = lockedElements[`${selectedId}:${subId}`];
+    return lock !== undefined;
+  };
 
   React.useEffect(() => {
     const token = localStorage.getItem('access_token');
@@ -62,7 +88,7 @@ export const PropertiesPanel: React.FC = () => {
   return (
     <div className={`properties-panel ${isMinimized ? 'properties-panel--minimized' : ''}`}>
       <div className="properties-panel__header">
-        {!isMinimized && <h3>Propiedades {isNode ? 'de Clase' : 'de Relación'}</h3>}
+        {!isMinimized && <h3>Propiedades {isNode ? 'de Clase' : 'de Relacin'}</h3>}
         <div className="properties-panel__actions">
           <button className="properties-panel__btn" onClick={() => setIsMinimized(!isMinimized)} title={isMinimized ? "Expandir" : "Minimizar"}>
             {isMinimized ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
@@ -82,40 +108,52 @@ export const PropertiesPanel: React.FC = () => {
             {isNode && selectedNode && (
               <>
                 <div className="property-group">
-                  <label>Nombre</label>
+                  <label>Nombre {isLocked('nombre') && <span title={lockedBy('')}><Lock size={12} style={{ marginLeft: 4, verticalAlign: 'middle' }} /></span>}</label>
                   <input 
                     type="text" 
                     value={selectedNode.nombre} 
-                    onChange={(e) => updateNode(selectedNode.id, { nombre: e.target.value })} 
+                    onChange={(e) => { updateNode(selectedNode.id, { nombre: e.target.value }); handleChangeLock('nombre'); }} 
+                    onFocus={() => handleFocus('nombre')}
+                    onBlur={() => handleBlur('nombre')}
                     placeholder="Nombre de la clase"
+                    disabled={isLocked('nombre')}
                   />
                 </div>
                 {selectedNode.type === 'class' && (
                   <div className="property-group">
-                    <label>Estereotipo</label>
+                    <label>Estereotipo {isLocked('estereotipo') && <span title={lockedBy('')}><Lock size={12} style={{ marginLeft: 4, verticalAlign: 'middle' }} /></span>}</label>
                     <input 
                       type="text" 
                       value={selectedNode.estereotipo || ''} 
-                      onChange={(e) => updateNode(selectedNode.id, { estereotipo: e.target.value })} 
+                      onChange={(e) => { updateNode(selectedNode.id, { estereotipo: e.target.value }); handleChangeLock('estereotipo'); }} 
+                      onFocus={() => handleFocus('estereotipo')}
+                      onBlur={() => handleBlur('estereotipo')}
                       placeholder="ej. table"
+                      disabled={isLocked('estereotipo')}
                     />
                   </div>
                 )}
                 <div className="property-group">
-                  <label>Color</label>
+                  <label>Color {isLocked('color') && <span title={lockedBy('')}><Lock size={12} style={{ marginLeft: 4, verticalAlign: 'middle' }} /></span>}</label>
                   <input 
                     type="color" 
                     value={selectedNode.color} 
-                    onChange={(e) => updateNode(selectedNode.id, { color: e.target.value })} 
+                    onChange={(e) => { updateNode(selectedNode.id, { color: e.target.value }); handleChangeLock('color'); }}
+                    onFocus={() => handleFocus('color')}
+                    onBlur={() => handleBlur('color')}
+                    disabled={isLocked('color')}
                   />
                 </div>
                 {selectedNode.type === 'note' && (
                   <div className="property-group">
-                    <label>Contenido</label>
+                    <label>Contenido {isLocked('contenido') && <span title={lockedBy('')}><Lock size={12} style={{ marginLeft: 4, verticalAlign: 'middle' }} /></span>}</label>
                     <textarea 
                       value={selectedNode.contenido || ''} 
-                      onChange={(e) => updateNode(selectedNode.id, { contenido: e.target.value })} 
+                      onChange={(e) => { updateNode(selectedNode.id, { contenido: e.target.value }); handleChangeLock('contenido'); }} 
+                      onFocus={() => handleFocus('contenido')}
+                      onBlur={() => handleBlur('contenido')}
                       rows={4}
+                      disabled={isLocked('contenido')}
                     />
                   </div>
                 )}
@@ -125,30 +163,39 @@ export const PropertiesPanel: React.FC = () => {
             {!isNode && selectedRel && (
               <>
                 <div className="property-group">
-                  <label>Etiqueta Central</label>
+                  <label>Etiqueta Central {isLocked('label') && <span title={lockedBy('')}><Lock size={12} style={{ marginLeft: 4, verticalAlign: 'middle' }} /></span>}</label>
                   <input 
                     type="text" 
                     value={selectedRel.label || ''} 
-                    onChange={(e) => updateRelation(selectedRel.id, { label: e.target.value })} 
-                    placeholder="Nombre de la relación"
+                    onChange={(e) => { updateRelation(selectedRel.id, { label: e.target.value }); handleChangeLock('label'); }} 
+                    onFocus={() => handleFocus('label')}
+                    onBlur={() => handleBlur('label')}
+                    placeholder="Nombre de la relacin"
+                    disabled={isLocked('label')}
                   />
                 </div>
                 <div className="property-group">
-                  <label>Card. Origen</label>
+                  <label>Card. Origen {isLocked('sourceLabel') && <span title={lockedBy('')}><Lock size={12} style={{ marginLeft: 4, verticalAlign: 'middle' }} /></span>}</label>
                   <input 
                     type="text" 
                     value={selectedRel.sourceLabel || ''} 
-                    onChange={(e) => updateRelation(selectedRel.id, { sourceLabel: e.target.value })} 
+                    onChange={(e) => { updateRelation(selectedRel.id, { sourceLabel: e.target.value }); handleChangeLock('sourceLabel'); }} 
+                    onFocus={() => handleFocus('sourceLabel')}
+                    onBlur={() => handleBlur('sourceLabel')}
                     placeholder="ej. 1, 0..1"
+                    disabled={isLocked('sourceLabel')}
                   />
                 </div>
                 <div className="property-group">
-                  <label>Card. Destino</label>
+                  <label>Card. Destino {isLocked('targetLabel') && <span title={lockedBy('')}><Lock size={12} style={{ marginLeft: 4, verticalAlign: 'middle' }} /></span>}</label>
                   <input 
                     type="text" 
                     value={selectedRel.targetLabel || ''} 
-                    onChange={(e) => updateRelation(selectedRel.id, { targetLabel: e.target.value })} 
+                    onChange={(e) => { updateRelation(selectedRel.id, { targetLabel: e.target.value }); handleChangeLock('targetLabel'); }} 
+                    onFocus={() => handleFocus('targetLabel')}
+                    onBlur={() => handleBlur('targetLabel')}
                     placeholder="ej. n, 0..m"
+                    disabled={isLocked('targetLabel')}
                   />
                 </div>
               </>

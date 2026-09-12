@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DiagramProvider, useDiagram } from '@/features/gestion_modelado/shared/context/DiagramContext';
-import { SalaSocketProvider } from '@/features/gestion_salas/colaboracion_tiempo_real/context/SalaSocketContext';
+import { RealTimeSyncProvider } from '@/features/gestion_concurrencia/sincronizacion_tiempo_real/context/RealTimeSyncContext';
 import { Menustrip } from '@/features/gestion_modelado/lienzo_principal/components/Menustrip/Menustrip';
 import { Toolbar } from '@/features/gestion_modelado/insertar_elemento/components/Toolbar/Toolbar';
 import { DiagramCanvas } from '@/features/gestion_modelado/lienzo_principal/components/DiagramCanvas/DiagramCanvas';
@@ -146,10 +146,10 @@ export const SalaView: React.FC = () => {
   }
 
   return (
-    <SalaSocketProvider sala={sala}>
+    <RealTimeSyncProvider sala={sala}>
       <DiagramProvider>
         <SalaContent sala={sala} />
       </DiagramProvider>
-    </SalaSocketProvider>
+    </RealTimeSyncProvider>
   );
 };

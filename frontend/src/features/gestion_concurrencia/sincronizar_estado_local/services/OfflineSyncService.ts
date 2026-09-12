@@ -3,7 +3,7 @@ export interface GitObject {
     data: any;
 }
 
-class ObjectStore {
+class OfflineSyncService {
     private store = new Map<string, GitObject>();
     private dbName = 'UmlGitDB';
     private storeName = 'objects';
@@ -75,4 +75,4 @@ class ObjectStore {
 }
 
 // Exportamos un singleton
-export const objectStore = new ObjectStore();
+export const offlineSyncService = new OfflineSyncService();

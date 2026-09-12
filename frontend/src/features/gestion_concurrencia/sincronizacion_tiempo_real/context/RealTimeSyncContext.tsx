@@ -13,10 +13,14 @@ interface Cursor {
   nickname: string;
 }
 
-interface SalaSocketContextType {
+interface RealTimeSyncContextType {
   socket: WebSocket | null;
   pendingGuests: PendingGuest[];
   cursors: Record<string, Cursor>;
+  lockedElements: Record<string, string>; // element_id -> nickname
+  lockElement: (elementId: string) => void;
+  refreshLock: (elementId: string) => void;
+  unlockElement: (elementId: string) => void;
   approveGuest: (guestId: string, approved: boolean, proyectoId: number) => void;
   broadcastDiagramEvent: (event: any) => void;
   broadcastDiagramDelta: (head: string, objects: Record<string, any>) => void;
@@ -27,11 +31,12 @@ interface SalaSocketContextType {
   isReadOnly: boolean;
 }
 
-const SalaSocketContext = createContext<SalaSocketContextType | null>(null);
+const RealTimeSyncContext = createContext<RealTimeSyncContextType | null>(null);
 
-export const SalaSocketProvider: React.FC<{ children: React.ReactNode; sala: any }> = ({ children, sala }) => {
+export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: any }> = ({ children, sala }) => {
   const [pendingGuests, setPendingGuests] = useState<PendingGuest[]>([]);
   const [cursors, setCursors] = useState<Record<string, Cursor>>({});
+  const [lockedElements, setLockedElements] = useState<Record<string, string>>({});
   const [roomUsers, setRoomUsers] = useState<any[]>([]);
   const [isReadOnly, setIsReadOnly] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
@@ -112,11 +117,11 @@ export const SalaSocketProvider: React.FC<{ children: React.ReactNode; sala: any
 
             case 'diagram_delta':
               // Guardar todos los nuevos objetos en la IndexedDB/Cache local
-              if (data.objects) {
-                // Dynamic import para no romper si ObjectStore no está listo
-                import('@/features/gestion_modelado/shared/store/ObjectStore').then(({ objectStore }) => {
+              if (data.objects && data.head) {
+                // Dynamic import para no romper si OfflineSyncService no está listo
+                import('@/features/gestion_concurrencia/sincronizar_estado_local/services/OfflineSyncService').then(({ offlineSyncService }) => {
                   Object.keys(data.objects).forEach(hash => {
-                    objectStore.putObject(hash, data.objects[hash]);
+                    offlineSyncService.putObject(hash, data.objects[hash]);
                   });
                   // Notificar al frontend que llegaron deltas para que redibuje el head
                   window.dispatchEvent(new CustomEvent('remote_diagram_delta', { detail: { head: data.head } }));
@@ -139,6 +144,19 @@ export const SalaSocketProvider: React.FC<{ children: React.ReactNode; sala: any
             case 'kicked':
               alert('Has sido expulsado de la sala.');
               window.location.href = '/dashboard';
+              break;
+            case 'element_locked':
+              setLockedElements(prev => ({
+                ...prev,
+                [data.element_id]: data.nickname
+              }));
+              break;
+            case 'element_unlocked':
+              setLockedElements(prev => {
+                const newLocks = { ...prev };
+                delete newLocks[data.element_id];
+                return newLocks;
+              });
               break;
             case 'diagram_event':
               window.dispatchEvent(new CustomEvent('remote_diagram_event', { detail: data.payload }));
@@ -278,15 +296,41 @@ export const SalaSocketProvider: React.FC<{ children: React.ReactNode; sala: any
     };
   }, [isGuest]);
 
+  const lockElement = (elementId: string) => {
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({ type: 'lock_element', element_id: elementId }));
+    }
+  };
+
+  const refreshLock = (elementId: string) => {
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({ type: 'refresh_lock', element_id: elementId }));
+    }
+  };
+
+  const unlockElement = (elementId: string) => {
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({ type: 'unlock_element', element_id: elementId }));
+    }
+  };
+
   return (
-    <SalaSocketContext.Provider value={{ socket: socketRef.current, pendingGuests, cursors, approveGuest, broadcastDiagramEvent, broadcastDiagramDelta, roomUsers, requestRoomUsers, kickUser, changeUserRole, isReadOnly }}>
+    <RealTimeSyncContext.Provider value={{
+      socket: socketRef.current,
+      pendingGuests,
+      cursors,
+      lockedElements,
+      lockElement,
+      refreshLock,
+      unlockElement,
+      approveGuest, broadcastDiagramEvent, broadcastDiagramDelta, roomUsers, requestRoomUsers, kickUser, changeUserRole, isReadOnly }}>
       {children}
-    </SalaSocketContext.Provider>
+    </RealTimeSyncContext.Provider>
   );
 };
 
-export const useSalaSocket = () => {
-  const context = useContext(SalaSocketContext);
-  if (!context) throw new Error("useSalaSocket must be used within SalaSocketProvider");
+export const useRealTimeSync = () => {
+  const context = useContext(RealTimeSyncContext);
+  if (!context) throw new Error("useRealTimeSync must be used within RealTimeSyncProvider");
   return context;
 };

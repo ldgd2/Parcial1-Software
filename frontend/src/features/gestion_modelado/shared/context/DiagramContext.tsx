@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import type { ClassNode, DiagramState, Atributo, Metodo, Relation, RelationType, NodeType, Correccion } from '../types/types';
-import { useSalaSocket } from '@/features/gestion_salas/colaboracion_tiempo_real/context/SalaSocketContext';
-import { objectStore } from '../store/ObjectStore';
+import { useRealTimeSync } from '@/features/gestion_concurrencia/sincronizacion_tiempo_real/context/RealTimeSyncContext';
+import { offlineSyncService } from '@/features/gestion_concurrencia/sincronizar_estado_local/services/OfflineSyncService';
 import { generateDeterministicHash } from '../utils/hashGenerator';
 import { syncOnReconnect, type ConflictItem, type ClassVersionSnapshot } from '../utils/VersionManager';
 
@@ -83,26 +83,26 @@ async function bumpVersion(node: ClassNode, isOffline: boolean): Promise<ClassNo
   };
 }
 
-// ─── Helper: emitir delta al ObjectStore e IndexedDB ─────────────────────────
+// ─── Helper: emitir delta al offlineSyncService e IndexedDB ─────────────────────────
 
-async function saveToObjectStore(node: ClassNode): Promise<Record<string, any>> {
+async function saveToofflineSyncService(node: ClassNode): Promise<Record<string, any>> {
   const objects: Record<string, any> = {};
 
   for (const attr of node.atributos) {
     const obj = { type: 'attribute', data: attr };
     const h = await generateDeterministicHash(obj);
     objects[h] = obj;
-    objectStore.putObject(h, obj as any);
+    offlineSyncService.putObject(h, obj as any);
   }
   for (const met of node.metodos) {
     const obj = { type: 'method', data: met };
     const h = await generateDeterministicHash(obj);
     objects[h] = obj;
-    objectStore.putObject(h, obj as any);
+    offlineSyncService.putObject(h, obj as any);
   }
   const classObj = { type: 'class', data: node };
   objects[node.hash] = classObj;
-  objectStore.putObject(node.hash, classObj as any);
+  offlineSyncService.putObject(node.hash, classObj as any);
 
   return objects;
 }
@@ -119,7 +119,7 @@ export const DiagramProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [conflicts, setConflicts] = useState<ConflictItem[]>([]);
   const isDirty = useRef(false);
-  const { broadcastDiagramEvent, broadcastDiagramDelta } = useSalaSocket();
+  const { broadcastDiagramEvent, broadcastDiagramDelta } = useRealTimeSync();
 
   const mark = useCallback(() => { isDirty.current = true; }, []);
 
@@ -229,7 +229,7 @@ export const DiagramProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setSelectedId(node.id);
         broadcastDiagramEvent({ action: 'addNode', payload: { node } });
         if (!isOffline) {
-          saveToObjectStore(node).then(objects => {
+          saveToofflineSyncService(node).then(objects => {
             broadcastDiagramDelta(node.hash, objects);
           });
         }
@@ -265,7 +265,7 @@ export const DiagramProvider: React.FC<{ children: React.ReactNode }> = ({ child
     bumpVersion(updated, isOffline).then(bumped => {
       setNodes(latest => latest.map(n => n.id === id ? bumped : n));
       if (!isRemote && !isOffline) {
-        saveToObjectStore(bumped).then(objects => {
+        saveToofflineSyncService(bumped).then(objects => {
           broadcastDiagramDelta(bumped.hash, objects);
         });
       }
@@ -306,7 +306,7 @@ export const DiagramProvider: React.FC<{ children: React.ReactNode }> = ({ child
     bumpVersion(updated, isOffline).then(bumped => {
       setNodes(latest => latest.map(n => n.id === nodeId ? bumped : n));
       if (!isRemote && !isOffline) {
-        saveToObjectStore(bumped).then(objects => broadcastDiagramDelta(bumped.hash, objects));
+        saveToofflineSyncService(bumped).then(objects => broadcastDiagramDelta(bumped.hash, objects));
       }
     });
 
@@ -330,7 +330,7 @@ export const DiagramProvider: React.FC<{ children: React.ReactNode }> = ({ child
     bumpVersion(updated, isOffline).then(bumped => {
       setNodes(latest => latest.map(n => n.id === nodeId ? bumped : n));
       if (!isRemote && !isOffline) {
-        saveToObjectStore(bumped).then(objects => broadcastDiagramDelta(bumped.hash, objects));
+        saveToofflineSyncService(bumped).then(objects => broadcastDiagramDelta(bumped.hash, objects));
       }
     });
 
@@ -352,7 +352,7 @@ export const DiagramProvider: React.FC<{ children: React.ReactNode }> = ({ child
     bumpVersion(updated, isOffline).then(bumped => {
       setNodes(latest => latest.map(n => n.id === nodeId ? bumped : n));
       if (!isRemote && !isOffline) {
-        saveToObjectStore(bumped).then(objects => broadcastDiagramDelta(bumped.hash, objects));
+        saveToofflineSyncService(bumped).then(objects => broadcastDiagramDelta(bumped.hash, objects));
       }
     });
 
@@ -376,7 +376,7 @@ export const DiagramProvider: React.FC<{ children: React.ReactNode }> = ({ child
     bumpVersion(updated, isOffline).then(bumped => {
       setNodes(latest => latest.map(n => n.id === nodeId ? bumped : n));
       if (!isRemote && !isOffline) {
-        saveToObjectStore(bumped).then(objects => broadcastDiagramDelta(bumped.hash, objects));
+        saveToofflineSyncService(bumped).then(objects => broadcastDiagramDelta(bumped.hash, objects));
       }
     });
 
@@ -400,7 +400,7 @@ export const DiagramProvider: React.FC<{ children: React.ReactNode }> = ({ child
     bumpVersion(updated, isOffline).then(bumped => {
       setNodes(latest => latest.map(n => n.id === nodeId ? bumped : n));
       if (!isRemote && !isOffline) {
-        saveToObjectStore(bumped).then(objects => broadcastDiagramDelta(bumped.hash, objects));
+        saveToofflineSyncService(bumped).then(objects => broadcastDiagramDelta(bumped.hash, objects));
       }
     });
 
@@ -422,7 +422,7 @@ export const DiagramProvider: React.FC<{ children: React.ReactNode }> = ({ child
     bumpVersion(updated, isOffline).then(bumped => {
       setNodes(latest => latest.map(n => n.id === nodeId ? bumped : n));
       if (!isRemote && !isOffline) {
-        saveToObjectStore(bumped).then(objects => broadcastDiagramDelta(bumped.hash, objects));
+        saveToofflineSyncService(bumped).then(objects => broadcastDiagramDelta(bumped.hash, objects));
       }
     });
 

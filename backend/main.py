@@ -26,7 +26,7 @@ from backend.modules.gestion_proyectos.crear_proyecto.controllers.crear_controll
 from backend.modules.gestion_proyectos.administrar_proyecto.controllers.admin_controller import router as admin_proyecto_router
 from backend.modules.gestion_proyectos.compartir_proyecto.controllers.compartir_controller import router as compartir_proyecto_router
 from backend.modules.gestion_salas.controllers.sala_controller import router as sala_router
-from backend.modules.gestion_salas.controllers.ws_controller import router as ws_router
+from backend.modules.gestion_concurrencia.sincronizacion_tiempo_real.controllers.ws_sync_controller import router as ws_router
 
 # CU8 - CU11: Gestión de Modelado
 from backend.modules.gestion_modelado.insertar_elemento.controllers.insertar_controller import router as insertar_elemento_router

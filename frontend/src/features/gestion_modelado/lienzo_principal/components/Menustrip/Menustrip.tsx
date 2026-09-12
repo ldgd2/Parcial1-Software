@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_URL } from '@/shared/lib/api';
 import { useDiagram } from '@/features/gestion_modelado/shared/context/DiagramContext';
-import { useSalaSocket } from '@/features/gestion_salas/colaboracion_tiempo_real/context/SalaSocketContext';
+import { useRealTimeSync } from '@/features/gestion_concurrencia/sincronizacion_tiempo_real/context/RealTimeSyncContext';
 import { PermisosModal } from '../PermisosModal/PermisosModal';
 import type { SalaInfo } from '@/features/gestion_modelado/shared/types/types';
 import './Menustrip.css';
@@ -21,7 +21,7 @@ interface MenuItem {
 export const Menustrip: React.FC<Props> = ({ sala, onSave, saving }) => {
   const navigate = useNavigate();
   const { addNode, nodes, loadDiagram, getDiagramState } = useDiagram();
-  const { pendingGuests } = useSalaSocket();
+  const { pendingGuests } = useRealTimeSync();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [showShare, setShowShare] = useState(false);
   const [showPermisos, setShowPermisos] = useState(false);

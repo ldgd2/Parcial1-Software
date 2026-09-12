@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useSalaSocket } from '@/features/gestion_salas/colaboracion_tiempo_real/context/SalaSocketContext';
+import { useRealTimeSync } from '@/features/gestion_concurrencia/sincronizacion_tiempo_real/context/RealTimeSyncContext';
 import './PermisosModal.css';
 
 interface Props {
@@ -8,7 +8,7 @@ interface Props {
 }
 
 export const PermisosModal: React.FC<Props> = ({ onClose, proyectoId }) => {
-  const { pendingGuests, roomUsers, approveGuest, requestRoomUsers, kickUser, changeUserRole } = useSalaSocket();
+  const { pendingGuests, roomUsers, approveGuest, requestRoomUsers, kickUser, changeUserRole } = useRealTimeSync();
   const [activeTab, setActiveTab] = useState<'pending' | 'users'>('pending');
 
   useEffect(() => {

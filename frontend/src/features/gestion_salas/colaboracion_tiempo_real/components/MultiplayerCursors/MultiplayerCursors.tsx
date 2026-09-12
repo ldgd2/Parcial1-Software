@@ -1,9 +1,9 @@
 import React from 'react';
-import { useSalaSocket } from '../../context/SalaSocketContext';
+import { useRealTimeSync } from '@/features/gestion_concurrencia/sincronizacion_tiempo_real/context/RealTimeSyncContext';
 import './MultiplayerCursors.css';
 
 export const MultiplayerCursors: React.FC = () => {
-  const { cursors } = useSalaSocket();
+  const { cursors } = useRealTimeSync();
 
   return (
     <div className="multiplayer-cursors" style={{ pointerEvents: 'none', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999 }}>

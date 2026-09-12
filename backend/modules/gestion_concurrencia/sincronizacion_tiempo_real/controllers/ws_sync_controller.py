@@ -177,6 +177,38 @@ async def websocket_endpoint(
                         websocket,
                     )
 
+                # ── Locks ─────────────────────────────────────────────────────────
+                elif msg_type == "lock_element":
+                    from backend.modules.gestion_concurrencia.bloquear_elemento.services.lock_service import lock_service
+                    element_id = message.get("element_id")
+                    if element_id and lock_service.lock_element(codigo_acceso, element_id, "host", "Host"):
+                        await manager.broadcast_to_sala(
+                            {"type": "element_locked", "element_id": element_id, "nickname": "Host"},
+                            codigo_acceso,
+                            exclude=websocket
+                        )
+                    # Broadcast unlocks for any stale keys
+                    stale = lock_service.get_stale_locks(codigo_acceso)
+                    for st in stale:
+                        lock_service.unlock_element(codigo_acceso, st, lock_service.get_locked_elements(codigo_acceso).get(st, {}).get("user_id"))
+                        await manager.broadcast_to_sala({"type": "element_unlocked", "element_id": st}, codigo_acceso, exclude=websocket)
+
+                elif msg_type == "refresh_lock":
+                    from backend.modules.gestion_concurrencia.bloquear_elemento.services.lock_service import lock_service
+                    element_id = message.get("element_id")
+                    if element_id:
+                        lock_service.refresh_lock(codigo_acceso, element_id, "host")
+
+                elif msg_type == "unlock_element":
+                    from backend.modules.gestion_concurrencia.bloquear_elemento.services.lock_service import lock_service
+                    element_id = message.get("element_id")
+                    if element_id and lock_service.unlock_element(codigo_acceso, element_id, "host"):
+                        await manager.broadcast_to_sala(
+                            {"type": "element_unlocked", "element_id": element_id},
+                            codigo_acceso,
+                            exclude=websocket
+                        )
+
                 # ── Delta del diagrama: guardar en BD y propagar ──────────
                 elif msg_type in ("sync_offline", "diagram_delta"):
                     new_objects = message.get("objects", {})
@@ -228,6 +260,38 @@ async def websocket_endpoint(
                         {"type": "snapshots_response", "snapshots": snapshots},
                         websocket,
                     )
+
+                # ── Locks ─────────────────────────────────────────────────────────
+                elif msg_type == "lock_element":
+                    from backend.modules.gestion_concurrencia.bloquear_elemento.services.lock_service import lock_service
+                    element_id = message.get("element_id")
+                    if element_id and lock_service.lock_element(codigo_acceso, element_id, guest_id, nickname):
+                        await manager.broadcast_to_sala(
+                            {"type": "element_locked", "element_id": element_id, "nickname": nickname},
+                            codigo_acceso,
+                            exclude=websocket
+                        )
+                    # Broadcast unlocks for any stale keys
+                    stale = lock_service.get_stale_locks(codigo_acceso)
+                    for st in stale:
+                        lock_service.unlock_element(codigo_acceso, st, lock_service.get_locked_elements(codigo_acceso).get(st, {}).get("user_id"))
+                        await manager.broadcast_to_sala({"type": "element_unlocked", "element_id": st}, codigo_acceso, exclude=websocket)
+
+                elif msg_type == "refresh_lock":
+                    from backend.modules.gestion_concurrencia.bloquear_elemento.services.lock_service import lock_service
+                    element_id = message.get("element_id")
+                    if element_id:
+                        lock_service.refresh_lock(codigo_acceso, element_id, guest_id)
+
+                elif msg_type == "unlock_element":
+                    from backend.modules.gestion_concurrencia.bloquear_elemento.services.lock_service import lock_service
+                    element_id = message.get("element_id")
+                    if element_id and lock_service.unlock_element(codigo_acceso, element_id, guest_id):
+                        await manager.broadcast_to_sala(
+                            {"type": "element_unlocked", "element_id": element_id},
+                            codigo_acceso,
+                            exclude=websocket
+                        )
 
                 # ── Delta del guest: guardar en BD y propagar ─────────────
                 elif msg_type in ("sync_offline", "diagram_delta"):
