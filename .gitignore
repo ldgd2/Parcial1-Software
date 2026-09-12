@@ -40,4 +40,5 @@ Thumbs.db
 # Agentes / Configuración local de Gemini (opcional pero recomendado)
 .agents/
 .agent/
+.agent/
 .gemini/
