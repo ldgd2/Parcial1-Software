@@ -38,6 +38,10 @@ from backend.modules.gestion_modelado.eliminar_elemento.controllers.eliminar_con
 from backend.modules.gestion_interoperabilidad.exportar_a_xml.controllers.export_controller import router as export_router
 from backend.modules.gestion_interoperabilidad.importar_desde_xml.controllers.import_controller import router as import_router
 
+# IA
+from backend.modules.gestion_asistencia_ia.generar_diagrama_prompt.controllers.prompt_controller import router as prompt_ia_router
+from backend.modules.gestion_asistencia_ia.digitalizar_desde_imagen.controllers.digitalizar_controller import router as digitalizar_ia_router
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
@@ -85,6 +89,10 @@ app.include_router(eliminar_elemento_router)
 # Interoperabilidad
 app.include_router(export_router)
 app.include_router(import_router)
+
+# IA
+app.include_router(prompt_ia_router)
+app.include_router(digitalizar_ia_router)
 
 @app.get("/")
 async def root():

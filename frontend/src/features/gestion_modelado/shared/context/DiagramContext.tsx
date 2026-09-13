@@ -33,6 +33,7 @@ interface DiagramContextType {
   cancelConnect: () => void;
   updateRelation: (id: string, partial: Partial<Relation>, isRemote?: boolean) => void;
   deleteRelation: (id: string, isRemote?: boolean) => void;
+  addRelation: (relation: Relation, isRemote?: boolean) => void;
   // Atributos y Métodos
   addAtributo: (nodeId: string, attr?: Atributo, isRemote?: boolean) => void;
   updateAtributo: (nodeId: string, attrId: string, partial: Partial<Atributo>, isRemote?: boolean) => void;
@@ -268,6 +269,12 @@ export const DiagramProvider: React.FC<{ children: React.ReactNode }> = ({ child
     mark();
   }, [nodes, mark, broadcastDiagramEvent, broadcastDiagramDelta, isOffline]);
 
+
+  const addRelation = useCallback((relation: Relation, isRemote = false) => {
+    setRelations(prev => [...prev, relation]);
+    if (!isRemote) broadcastDiagramEvent({ action: 'addRelation', payload: { relation } });
+    mark();
+  }, [broadcastDiagramEvent, mark]);
 
   const updateRelation = useCallback((id: string, partial: Partial<Relation>, isRemote = false) => {
     setRelations(prev => prev.map(r => r.id === id ? { ...r, ...partial, version: r.version + 1 } : r));
@@ -649,7 +656,7 @@ export const DiagramProvider: React.FC<{ children: React.ReactNode }> = ({ child
       nodes, relations, correcciones, isOffline, conflicts, selectedIds, connectingSource, activeTool, setSelectedIds, setActiveTool,
       addNode, updateNode, deleteNode, moveNode,
       startConnect, finishConnect, cancelConnect,
-      updateRelation, deleteRelation,
+      updateRelation, deleteRelation, addRelation,
       addAtributo, updateAtributo, deleteAtributo,
       addMetodo, updateMetodo, deleteMetodo,
       addCorreccion, resolveCorreccion,

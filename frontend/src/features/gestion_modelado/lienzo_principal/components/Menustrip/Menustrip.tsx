@@ -11,6 +11,7 @@ interface Props {
   sala: SalaInfo;
   onSave: () => Promise<void>;
   saving: boolean;
+  onOpenChat: () => void;
 }
 
 interface MenuItem {
@@ -18,7 +19,7 @@ interface MenuItem {
   items: { label?: string; shortcut?: string; action: () => void; separator?: boolean }[];
 }
 
-export const Menustrip: React.FC<Props> = ({ sala, onSave, saving }) => {
+export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat }) => {
   const navigate = useNavigate();
   const { addNode, nodes, loadDiagram, getDiagramState } = useDiagram();
   const { pendingGuests } = useRealTimeSync();
@@ -172,6 +173,7 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving }) => {
     {
       label: 'HERRAMIENTAS',
       items: [
+        { label: 'Asistente IA (Chat)', action: () => { onOpenChat(); setOpenMenu(null); } },
         { label: 'Permisos de Acceso', action: () => { setShowPermisos(true); setOpenMenu(null); } },
       ]
     }

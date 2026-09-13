@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     # Configuración de Correo para OTP
     GMAIL_USER: str = ""
     GMAIL_APP_PASSWORD: str = ""
+    
+    # Configuración de IA
+    IA_SERVICE: str = "googlecloud" # o openroute
+    IA_API: str = ""
+    IA_IMAGE_API: str = ""
 
     @property
     def DATABASE_URL(self) -> str:

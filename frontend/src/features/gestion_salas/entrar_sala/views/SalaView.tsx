@@ -6,6 +6,7 @@ import { Menustrip } from '@/features/gestion_modelado/lienzo_principal/componen
 import { Toolbar } from '@/features/gestion_modelado/insertar_elemento/components/Toolbar/Toolbar';
 import { DiagramCanvas } from '@/features/gestion_modelado/lienzo_principal/components/DiagramCanvas/DiagramCanvas';
 import { MultiplayerCursors } from '@/features/gestion_salas/colaboracion_tiempo_real/components/MultiplayerCursors/MultiplayerCursors';
+import { ChatPanel } from '@/features/gestion_asistencia_ia/generar_diagrama_prompt/components/ChatPanel';
 import { salaService } from '@/features/gestion_salas/shared/services/salaService';
 import { PropertiesPanel } from '@/features/gestion_modelado/editar_elemento/components/PropertiesPanel/PropertiesPanel';
 import type { SalaInfo } from '@/features/gestion_modelado/shared/types/types';
@@ -15,6 +16,7 @@ const SalaContent: React.FC<{ sala: SalaInfo }> = ({ sala }) => {
   const { loadDiagram, getDiagramState, isDirty } = useDiagram();
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const isGuest = new URLSearchParams(window.location.search).get('guest') === 'true';
 
   // Load diagram on mount
@@ -75,12 +77,13 @@ const SalaContent: React.FC<{ sala: SalaInfo }> = ({ sala }) => {
 
   return (
     <div className="sala-view">
-      <Menustrip sala={sala} onSave={handleSave} saving={saving} />
+      <Menustrip sala={sala} onSave={handleSave} saving={saving} onOpenChat={() => setIsChatOpen(true)} />
 
       <div className="sala-view__workspace">
         <Toolbar />
         <DiagramCanvas onCanvasClick={() => {}} />
         <MultiplayerCursors />
+        <ChatPanel isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
         <PropertiesPanel />
       </div>
 
