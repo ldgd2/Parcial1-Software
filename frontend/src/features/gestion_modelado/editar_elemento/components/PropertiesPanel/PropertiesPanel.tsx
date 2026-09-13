@@ -23,7 +23,8 @@ function getCurrentUser() {
 }
 
 export const PropertiesPanel: React.FC = () => {
-  const { nodes, relations, correcciones, selectedId, updateNode, updateRelation, setSelectedId, addCorreccion, resolveCorreccion } = useDiagram();
+  const { nodes, relations, correcciones, selectedIds, updateNode, updateRelation, setSelectedIds, addCorreccion, resolveCorreccion } = useDiagram();
+  const selectedId = selectedIds.length === 1 ? selectedIds[0] : null;
   const realTimeSync = useRealTimeSync();
   const lockElement = realTimeSync?.lockElement;
   const refreshLock = realTimeSync?.refreshLock;
@@ -94,7 +95,7 @@ export const PropertiesPanel: React.FC = () => {
             {isMinimized ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
           </button>
           {!isMinimized && (
-            <button className="properties-panel__btn" onClick={() => setSelectedId(null)} title="Cerrar">
+            <button className="properties-panel__btn" onClick={() => setSelectedIds([])} title="Cerrar">
               <X size={16} />
             </button>
           )}

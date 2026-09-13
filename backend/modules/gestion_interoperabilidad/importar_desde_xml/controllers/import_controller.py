@@ -26,7 +26,15 @@ async def importar_xmi(
         
     contents = await file.read()
     try:
-        diagram_data = await import_service.parsear_xmi(contents.decode('utf-8'))
+        # EA XMI suele venir en windows-1252, intentamos utf-8 primero, luego fallback
+        try:
+            text_content = contents.decode('utf-8')
+        except UnicodeDecodeError:
+            text_content = contents.decode('windows-1252')
+            
+        diagram_data = await import_service.parsear_xmi(text_content)
         return {"status": "success", "data": diagram_data}
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=f"Error parseando XMI: {str(e)}")

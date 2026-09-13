@@ -19,7 +19,35 @@ export interface Metodo {
 
 // ─── CU8: Tipos de elementos del diagrama ────────────────────────────────────
 
-export type NodeType = 'class' | 'interface' | 'enum' | 'abstract' | 'note';
+export type NodeType =
+  | 'class'
+  | 'interface'
+  | 'abstract'
+  | 'enum'
+  | 'datatype'
+  | 'primitive'
+  | 'signal'
+  | 'note'
+  | 'part'
+  | 'port'
+  | 'expose_interface'
+  | 'auxillary'
+  | 'focus'
+  | 'implementation_class'
+  | 'realization_class'
+  | 'specification'
+  | 'type'
+  | 'utility'
+  | 'create_event'
+  | 'destroy_event'
+  | 'constraint'
+  | 'text'
+  | 'artifact'
+  | 'requirement'
+  | 'issue'
+  | 'change'
+  | 'information_item'
+  | 'boundary';
 
 export interface ClassNode {
   id: string;
@@ -27,6 +55,7 @@ export interface ClassNode {
   x: number;
   y: number;
   width?: number;
+  height?: number;
   nombre: string;
   color: string;
   atributos: Atributo[];
@@ -44,16 +73,38 @@ export interface ClassNode {
   isOfflineDirty?: boolean;
 }
 
-// ─── CU9: Relaciones / Conexiones ────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────────
+// 🟪 CU9: Relaciones / Conexiones 
+// ────────────────────────────────────────────────────────────────────────────
 
 export type RelationType =
-  | 'association'    // Asociación → línea simple con flecha
-  | 'inheritance'    // Herencia   → línea con triángulo vacío
-  | 'composition'    // Composición → línea con rombo relleno
-  | 'aggregation'    // Agregación  → línea con rombo vacío
-  | 'dependency'     // Dependencia → línea punteada con flecha
-  | 'realization'    // Realización → línea punteada con triángulo vacío
-  | 'directed'       // Asociación dirigida → flecha simple
+  | 'association'    // Asociación — línea simple con flecha
+  | 'inheritance'    // Herencia   — línea con triángulo vacío
+  | 'composition'    // Composición — línea con rombo relleno
+  | 'aggregation'    // Agregación  — línea con rombo vacío
+  | 'dependency'     // Dependencia — línea punteada con flecha
+  | 'realization'    // Realización — línea punteada con triángulo vacío
+  | 'directed'       // Asociación dirigida — flecha simple
+  | 'association_class' // Clase Asociación
+  | 'template_binding'  // Enlace de plantilla
+  | 'instantiate'       // Instancia (Instantiates)
+  | 'instantiated_by'   // Instantiated by
+  | 'substitution'      // Sustitución
+  | 'usage'             // Uso
+  | 'trace'             // Trazabilidad
+  | 'information_flow'  // Flujo de información
+  | 'abstraction'       // Abstracción
+  | 'calls'             // Llamadas (Calls)
+  | 'called_by'         // Llamadas (Called by)
+  | 'create'            // Create
+  | 'send'              // Send
+  | 'aggregation_to_whole'
+  | 'aggregation_to_part'
+  | 'composition_to_whole'
+  | 'composition_to_part'
+  | 'assembly'          // Assembly
+  | 'connector'         // Connector
+  | 'delegate'          // Delegate
   | '1:1'            // Base de Datos: 1 a 1
   | '1:N'            // Base de Datos: 1 a Muchos
   | 'N:M'            // Base de Datos: Muchos a Muchos
@@ -62,16 +113,27 @@ export type RelationType =
   | '0..N:1'         // Base de Datos: 0..N a 1
   | '0..N:M';        // Base de Datos: 0..N a Muchos
 
+export type EndpointSide = 'top' | 'bottom' | 'left' | 'right';
+
+/** Ancla de extremo de relación: posición relativa al nodo (sobrevive cuando el nodo se mueve) */
+export interface RelationEndpoint {
+  side: EndpointSide;
+  t: number; // 0..1 a lo largo del lado
+}
+
 export interface Relation {
   id: string;
   type: RelationType;
-  sourceId: string;   // ID del nodo origen
-  targetId: string;   // ID del nodo destino
-  label?: string;     // Etiqueta opcional en la relación
-  sourceLabel?: string; // Multiplicidad origen (ej. "1")
-  targetLabel?: string; // Multiplicidad destino (ej. "*")
+  sourceId: string;
+  targetId: string;
+  label?: string;
+  sourceLabel?: string;
+  targetLabel?: string;
   version: number;
   hash: string;
+  waypoints?: { x: number; y: number }[];
+  sourceEndpoint?: RelationEndpoint; // ancla del extremo origen (fijada por el usuario)
+  targetEndpoint?: RelationEndpoint; // ancla del extremo destino (fijada por el usuario)
 }
 
 export interface Correccion {

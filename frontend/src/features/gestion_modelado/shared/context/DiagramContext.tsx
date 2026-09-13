@@ -17,10 +17,10 @@ interface DiagramContextType {
   correcciones: Record<string, Correccion[]>;
   isOffline: boolean;
   conflicts: ConflictItem[];
-  selectedId: string | null;
+  selectedIds: string[];
   connectingSource: string | null;   // CU9: ID del nodo que está siendo el origen de una conexión
   activeTool: string;
-  setSelectedId: (id: string | null) => void;
+  setSelectedIds: (ids: string[]) => void;
   setActiveTool: (tool: string) => void;
   // CU8: Insertar elemento
   addNode: (type?: NodeType, node?: ClassNode, isRemote?: boolean) => void;
@@ -113,7 +113,7 @@ export const DiagramProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [nodes, setNodes] = useState<ClassNode[]>([]);
   const [relations, setRelations] = useState<Relation[]>([]);
   const [correcciones, setCorrecciones] = useState<Record<string, Correccion[]>>({});
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeTool, setActiveTool] = useState<string>('select');
   const [connectingSource, setConnectingSource] = useState<string | null>(null);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -188,21 +188,51 @@ export const DiagramProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // ── CRUD — patrón correcto: compute async PRIMERO, luego setNodes sync ───
 
-  // CU8: Insertar elemento — soporta distintos tipos
   const addNode = useCallback((type: NodeType = 'class', remoteNode?: ClassNode, isRemote = false) => {
-    const baseAttrs: Atributo[] = type !== 'note' && type !== 'enum'
-      ? [{ id: uid(), visibilidad: '-', nombre: 'id', tipo: 'int', version: 0 }]
+    if (type === 'port' && !isRemote) {
+      const hasPart = nodes.some(n => n.type === 'part');
+      if (!hasPart) {
+        alert('No se puede crear un Port sin un Part existente.');
+        return;
+      }
+    }
+    const NO_ATTRS = ['note', 'enum', 'port', 'expose_interface', 'create_event', 'destroy_event', 'constraint', 'text', 'boundary', 'part'];
+    const NO_METS  = ['note', 'enum', 'port', 'expose_interface', 'create_event', 'destroy_event', 'constraint', 'text', 'boundary', 'part'];
+    const baseAttrs: Atributo[] = !NO_ATTRS.includes(type)
+      ? [{ id: uid(), visibilidad: '-', nombre: 'atributo', tipo: 'int', version: 0 }]
       : [];
-    const baseMets: Metodo[] = type === 'class' || type === 'abstract' || type === 'interface'
-      ? [{ id: uid(), visibilidad: '+', nombre: type === 'interface' ? 'operacion' : 'getNombre', parametros: '', retorno: 'String', version: 0 }]
+    const baseMets: Metodo[] = !NO_METS.includes(type)
+      ? [{ id: uid(), visibilidad: '+', nombre: 'operacion', parametros: '', retorno: 'void', version: 0 }]
       : [];
-
     const colorMap: Record<NodeType, string> = {
-      class: '#393E46',
-      interface: '#1a4a6b',
-      abstract: '#4a2060',
-      enum: '#1a5c3a',
-      note: '#5c4a1a',
+      class: '#ed8936',
+      interface: '#b794f4',
+      abstract: '#ed8936',
+      enum: '#68d391',
+      datatype: '#ecc94b',
+      primitive: '#a3e635',
+      signal: '#fefcbf',
+      note: '#f6e05e',
+      part: '#ecc94b',
+      port: '#ed8936',
+      expose_interface: '#9f7aea',
+      auxillary: '#4a7fd4',
+      focus: '#4a7fd4',
+      implementation_class: '#4a7fd4',
+      realization_class: '#4a7fd4',
+      specification: '#4a7fd4',
+      type: '#4a7fd4',
+      utility: '#4a7fd4',
+      create_event: '#6a1b9a',
+      destroy_event: '#6a1b9a',
+      constraint: '#f56565',
+      text: '#a0aec0',
+      artifact: '#4299e1',
+      requirement: '#ed8936',
+      issue: '#e53e3e',
+      change: '#ed8936',
+      information_item: '#4fd1c5',
+      boundary: '#718096'
     };
 
     const base: ClassNode = remoteNode || {
@@ -226,7 +256,7 @@ export const DiagramProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const node: ClassNode = { ...base, hash };
       setNodes(prev => [...prev, node]);
       if (!isRemote) {
-        setSelectedId(node.id);
+        setSelectedIds([node.id]);
         broadcastDiagramEvent({ action: 'addNode', payload: { node } });
         if (!isOffline) {
           saveToofflineSyncService(node).then(objects => {
@@ -236,7 +266,7 @@ export const DiagramProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     });
     mark();
-  }, [mark, broadcastDiagramEvent, broadcastDiagramDelta, isOffline]);
+  }, [nodes, mark, broadcastDiagramEvent, broadcastDiagramDelta, isOffline]);
 
 
   const updateRelation = useCallback((id: string, partial: Partial<Relation>, isRemote = false) => {
@@ -278,7 +308,7 @@ export const DiagramProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const deleteNode = useCallback((id: string, isRemote = false) => {
     setNodes(prev => prev.filter(n => n.id !== id));
     if (!isRemote) {
-      setSelectedId(sel => sel === id ? null : sel);
+      setSelectedIds(sel => sel.filter(s => s !== id));
       broadcastDiagramEvent({ action: 'deleteNode', payload: { id } });
     }
     mark();
@@ -468,12 +498,13 @@ export const DiagramProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // CU9: Iniciar conexión — el usuario selecciona el nodo origen
   const startConnect = useCallback((sourceId: string) => {
     setConnectingSource(sourceId);
-    setSelectedId(null);
+    setSelectedIds([]);
   }, []);
 
   // CU9: Finalizar conexión — el usuario selecciona el nodo destino y el tipo
   const finishConnect = useCallback((targetId: string, type: RelationType) => {
-    if (!connectingSource || connectingSource === targetId) {
+    const isSelfLoopAllowed = ['delegate', 'assembly', 'connector', 'association'].includes(type);
+    if (!connectingSource || (connectingSource === targetId && !isSelfLoopAllowed)) {
       setConnectingSource(null);
       return;
     }
@@ -615,7 +646,7 @@ export const DiagramProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   return (
     <DiagramContext.Provider value={{
-      nodes, relations, correcciones, isOffline, conflicts, selectedId, connectingSource, activeTool, setSelectedId, setActiveTool,
+      nodes, relations, correcciones, isOffline, conflicts, selectedIds, connectingSource, activeTool, setSelectedIds, setActiveTool,
       addNode, updateNode, deleteNode, moveNode,
       startConnect, finishConnect, cancelConnect,
       updateRelation, deleteRelation,

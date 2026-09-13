@@ -1,98 +1,97 @@
 import xml.etree.ElementTree as ET
-import uuid
-import random
+from backend.modules.gestion_interoperabilidad.shared.xmi.elements.class_mapper import ClassMapper
+from backend.modules.gestion_interoperabilidad.shared.xmi.relations.relation_base import RelationBaseMapper
+import backend.modules.gestion_interoperabilidad.shared.xmi.elements
+import backend.modules.gestion_interoperabilidad.shared.xmi.relations
 
 async def parsear_xmi(xml_content: str) -> dict:
-    root = ET.fromstring(xml_content)
-    
-    # namespaces
-    ns = {
-        'uml': 'http://schema.omg.org/spec/UML/2.1',
-        'xmi': 'http://schema.omg.org/spec/XMI/2.1'
-    }
+    try:
+        root = ET.fromstring(xml_content)
+    except Exception:
+        return {"nodes": [], "relations": []}
     
     nodes = []
     relations = []
     
-    # Buscar todos los packagedElement
-    for elem in root.findall('.//packagedElement'):
+    valid_tags = ClassMapper.get_supported_tags() + RelationBaseMapper.get_supported_tags() + ['packagedElement']
+    
+    geometries = {}
+    for elem in root.iter():
+        if elem.tag.endswith('DiagramElement'):
+            subject = elem.attrib.get('subject', '')
+            geometry = elem.attrib.get('geometry', '')
+            if subject and geometry:
+                parts = {}
+                for p in geometry.split(';'):
+                    if '=' in p:
+                        k, v = p.split('=', 1)
+                        parts[k.strip().lower()] = v.strip()
+                try:
+                    left = int(parts.get('left', parts.get('l', 0)))
+                    top = int(parts.get('top', parts.get('t', 0)))
+                    right = int(parts.get('right', parts.get('r', 0)))
+                    bottom = int(parts.get('bottom', parts.get('b', 0)))
+                    
+                    w_val = abs(right - left)
+                    h_val = abs(bottom - top)
+                    if w_val == 0: w_val = 220
+                    if h_val == 0: h_val = 100
+
+                    if left != 0 or top != 0:
+                        geometries[subject.replace('EAID_', '')] = {
+                            "x": left,
+                            "y": abs(top),
+                            "width": w_val,
+                            "height": h_val
+                        }
+                except ValueError:
+                    pass
+    
+    all_elements = []
+    for elem in root.iter():
+        tag_clean = elem.tag.split('}')[-1]
+        if tag_clean in valid_tags:
+            if elem.attrib.get('name') == 'EARootClass': continue
+            all_elements.append(elem)
+            
+    class_xmi_types = ClassMapper.get_supported_xmi_types()
+    relation_xmi_types = RelationBaseMapper.get_supported_xmi_types()
+            
+    for elem in all_elements:
+        tag_clean = elem.tag.split('}')[-1]
         xmi_type = elem.attrib.get('{http://schema.omg.org/spec/XMI/2.1}type')
-        if xmi_type == 'uml:Class':
-            node_id = elem.attrib.get('{http://schema.omg.org/spec/XMI/2.1}id') or str(uuid.uuid4())
-            name = elem.attrib.get('name', 'Clase Importada')
+        if not xmi_type:
+            xmi_type = f"uml:{tag_clean}"
+            if xmi_type == 'uml:packagedElement': continue
             
-            is_table = False
-            ext = elem.find('Extension')
-            if ext is not None and ext.attrib.get('stereotype') == 'table':
-                is_table = True
+        stereotype = None
+        for tag_elem in elem.iter():
+            if tag_elem.tag.endswith('TaggedValue') and tag_elem.attrib.get('tag') == 'stereotype':
+                stereotype = tag_elem.attrib.get('value')
+                break
                 
-            atributos = []
-            for attr in elem.findall('ownedAttribute'):
-                attr_name = attr.attrib.get('name', 'attr')
-                vis = '+' if attr.attrib.get('visibility') == 'public' else '-'
-                
-                # Try to extract type
-                tipo = 'String'
-                type_elem = attr.find('type')
-                if type_elem is not None:
-                    href = type_elem.attrib.get('href', '')
-                    if '#' in href:
-                        tipo = href.split('#')[-1]
-                
-                atributos.append({
-                    "id": attr.attrib.get('{http://schema.omg.org/spec/XMI/2.1}id') or str(uuid.uuid4()),
-                    "nombre": attr_name,
-                    "visibilidad": vis,
-                    "tipo": tipo,
-                    "version": 0
-                })
-                
-            metodos = []
-            for met in elem.findall('ownedOperation'):
-                met_name = met.attrib.get('name', 'metodo')
-                vis = '+' if met.attrib.get('visibility') == 'public' else '-'
-                
-                metodos.append({
-                    "id": met.attrib.get('{http://schema.omg.org/spec/XMI/2.1}id') or str(uuid.uuid4()),
-                    "nombre": met_name,
-                    "visibilidad": vis,
-                    "parametros": "",
-                    "retorno": "void",
-                    "version": 0
-                })
-                
-            nodes.append({
-                "id": node_id,
-                "type": "class",
-                "x": random.randint(100, 500),
-                "y": random.randint(100, 500),
-                "nombre": name,
-                "color": "#393E46" if not is_table else "#1a5c3a",
-                "atributos": atributos,
-                "metodos": metodos,
-                "version": 0,
-                "estereotipo": "table" if is_table else None
-            })
+        if not stereotype:
+            ext = elem.find('.//Extension')
+            if ext is not None and ext.attrib.get('stereotype'):
+                stereotype = ext.attrib.get('stereotype')
             
-        elif xmi_type == 'uml:Association':
-            rel_id = elem.attrib.get('{http://schema.omg.org/spec/XMI/2.1}id') or str(uuid.uuid4())
-            name = elem.attrib.get('name', '')
+        if xmi_type in class_xmi_types:
+            node_id = elem.attrib.get('{http://schema.omg.org/spec/XMI/2.1}id') or elem.attrib.get('xmi.id')
+            if node_id:
+                node_id_clean = node_id.replace('EAID_', '')
+                if geometries and node_id_clean not in geometries:
+                    continue
+                    
+            mapper = ClassMapper.create(xmi_type, stereotype)
+            node_dict = mapper.parse(elem, geometries)
+            if node_dict:
+                nodes.append(node_dict)
             
-            ends = elem.findall('ownedEnd')
-            if len(ends) == 2:
-                src = ends[0].attrib.get('type')
-                tgt = ends[1].attrib.get('type')
-                
-                relations.append({
-                    "id": rel_id,
-                    "type": "association",
-                    "sourceId": src,
-                    "targetId": tgt,
-                    "label": name,
-                    "sourceLabel": "",
-                    "targetLabel": "",
-                    "version": 0
-                })
+        elif xmi_type in relation_xmi_types:
+            mapper = RelationBaseMapper.create(xmi_type, stereotype)
+            rel_dict = mapper.parse(elem)
+            if rel_dict:
+                relations.append(rel_dict)
                 
     return {
         "nodes": nodes,

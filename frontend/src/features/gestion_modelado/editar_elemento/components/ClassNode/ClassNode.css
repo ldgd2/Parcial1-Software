@@ -6,11 +6,12 @@
   cursor: grab;
   transition: box-shadow 0.2s, border-color 0.2s;
   animation: nodeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  color: var(--text-primary);
 }
 
 @keyframes nodeIn {
   from { opacity: 0; transform: scale(0.92); }
-  to { opacity: 1; transform: scale(1); }
+  to   { opacity: 1; transform: scale(1); }
 }
 
 .class-node:active { cursor: grabbing; }
@@ -27,14 +28,12 @@
 
 .class-node__select-bar {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+  top: 0; left: 0; right: 0;
   height: 2px;
   background: var(--primary);
 }
 
-/* Header */
+/* ── Header (franja coloreada según tipo) ─────────────────── */
 .class-node__header {
   padding: 0.625rem 0.875rem;
   display: flex;
@@ -44,13 +43,17 @@
   position: relative;
   user-select: none;
   cursor: grab;
+  /* El background se aplica via node.color en el style inline */
 }
 
 .class-node__stereotype {
   font-size: 0.6rem;
   letter-spacing: 0.08em;
-  color: rgba(255,255,255,0.5);
+  color: rgba(255,255,255,0.75);
   font-style: italic;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .class-node__title {
@@ -93,7 +96,7 @@
 }
 .class-node__delete:hover { background: rgba(230, 163, 163, 0.3); }
 
-/* Section */
+/* ── Sections ─────────────────────────────────────────────── */
 .class-node__section {
   padding: 0.5rem 0;
 }
@@ -124,7 +127,7 @@
   transition: background 0.15s;
   line-height: 1;
 }
-.class-node__add-btn:hover { background: rgba(223, 208, 184, 0.1); }
+.class-node__add-btn:hover { background: rgba(255,255,255,0.06); }
 
 .class-node__divider {
   height: 1px;
@@ -132,7 +135,7 @@
   margin: 0;
 }
 
-/* Row */
+/* ── Row ──────────────────────────────────────────────────── */
 .class-node__row {
   display: flex;
   align-items: center;
@@ -148,16 +151,20 @@
   overflow: hidden;
   text-overflow: ellipsis;
   width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 3px;
 }
 
 .class-node__vis {
   color: var(--primary);
   margin-right: 3px;
   font-weight: 700;
+  font-family: monospace;
 }
 
 .class-node__type {
-  color: var(--secondary);
+  color: var(--secondary, #a0aec0);
   font-style: italic;
 }
 
@@ -168,9 +175,9 @@
   font-style: italic;
 }
 
-/* Inline edit inputs */
+/* ── Inline edit inputs ───────────────────────────────────── */
 .class-node__vis-select {
-  background: var(--bg-color);
+  background: var(--bg-color, #1a1f2e);
   border: 1px solid var(--border-color);
   color: var(--primary);
   font-size: 0.72rem;
@@ -200,7 +207,7 @@
 .class-node__field-input::placeholder { color: rgba(148, 137, 121, 0.4); }
 
 .class-node__field-input--type {
-  color: var(--secondary);
+  color: var(--secondary, #a0aec0);
   flex: 0.7;
 }
 
@@ -222,7 +229,7 @@
 }
 .class-node__row-delete:hover { color: #e6a3a3; }
 
-/* ── CU9: Connect mode highlight ───────────────────────────── */
+/* ── CU9: Connect mode highlight ──────────────────────────── */
 .class-node--connectable {
   cursor: crosshair !important;
   transition: box-shadow 0.15s, border-color 0.15s;
@@ -241,7 +248,7 @@
   50%       { box-shadow: 0 0 0 4px rgba(74, 127, 212, 0.3), 0 0 30px rgba(74, 127, 212, 0.5); }
 }
 
-/* ── CU8: Note type ─────────────────────────────────────────── */
+/* ── Note type ────────────────────────────────────────────── */
 .class-node--note {
   background: #2a2510;
   border-color: #7a6a20;
@@ -256,10 +263,8 @@
 
 .class-node__note-corner {
   position: absolute;
-  top: 0;
-  right: 0;
-  width: 0;
-  height: 0;
+  top: 0; right: 0;
+  width: 0; height: 0;
   border-left: 12px solid transparent;
   border-bottom: 12px solid #2a2510;
   border-top: 12px solid #7a6a20;
@@ -279,7 +284,7 @@
   padding: 4px 0;
 }
 
-/* ── add-btn block variant (for enum) ──────────────────────── */
+/* ── add-btn block variant (enum) ─────────────────────────── */
 .class-node__add-btn--block {
   width: auto;
   height: auto;
@@ -289,7 +294,7 @@
   border-radius: 4px;
 }
 
-/* ── DiagramCanvas connecting cursor ───────────────────────── */
+/* ── DiagramCanvas connecting cursor ──────────────────────── */
 .diagram-canvas--connecting {
   cursor: crosshair !important;
 }
