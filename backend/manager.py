@@ -13,15 +13,27 @@ def main_menu():
         print_header("MANAGER PRINCIPAL")
         console.print("[1] Base de Datos (Migraciones, Seeders)")
         console.print("[2] Configuración")
+        console.print("[3] Sistema (Servicios)")
+        console.print("[4] Test API")
+        console.print("[5] Usuarios")
         console.print("[0] Salir")
         
-        opcion = Prompt.ask("\nSelecciona una opción", choices=["1", "2", "0"], default="0")
+        opcion = Prompt.ask("\nSelecciona una opción", choices=["1", "2", "3", "4", "5", "0"], default="0")
         
         if opcion == "1":
             menu_db()
         elif opcion == "2":
             from backend.cli.modules.config.menu import menu_config
             menu_config()
+        elif opcion == "3":
+            from backend.cli.modules.sistema.menu import menu_sistema
+            menu_sistema()
+        elif opcion == "4":
+            from backend.cli.modules.test_api.menu import menu_test_api
+            menu_test_api()
+        elif opcion == "5":
+            from backend.cli.modules.usuarios.menu import menu_usuarios
+            menu_usuarios()
         elif opcion == "0":
             console.print("\n[bold green]Saliendo del Manager... ¡Hasta luego![/bold green]")
             break

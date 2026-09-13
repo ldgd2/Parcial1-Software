@@ -47,3 +47,7 @@ yagmail==0.16.0
 pydantic-settings==2.15.0
 rich==15.0.0
 faker==40.38.0
+
+typer[all]
+rich
+httpx
