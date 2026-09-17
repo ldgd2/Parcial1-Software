@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { salaService } from '@/features/gestion_salas/shared/services/salaService';
 import { getGuestId, getGuestNickname } from '@/shared/utils/animalNames';
+import { WS_URL } from '@/shared/lib/api';
 import './UnirseView.css';
 
 export const UnirseView: React.FC = () => {
@@ -15,13 +16,15 @@ export const UnirseView: React.FC = () => {
   useEffect(() => {
     if (!codigo) { navigate('/dashboard'); return; }
 
-    const isLogged = !!localStorage.getItem('access_token');
-    
-    let intervalId: any;
+    let isLogged = false;
+    import('@/shared/lib/TokenService').then(({ TokenService }) => {
+      isLogged = !!TokenService.getToken();
+      
+      let intervalId: any;
 
-    if (isLogged) {
-      // Authenticated flow
-      salaService.unirse(codigo)
+      if (isLogged) {
+        // Authenticated flow
+        salaService.unirse(codigo)
         .then((data: any) => {
           setProyectoNombre(data.proyecto_nombre || 'la sala');
           if (data.acceso === 'aprobado') {
@@ -62,7 +65,7 @@ export const UnirseView: React.FC = () => {
       const guestId = getGuestId();
       const nickname = getGuestNickname();
       
-      const wsUrl = `ws://localhost:8000/ws/salas/${codigo}?user_type=guest&guest_id=${guestId}&nickname=${encodeURIComponent(nickname)}`;
+      const wsUrl = `${WS_URL}/ws/salas/${codigo}?user_type=guest&guest_id=${guestId}&nickname=${encodeURIComponent(nickname)}`;
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
@@ -104,6 +107,7 @@ export const UnirseView: React.FC = () => {
         }
       };
     }
+    });
   }, [codigo, navigate]);
 
   return (

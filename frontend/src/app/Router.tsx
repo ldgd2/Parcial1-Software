@@ -6,6 +6,7 @@ import { LandingView } from '../features/landing';
 import { DashboardView } from '../features/gestion_proyectos/administrar_proyecto/views/DashboardView';
 import { SalaView } from '../features/gestion_salas/entrar_sala/views/SalaView';
 import { UnirseView } from '../features/gestion_salas/entrar_sala/views/UnirseView';
+import { GithubCallbackView } from '../features/gestion_asistencia_ia/exportar_github/views/GithubCallbackView';
 
 export const AppRouter = () => {
   return (
@@ -18,6 +19,7 @@ export const AppRouter = () => {
         <Route path="/dashboard" element={<DashboardView />} />
         <Route path="/diagrama/:id" element={<SalaView />} />
         <Route path="/unirse/:codigo" element={<UnirseView />} />
+        <Route path="/github/callback" element={<GithubCallbackView />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

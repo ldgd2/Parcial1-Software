@@ -1,0 +1,14 @@
+package com.proyecto.dtos;
+
+import jakarta.validation.constraints.NotNull;
+import lombok.Data;
+import java.util.UUID;
+
+@Data
+public class {{ clase.nombre }}RequestDTO {
+
+    {% for attr in clase.atributos %}{% if attr.visibilidad != 'PK' %}
+    @NotNull(message = "El campo {{ attr.nombre }} es obligatorio")
+    private {{ attr.tipo }} {{ attr.nombre }};
+    {% endif %}{% endfor %}
+}

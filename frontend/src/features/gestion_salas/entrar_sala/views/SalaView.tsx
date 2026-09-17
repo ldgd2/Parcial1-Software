@@ -35,7 +35,12 @@ const SalaContent: React.FC<{ sala: SalaInfo }> = ({ sala }) => {
     if (saving || isGuest) return;
     setSaving(true);
     try {
-      await salaService.guardarLienzo(sala.proyecto_id, getDiagramState());
+      if ((sala as any).isOfflineMode) {
+        const { offlineSyncService } = await import('@/features/gestion_concurrencia/sincronizar_estado_local/services/OfflineSyncService');
+        offlineSyncService.saveLocalDiagramState(getDiagramState());
+      } else {
+        await salaService.guardarLienzo(sala.proyecto_id, getDiagramState());
+      }
       isDirty.current = false;
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 2500);
@@ -45,7 +50,7 @@ const SalaContent: React.FC<{ sala: SalaInfo }> = ({ sala }) => {
     } finally {
       setSaving(false);
     }
-  }, [saving, sala.proyecto_id, getDiagramState, isDirty]);
+  }, [saving, sala.proyecto_id, getDiagramState, isDirty, (sala as any).isOfflineMode, isGuest]);
 
   const handleSaveRef = React.useRef(handleSave);
   useEffect(() => {
@@ -106,27 +111,48 @@ export const SalaView: React.FC = () => {
 
   useEffect(() => {
     const isGuest = new URLSearchParams(window.location.search).get('guest') === 'true';
-    if (!isGuest && !localStorage.getItem('access_token')) { 
-      navigate('/login'); 
-      return; 
-    }
-    if (!id) { navigate('/dashboard'); return; }
+    
+    import('@/shared/lib/TokenService').then(({ TokenService }) => {
+      if (!isGuest && !TokenService.getToken()) { 
+        navigate('/login'); 
+        return; 
+      }
+      if (!id) { navigate('/dashboard'); return; }
 
-    const loadData = isGuest 
-      ? salaService.unirse(new URLSearchParams(window.location.search).get('codigo') || '')
-          .then((data: any) => ({
-             proyecto_id: data.proyecto_id,
-             proyecto_nombre: data.proyecto_nombre,
-             codigo_acceso: new URLSearchParams(window.location.search).get('codigo'),
-             lienzo_json: null // Guest will get diagram via WS sync, or we can fetch it
-          }))
-      : salaService.cargarLienzo(Number(id));
+      if (id === 'local' || !navigator.onLine) {
+        // Modo local: cargar desde IndexedDB (via DiagramContext luego)
+        import('@/features/gestion_concurrencia/sincronizar_estado_local/services/OfflineSyncService').then(async ({ offlineSyncService }) => {
+            const localState = await offlineSyncService.getLocalDiagramState();
+            setSala({
+              proyecto_id: 0,
+              proyecto_nombre: "Diagrama Local",
+              codigo_acceso: "local",
+              rol_proyecto: "anfitrion",
+              isOfflineMode: true,
+              lienzo_json: localState ? JSON.stringify(localState) : null
+            } as any);
+            setLoading(false);
+        });
+        return;
+      }
 
-    loadData
-      .then((data) => setSala(data as SalaInfo))
-      .catch((err) => setError(err.message || 'No tienes acceso a esta sala.'))
-      .finally(() => setLoading(false));
+      const loadData = isGuest 
+        ? salaService.unirse(new URLSearchParams(window.location.search).get('codigo') || '')
+            .then((data: any) => ({
+               proyecto_id: data.proyecto_id,
+               proyecto_nombre: data.proyecto_nombre,
+               codigo_acceso: new URLSearchParams(window.location.search).get('codigo'),
+               lienzo_json: null // Guest will get diagram via WS sync, or we can fetch it
+            }))
+        : salaService.cargarLienzo(Number(id));
+
+      loadData
+        .then((data) => setSala(data as SalaInfo))
+        .catch((err) => setError(err.message || 'No tienes acceso a esta sala.'))
+        .finally(() => setLoading(false));
+    });
   }, [id, navigate]);
+
 
   if (loading) {
     return (

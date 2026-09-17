@@ -11,7 +11,7 @@ import { Modal } from '../components/Modal/Modal';
 import { NotifProvider, useNotif } from '@/features/gestion_proyectos/shared/context/NotifContext';
 import { proyectoService } from '@/features/gestion_proyectos/shared/utils/proyectoService';
 import type { Proyecto } from '@/features/gestion_proyectos/shared/utils/types';
-import { apiFetch } from '@/shared/lib/api';
+import { apiFetch, API_URL } from '@/shared/lib/api';
 import './DashboardView.css';
 
 // Inner component to access context
@@ -31,7 +31,30 @@ const DashboardContent: React.FC = () => {
   const [proyectoEliminar, setProyectoEliminar] = useState<Proyecto | null>(null);
   const [eliminando, setEliminando] = useState(false);
 
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  useEffect(() => {
+    const onOnline = () => {
+      // Intentamos hacer ping al backend antes de volver online
+      fetch(`${API_URL}/docs`, { method: 'HEAD' })
+        .then(() => setIsOffline(false))
+        .catch(() => setIsOffline(true));
+    };
+    const onOffline = () => setIsOffline(true);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, []);
+
   const cargarProyectos = useCallback(async () => {
+    if (isOffline) {
+      setProyectos([]);
+      setLoading(false);
+      return;
+    }
     try {
       const data = await proyectoService.listar();
       setProyectos(data);
@@ -40,23 +63,46 @@ const DashboardContent: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [notificar]);
+  }, [notificar, isOffline]);
 
-  const cargarUsuario = useCallback(async () => {
-    try {
-      const data = await apiFetch('/usuarios/me');
-      setUserName(data.nombre || data.email || 'Usuario');
-    } catch {
-      // No redirigir si /me falla; el token guard ya protege la ruta
-      setUserName('Usuario');
+  const checkBackendAndAuth = useCallback(async () => {
+    if (!navigator.onLine) {
+      setIsOffline(true);
+      setLoading(false);
+      return;
     }
-  }, []);
+
+    try {
+      // Intentamos acceder a una ruta para ver si el backend responde
+      await fetch(`${API_URL}/docs`, { method: 'HEAD' });
+      setIsOffline(false);
+      
+      const { TokenService } = await import('@/shared/lib/TokenService');
+      if (!TokenService.getToken()) {
+        navigate('/login');
+        return;
+      }
+      
+      try {
+        const data = await apiFetch('/usuarios/me');
+        setUserName(data.nombre || data.email || 'Usuario');
+      } catch {
+        setUserName('Usuario');
+      }
+      
+      await cargarProyectos();
+      
+    } catch (e: any) {
+      // Si falla el fetch por red, asumimos que el backend está muerto
+      console.warn('Backend inalcanzable, activando modo offline', e);
+      setIsOffline(true);
+      setLoading(false);
+    }
+  }, [cargarProyectos, navigate]);
 
   useEffect(() => {
-    if (!localStorage.getItem('access_token')) { navigate('/login'); return; }
-    cargarUsuario();
-    cargarProyectos();
-  }, [cargarProyectos, cargarUsuario, navigate]);
+    checkBackendAndAuth();
+  }, [checkBackendAndAuth]);
 
   const handleCrear = async (nombre: string, descripcion: string) => {
     const nuevo = await proyectoService.crear(nombre, descripcion);
@@ -105,13 +151,20 @@ const DashboardContent: React.FC = () => {
         {/* Header */}
         <div className="dashboard-header">
           <div className="dashboard-header__left">
-            <h1 className="dashboard-header__title">MIS PROYECTOS</h1>
+            <h1 className="dashboard-header__title">
+              {isOffline ? 'MODO SIN CONEXIÓN' : 'MIS PROYECTOS'}
+            </h1>
             <p className="dashboard-header__sub">
-              {proyectos.length} {proyectos.length === 1 ? 'proyecto' : 'proyectos'}
+              {isOffline ? 'Estás trabajando localmente.' : `${proyectos.length} ${proyectos.length === 1 ? 'proyecto' : 'proyectos'}`}
             </p>
           </div>
           <div className="dashboard-header__right">
-            <div className="dashboard-search">
+            {isOffline ? (
+              <button className="dashboard-search__input" style={{cursor: 'pointer', background: '#ed8936', color: '#1a1d21', fontWeight: 'bold'}} onClick={() => navigate('/diagrama/local')}>
+                IR A ENTORNO LOCAL
+              </button>
+            ) : (
+              <div className="dashboard-search">
               <span className="dashboard-search__icon"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2l10 10-10 10L2 12 12 2z"/></svg></span>
               <input
                 id="input-buscar-proyecto"
@@ -122,6 +175,7 @@ const DashboardContent: React.FC = () => {
                 onChange={e => setBusqueda(e.target.value)}
               />
             </div>
+            )}
           </div>
         </div>
 
@@ -130,6 +184,14 @@ const DashboardContent: React.FC = () => {
           <div className="dashboard-loading">
             <div className="dashboard-loading__spinner" />
             <p>Cargando proyectos...</p>
+          </div>
+        ) : isOffline ? (
+          <div className="dashboard-empty">
+            <h2>Estás sin conexión a internet</h2>
+            <p>Puedes crear un diagrama localmente y exportarlo a XML/JSON.</p>
+            <button style={{marginTop: '20px', padding: '10px 20px', background: '#ed8936', color: 'black', fontWeight: 'bold'}} onClick={() => navigate('/diagrama/local')}>
+              CREAR DIAGRAMA LOCAL
+            </button>
           </div>
         ) : (
           <div className="dashboard-grid">

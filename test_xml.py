@@ -1,27 +1,20 @@
-import asyncio
-import sys
-sys.path.append('c:\\Users\\ldgd2\\Documents\\universidad\\software 1\\sem 2-2026\\examen1\\Examen')
-
-from backend.modules.gestion_interoperabilidad.exportar_a_xml.services.export_service import generar_xmi
 import xml.etree.ElementTree as ET
 
-class DummyUser:
-    nombre = 'Test'
+xml = """
+<UML:Class name="DataType1" xmi.id="EAID_123">
+    <UML:ModelElement.stereotype>
+        <UML:Stereotype name="DataType"/>
+    </UML:ModelElement.stereotype>
+</UML:Class>
+"""
 
-class DummyProyecto:
-    id = 1
-    lienzo_json = '{"nodes": [{"id":"n1","nombre":"Class1","x":100,"y":100,"width":150}], "relations": []}'
+root = ET.fromstring(xml)
+stereotype = None
+for s_elem in root.iter():
+    print(f"Found tag: {s_elem.tag}")
+    if s_elem.tag.endswith('Stereotype'):
+        stereotype = s_elem.attrib.get('name')
+        print(f"Match! Stereotype: {stereotype}")
+        break
 
-class DummyResult:
-    def scalar_one_or_none(self):
-        return DummyProyecto()
-
-class DummyDB:
-    async def execute(self, q):
-        return DummyResult()
-
-async def main():
-    res = await generar_xmi(1, DummyUser(), DummyDB())
-    print(res)
-
-asyncio.run(main())
+print(f"Result: {stereotype}")

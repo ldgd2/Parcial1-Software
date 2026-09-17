@@ -41,6 +41,7 @@ from backend.modules.gestion_interoperabilidad.importar_desde_xml.controllers.im
 # IA
 from backend.modules.gestion_asistencia_ia.generar_diagrama_prompt.controllers.prompt_controller import router as prompt_ia_router
 from backend.modules.gestion_asistencia_ia.digitalizar_desde_imagen.controllers.digitalizar_controller import router as digitalizar_ia_router
+from backend.modules.gestion_asistencia_ia.exportar_github.controllers.exportar_controller import router as exportar_github_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -93,6 +94,8 @@ app.include_router(import_router)
 # IA
 app.include_router(prompt_ia_router)
 app.include_router(digitalizar_ia_router)
+app.include_router(exportar_github_router)
+
 
 @app.get("/")
 async def root():

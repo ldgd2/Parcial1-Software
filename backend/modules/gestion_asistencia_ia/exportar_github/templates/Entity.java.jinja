@@ -1,0 +1,29 @@
+package com.proyecto.models;
+
+import jakarta.persistence.*;
+import com.proyecto.common.BaseEntity;
+import java.util.UUID;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+
+@Data
+@EqualsAndHashCode(callSuper = true)
+@NoArgsConstructor
+@AllArgsConstructor
+@Entity
+@Table(name = "{{ clase.nombre | lower }}s")
+public class {{ clase.nombre }} extends BaseEntity {
+
+    {% for attr in clase.atributos %}
+    {% if attr.visibilidad == 'PK' %}
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private UUID {{ attr.nombre }};
+    {% else %}
+    @Column(name = "{{ attr.nombre | lower }}")
+    private {{ attr.tipo }} {{ attr.nombre }};
+    {% endif %}
+    {% endfor %}
+}

@@ -1,0 +1,81 @@
+package com.proyecto.services;
+
+import com.proyecto.models.{{ clase.nombre }};
+import com.proyecto.dtos.{{ clase.nombre }}RequestDTO;
+import com.proyecto.dtos.{{ clase.nombre }}ResponseDTO;
+import com.proyecto.repositories.{{ clase.nombre }}Repository;
+import com.proyecto.exceptions.ResourceNotFoundException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Service
+public class {{ clase.nombre }}Service {
+
+    @Autowired
+    private {{ clase.nombre }}Repository repository;
+
+    public List<{{ clase.nombre }}ResponseDTO> findAll() {
+        return repository.findAll().stream()
+                .map(this::mapToResponseDTO)
+                .collect(Collectors.toList());
+    }
+
+    public {{ clase.nombre }}ResponseDTO findById(UUID id) {
+        {{ clase.nombre }} entity = repository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("{{ clase.nombre }} no encontrado con id: " + id));
+        return mapToResponseDTO(entity);
+    }
+
+    public {{ clase.nombre }}ResponseDTO create({{ clase.nombre }}RequestDTO dto) {
+        {{ clase.nombre }} entity = new {{ clase.nombre }}();
+        mapToEntity(dto, entity);
+        {{ clase.nombre }} saved = repository.save(entity);
+        return mapToResponseDTO(saved);
+    }
+
+    public {{ clase.nombre }}ResponseDTO update(UUID id, {{ clase.nombre }}RequestDTO dto) {
+        {{ clase.nombre }} entity = repository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("{{ clase.nombre }} no encontrado con id: " + id));
+        mapToEntity(dto, entity);
+        {{ clase.nombre }} updated = repository.save(entity);
+        return mapToResponseDTO(updated);
+    }
+
+    public void deleteById(UUID id) {
+        if (!repository.existsById(id)) {
+            throw new ResourceNotFoundException("{{ clase.nombre }} no encontrado con id: " + id);
+        }
+        repository.deleteById(id);
+    }
+
+    // Mapeos Manuales
+    private {{ clase.nombre }}ResponseDTO mapToResponseDTO({{ clase.nombre }} entity) {
+        {{ clase.nombre }}ResponseDTO dto = new {{ clase.nombre }}ResponseDTO();
+        {% for attr in clase.atributos %}{% if attr.visibilidad == 'PK' %}
+        dto.set{{ attr.nombre | capitalize }}(entity.get{{ attr.nombre | capitalize }}());
+        {% else %}
+        dto.set{{ attr.nombre | capitalize }}(entity.get{{ attr.nombre | capitalize }}());
+        {% endif %}{% endfor %}
+        dto.setCreatedAt(entity.getCreatedAt());
+        dto.setUpdatedAt(entity.getUpdatedAt());
+        dto.setIsActive(entity.getIsActive());
+        return dto;
+    }
+
+    private void mapToEntity({{ clase.nombre }}RequestDTO dto, {{ clase.nombre }} entity) {
+        {% for attr in clase.atributos %}{% if attr.visibilidad != 'PK' %}
+        entity.set{{ attr.nombre | capitalize }}(dto.get{{ attr.nombre | capitalize }}());
+        {% endif %}{% endfor %}
+    }
+
+    {% for metodo in clase.metodos %}
+    public {{ metodo.retorno }} {{ metodo.nombre }}({{ metodo.parametros }}) {
+        // @IA_PROMPT_START: "Implementa la lógica del método {{ metodo.nombre }} de la clase {{ clase.nombre }} que retorna {{ metodo.retorno }} recibiendo los parámetros: {{ metodo.parametros }}"
+        // @IA_PROMPT_END
+    }
+    {% endfor %}
+}

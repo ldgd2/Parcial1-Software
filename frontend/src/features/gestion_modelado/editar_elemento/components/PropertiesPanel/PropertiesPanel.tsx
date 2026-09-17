@@ -8,17 +8,20 @@ function getCurrentUser() {
   const cached = localStorage.getItem('usuario_nombre');
   if (cached) return cached;
   
-  try {
-    const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
-    if (token) {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      let name = payload.nombre || payload.sub;
-      if (typeof name === 'string' && name.includes('@')) {
-        name = name.split('@')[0];
+  import('@/shared/lib/TokenService').then(({ TokenService }) => {
+    try {
+      const token = TokenService.getToken();
+      if (token) {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        let name = payload.nombre || payload.sub;
+        if (typeof name === 'string' && name.includes('@')) {
+          name = name.split('@')[0];
+        }
+        localStorage.setItem('usuario_nombre', name || 'Colaborador');
       }
-      return name || 'Colaborador';
-    }
-  } catch (e) {}
+    } catch (e) {}
+  });
+
   return localStorage.getItem('guestNickname') || 'Colaborador';
 }
 
@@ -55,17 +58,19 @@ export const PropertiesPanel: React.FC = () => {
   };
 
   React.useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (token && !localStorage.getItem('usuario_nombre')) {
-      import('@/shared/lib/api').then(({ apiFetch }) => {
-        apiFetch('/usuarios/me').then(user => {
-          if (user && user.nombre) {
-            localStorage.setItem('usuario_nombre', user.nombre);
-            setUserName(user.nombre);
-          }
-        }).catch(() => {});
-      });
-    }
+    import('@/shared/lib/TokenService').then(({ TokenService }) => {
+      const token = TokenService.getToken();
+      if (token && !localStorage.getItem('usuario_nombre')) {
+        import('@/shared/lib/api').then(({ apiFetch }) => {
+          apiFetch('/usuarios/me').then(user => {
+            if (user && user.nombre) {
+              localStorage.setItem('usuario_nombre', user.nombre);
+              setUserName(user.nombre);
+            }
+          }).catch(() => {});
+        });
+      }
+    });
   }, []);
 
   if (!selectedId) return null;

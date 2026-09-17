@@ -1,10 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { API_URL } from '@/shared/lib/api';
 import { useDiagram } from '@/features/gestion_modelado/shared/context/DiagramContext';
 import { useRealTimeSync } from '@/features/gestion_concurrencia/sincronizacion_tiempo_real/context/RealTimeSyncContext';
 import { PermisosModal } from '../PermisosModal/PermisosModal';
+import { TokenService } from '@/shared/lib/TokenService';
+import { API_URL } from '@/shared/lib/api';
 import type { SalaInfo } from '@/features/gestion_modelado/shared/types/types';
+import { XmiExporter } from '@/features/gestion_interoperabilidad_frontend/utils/xmi/core/XmiExporter';
+import { XmiImporter } from '@/features/gestion_interoperabilidad_frontend/utils/xmi/core/XmiImporter';
+import { useExportarGithub } from '@/features/gestion_asistencia_ia/exportar_github/hooks/useExportarGithub';
 import './Menustrip.css';
 
 interface Props {
@@ -28,6 +32,8 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
   const [showPermisos, setShowPermisos] = useState(false);
   const [copiado, setCopiado] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  
+  const { githubUsername, isExporting, isLoadingStatus, iniciarVinculacion, exportarProyecto } = useExportarGithub();
 
   const shareLink = `${window.location.origin}/unirse/${sala.codigo_acceso}`;
 
@@ -81,14 +87,36 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
     try {
       await onSave();
       
-      const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
-      const headers: Record<string, string> = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const isOffline = !navigator.onLine;
+
+      if (!isOffline) {
+        try {
+          const token = TokenService.getToken();
+          const headers: Record<string, string> = {};
+          if (token) headers['Authorization'] = `Bearer ${token}`;
+          
+          const response = await fetch(`${API_URL}/interoperabilidad/${sala.proyecto_id}/exportar-ea`, { headers });
+          if (!response.ok) throw new Error('Error backend');
+          
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `EA_${sala.proyecto_nombre.replace(/\s+/g, '_')}.xml`;
+          a.click();
+          URL.revokeObjectURL(url);
+          setOpenMenu(null);
+          return;
+        } catch (e) {
+          console.warn("Backend export failed, falling back to frontend export");
+        }
+      }
+
+      // Fallback/Offline export
+      const exporter = new XmiExporter();
+      const xmlString = exporter.export(getDiagramState(), sala.proyecto_nombre);
+      const blob = new Blob([xmlString], { type: 'application/xml' });
       
-      const response = await fetch(`${API_URL}/interoperabilidad/${sala.proyecto_id}/exportar-ea`, { headers });
-      if (!response.ok) throw new Error('Error al exportar');
-      
-      const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -102,35 +130,53 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
   };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const jsonFileInputRef = useRef<HTMLInputElement>(null);
 
   const importarEA = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
+      const isOffline = !navigator.onLine;
       
-      const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
-      const headers: Record<string, string> = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      
-      const response = await fetch(`${API_URL}/interoperabilidad/${sala.proyecto_id}/importar-ea`, {
-        method: 'POST',
-        headers,
-        body: formData
-      });
-      
-      if (!response.ok) throw new Error('Error al importar');
-      const result = await response.json();
-      
-      if (result.status === 'success') {
-        loadDiagram({
-          nodes: result.data.nodes,
-          relations: result.data.relations,
-          version: Date.now()
-        });
+      if (!isOffline) {
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          
+          const token = TokenService.getToken();
+          const headers: Record<string, string> = {};
+          if (token) headers['Authorization'] = `Bearer ${token}`;
+          
+          const response = await fetch(`${API_URL}/interoperabilidad/${sala.proyecto_id}/importar-ea`, {
+            method: 'POST',
+            headers,
+            body: formData
+          });
+          
+          if (!response.ok) throw new Error('Error backend');
+          const result = await response.json();
+          
+          if (result.status === 'success') {
+            loadDiagram({
+              nodes: result.data.nodes,
+              relations: result.data.relations,
+              version: Date.now()
+            });
+            setOpenMenu(null);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            return;
+          }
+        } catch (err) {
+          console.warn("Backend import failed, falling back to frontend import");
+        }
       }
+
+      // Fallback/Offline import
+      const text = await file.text();
+      const importer = new XmiImporter();
+      const state = importer.import(text);
+      loadDiagram(state);
     } catch (e) {
       alert("Error importando desde XML");
     }
@@ -139,12 +185,46 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const importarJSON = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    try {
+      const text = await file.text();
+      const state = JSON.parse(text);
+      loadDiagram(state);
+    } catch (e) {
+      alert("Error importando JSON");
+    }
+    
+    setOpenMenu(null);
+    if (jsonFileInputRef.current) jsonFileInputRef.current.value = '';
+  };
+
+  const handleExportarGithub = async () => {
+    if (!githubUsername) {
+        alert("Por favor vincula tu cuenta de GitHub primero desde 'Herramientas'.");
+        return;
+    }
+    const repoName = prompt("Ingresa el nombre para tu nuevo repositorio en GitHub:", sala.proyecto_nombre.toLowerCase().replace(/\s+/g, '-'));
+    if (!repoName) return;
+
+    const state = getDiagramState();
+    try {
+        const res = await exportarProyecto(repoName, state);
+        if (res) alert(res.mensaje);
+    } catch (err: any) {
+        alert("Error al exportar: " + (err.message || "Revisa la consola"));
+    }
+  };
+
   const menus: MenuItem[] = [
     {
       label: 'ARCHIVO',
       items: [
         { label: 'Guardar', shortcut: 'Ctrl+S', action: () => { onSave(); setOpenMenu(null); } },
         { label: 'Exportar JSON', action: exportarJSON },
+        { label: 'Importar JSON', action: () => jsonFileInputRef.current?.click() },
         { separator: true, action: () => {} },
         { label: 'Importar desde EA (XML)', action: () => fileInputRef.current?.click() },
         { label: 'Exportar a EA (XML)', action: exportarEA },
@@ -175,6 +255,12 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
       items: [
         { label: 'Asistente IA (Chat)', action: () => { onOpenChat(); setOpenMenu(null); } },
         { label: 'Permisos de Acceso', action: () => { setShowPermisos(true); setOpenMenu(null); } },
+        { separator: true, action: () => {} },
+        { 
+          label: githubUsername ? `GitHub: Conectado como ${githubUsername}` : (isLoadingStatus ? 'Cargando GitHub...' : 'Vincular con GitHub'), 
+          action: () => { if(!githubUsername && !isLoadingStatus) iniciarVinculacion(); setOpenMenu(null); } 
+        },
+        { label: isExporting ? 'Subiendo a GitHub...' : 'Generar Backend (GitHub)', action: () => { handleExportarGithub(); setOpenMenu(null); } },
       ]
     }
   ];
@@ -182,6 +268,7 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
   return (
     <>
     <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept=".xml" onChange={importarEA} />
+    <input type="file" ref={jsonFileInputRef} style={{ display: 'none' }} accept=".json" onChange={importarJSON} />
     <div className="menustrip" ref={menuRef}>
       {/* App brand */}
       <div className="menustrip__brand">

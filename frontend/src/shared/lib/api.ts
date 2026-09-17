@@ -1,7 +1,10 @@
+import { TokenService } from './TokenService';
+
 export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+export const WS_URL = API_URL.replace(/^http/, 'ws');
 
 export const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
-  const token = localStorage.getItem('access_token');
+  const token = TokenService.getToken();
   
   const headers = {
     'Content-Type': 'application/json',
@@ -18,7 +21,7 @@ export const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
 
   if (!response.ok) {
     if (response.status === 401) {
-      localStorage.removeItem('access_token');
+      TokenService.removeToken();
       window.location.href = '/login';
     }
     throw new Error(data.detail || data.message || 'Error en la petición');

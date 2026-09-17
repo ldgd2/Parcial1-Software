@@ -1,0 +1,17 @@
+package com.proyecto.dtos;
+
+import lombok.Data;
+import java.util.UUID;
+import java.time.LocalDateTime;
+
+@Data
+public class {{ clase.nombre }}ResponseDTO {
+
+    {% for attr in clase.atributos %}
+    private {{ attr.tipo }} {{ attr.nombre }};
+    {% endfor %}
+    
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private Boolean isActive;
+}

@@ -39,8 +39,7 @@ class ClassMapper:
         if stereotype:
             for sub_cls in cls._get_all_subclasses():
                 inst = sub_cls()
-                tag = inst.get_xml_tag().replace('UML:', 'uml:')
-                if xmi_type == tag and hasattr(inst, 'get_stereotype'):
+                if hasattr(inst, 'get_stereotype'):
                     if inst.get_stereotype().lower() == stereotype.lower():
                         return inst
 

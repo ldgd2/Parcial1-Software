@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { getGuestId, getGuestNickname } from '@/shared/utils/animalNames';
 import { useSearchParams } from 'react-router-dom';
+import { WS_URL } from '@/shared/lib/api';
 
 interface PendingGuest {
   guest_id: string;
@@ -46,7 +47,12 @@ export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: a
   const codigo = searchParams.get('codigo') || sala.codigo_acceso;
 
   useEffect(() => {
-    let wsUrl = `ws://localhost:8000/ws/salas/${codigo}`;
+    if (sala.isOfflineMode || !navigator.onLine) {
+      console.log('Modo offline detectado: WebSocket omitido.');
+      return;
+    }
+    
+    let wsUrl = `${WS_URL}/ws/salas/${codigo}`;
     
     if (isGuest) {
       let guestId = getGuestId();
@@ -224,6 +230,16 @@ export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: a
   };
 
   const broadcastDiagramDelta = (head: string, objects: Record<string, any>) => {
+    if (sala.isOfflineMode || !navigator.onLine) {
+      // Offline mode: guardamos directamente en la BD local IndexedDB
+      import('@/features/gestion_concurrencia/sincronizar_estado_local/services/OfflineSyncService').then(({ offlineSyncService }) => {
+        Object.keys(objects).forEach(hash => {
+          offlineSyncService.putObject(hash, objects[hash]);
+        });
+      });
+      return;
+    }
+
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify({
         type: 'diagram_delta',

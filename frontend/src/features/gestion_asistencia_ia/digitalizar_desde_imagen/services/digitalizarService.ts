@@ -1,8 +1,10 @@
 import type { DigitalizarResponse } from '../types/digitalizarTypes';
+import { API_URL } from '@/shared/lib/api';
+import { TokenService } from '@/shared/lib/TokenService';
 
 export const digitalizarImagen = async (imageBase64: string): Promise<DigitalizarResponse> => {
-    const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
-    const response = await fetch('http://localhost:8000/digitalizar/imagen', {
+    const token = TokenService.getToken();
+    const response = await fetch(`${API_URL}/digitalizar/imagen`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

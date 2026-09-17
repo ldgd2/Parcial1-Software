@@ -36,6 +36,7 @@ async def parsear_xmi(xml_content: str) -> dict:
                     h_val = abs(bottom - top)
                     if w_val == 0: w_val = 220
                     if h_val == 0: h_val = 100
+                    w_val = max(w_val, 140)
 
                     if left != 0 or top != 0:
                         geometries[subject.replace('EAID_', '')] = {
@@ -74,6 +75,12 @@ async def parsear_xmi(xml_content: str) -> dict:
             ext = elem.find('.//Extension')
             if ext is not None and ext.attrib.get('stereotype'):
                 stereotype = ext.attrib.get('stereotype')
+                
+        if not stereotype:
+            for s_elem in elem.iter():
+                if s_elem.tag.endswith('Stereotype'):
+                    stereotype = s_elem.attrib.get('name')
+                    break
             
         if xmi_type in class_xmi_types:
             node_id = elem.attrib.get('{http://schema.omg.org/spec/XMI/2.1}id') or elem.attrib.get('xmi.id')

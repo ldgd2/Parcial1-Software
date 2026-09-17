@@ -21,3 +21,33 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
+
+# --- Encriptación de datos sensibles (Fernet) ---
+from cryptography.fernet import Fernet
+import os
+import base64
+
+def get_fernet_instance():
+    from backend.core.config import settings
+    key = settings.ENCRYPTION_MASTER_KEY
+    if not key:
+        key = Fernet.generate_key().decode()
+        print("WARNING: ENCRYPTION_MASTER_KEY no está definida en .env. Usando llave temporal.")
+    
+    try:
+        return Fernet(key.encode())
+    except ValueError:
+        print("ERROR: ENCRYPTION_MASTER_KEY no es válida. Debe ser url-safe base64-encoded de 32 bytes.")
+        return Fernet(Fernet.generate_key())
+
+fernet = get_fernet_instance()
+
+def encriptar_dato(texto_plano: str) -> str:
+    if not texto_plano:
+        return ""
+    return fernet.encrypt(texto_plano.encode()).decode()
+
+def desencriptar_dato(texto_cifrado: str) -> str:
+    if not texto_cifrado:
+        return ""
+    return fernet.decrypt(texto_cifrado.encode()).decode()

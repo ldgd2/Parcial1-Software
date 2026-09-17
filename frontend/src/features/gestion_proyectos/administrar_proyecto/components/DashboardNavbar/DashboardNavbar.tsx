@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { TokenService } from '@/shared/lib/TokenService';
 import './DashboardNavbar.css';
 
 interface Props {
@@ -10,7 +11,7 @@ export const DashboardNavbar: React.FC<Props> = ({ userName }) => {
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    localStorage.removeItem('access_token');
+    TokenService.removeToken();
     navigate('/login');
   };
 

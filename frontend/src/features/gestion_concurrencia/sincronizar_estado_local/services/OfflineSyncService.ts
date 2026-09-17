@@ -72,6 +72,41 @@ class OfflineSyncService {
     getAll(): Map<string, GitObject> {
         return this.store;
     }
+
+    saveLocalDiagramState(state: any) {
+        if (!this.db) {
+            localStorage.setItem('diagrama_local', JSON.stringify(state));
+            return;
+        }
+        const transaction = this.db.transaction(this.storeName, 'readwrite');
+        const store = transaction.objectStore(this.storeName);
+        store.put({ type: 'local_diagram', data: state }, 'DIAGRAMA_LOCAL');
+    }
+
+    async getLocalDiagramState(): Promise<any> {
+        return new Promise((resolve) => {
+            if (!this.db) {
+                const stored = localStorage.getItem('diagrama_local');
+                resolve(stored ? JSON.parse(stored) : null);
+                return;
+            }
+            const transaction = this.db.transaction(this.storeName, 'readonly');
+            const store = transaction.objectStore(this.storeName);
+            const request = store.get('DIAGRAMA_LOCAL');
+            request.onsuccess = () => {
+                if (request.result && request.result.data) {
+                    resolve(request.result.data);
+                } else {
+                    const stored = localStorage.getItem('diagrama_local');
+                    resolve(stored ? JSON.parse(stored) : null);
+                }
+            };
+            request.onerror = () => {
+                const stored = localStorage.getItem('diagrama_local');
+                resolve(stored ? JSON.parse(stored) : null);
+            };
+        });
+    }
 }
 
 // Exportamos un singleton

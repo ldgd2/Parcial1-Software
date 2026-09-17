@@ -21,9 +21,15 @@ class Settings(BaseSettings):
     GMAIL_APP_PASSWORD: str = ""
     
     # Configuración de IA
-    IA_SERVICE: str = "googlecloud" # o openroute
+    IA_SERVICE: str = "openrouter" # o googlecloud
     IA_API: str = ""
+    IA_MODEL: str = "google/gemini-flash-1.5"
     IA_IMAGE_API: str = ""
+
+    # GitHub OAuth y Seguridad
+    GITHUB_CLIENT_ID: str = ""
+    GITHUB_CLIENT_SECRET: str = ""
+    ENCRYPTION_MASTER_KEY: str = ""
 
     @property
     def DATABASE_URL(self) -> str:

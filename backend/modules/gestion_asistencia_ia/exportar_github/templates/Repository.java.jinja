@@ -1,0 +1,10 @@
+package com.proyecto.repositories;
+
+import com.proyecto.models.{{ clase.nombre }};
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import java.util.UUID;
+
+@Repository
+public interface {{ clase.nombre }}Repository extends JpaRepository<{{ clase.nombre }}, UUID> {
+}

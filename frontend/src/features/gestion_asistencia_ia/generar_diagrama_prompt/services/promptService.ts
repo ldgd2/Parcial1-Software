@@ -1,8 +1,10 @@
 import type { PromptResponse } from '../types/promptTypes';
+import { TokenService } from '@/shared/lib/TokenService';
+import { API_URL } from '@/shared/lib/api';
 
 export const generarDiagramaPorPrompt = async (prompt: string): Promise<PromptResponse> => {
-    const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token');
-    const response = await fetch('http://localhost:8000/prompt/generar', {
+    const token = TokenService.getToken();
+    const response = await fetch(`${API_URL}/prompt/generar`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

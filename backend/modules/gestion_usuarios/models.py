@@ -35,3 +35,12 @@ class OTPCode(Base):
     codigo = Column(String, nullable=False)
     creado_en = Column(DateTime, default=datetime.datetime.utcnow)
     expira_en = Column(DateTime, nullable=False)
+
+class UsuarioGitHub(Base):
+    __tablename__ = "usuario_github"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"), unique=True)
+    github_username = Column(String)
+    encrypted_token = Column(String, nullable=False)
+

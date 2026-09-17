@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Widget } from '../../../../shared/components/ui/Widget';
 import { AuthLayout } from '../../shared/AuthLayout';
-import { apiFetch } from '../../../../shared/lib/api';
+import { apiFetch } from '@/shared/lib/api';
+import { TokenService } from '@/shared/lib/TokenService';
+import './login.css';
 
 export const LoginView: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -21,7 +23,7 @@ export const LoginView: React.FC = () => {
         body: JSON.stringify({ email, password }),
       });
       if (data.access_token) {
-        localStorage.setItem('access_token', data.access_token);
+        TokenService.setToken(data.access_token);
         
         try {
           const user = await apiFetch('/usuarios/me');
