@@ -1,29 +1,24 @@
-from backend.cli.console import console, print_header
+import os
+from backend.cli.console import console
+from rich.panel import Panel
 from rich.prompt import Prompt
-from . import crear, editar, eliminar, ver_estado, ver_log_tiempo_real, iniciar, detener, reiniciar, configurar_nginx
+from backend.cli.modules.sistema.servicios_controller import ejecutar as ejecutar_servicios
 
 def menu_sistema():
     while True:
-        print_header('MÓDULO: SISTEMA')
-        console.print('[1] Crear Servicio (Backend/Frontend)')
-        console.print('[2] Iniciar Servicio')
-        console.print('[3] Detener Servicio')
-        console.print('[4] Reiniciar Servicio')
-        console.print('[5] Editar Servicio')
-        console.print('[6] Eliminar Servicio')
-        console.print('[7] Ver Estado')
-        console.print('[8] Ver Log (Tiempo Real)')
-        console.print('[9] Configurar Nginx (y crear servicios)')
-        console.print('[0] Volver')
+        console.print(Panel("[bold cyan]Gestión de Sistema y Despliegue[/bold cyan]", border_style="cyan"))
         
-        op = Prompt.ask('- Selecciona', choices=['1','2','3','4','5','6','7','8','9','0'], default='0')
-        if op == '1': crear.ejecutar()
-        elif op == '2': iniciar.ejecutar()
-        elif op == '3': detener.ejecutar()
-        elif op == '4': reiniciar.ejecutar()
-        elif op == '5': editar.ejecutar()
-        elif op == '6': eliminar.ejecutar()
-        elif op == '7': ver_estado.ejecutar()
-        elif op == '8': ver_log_tiempo_real.ejecutar()
-        elif op == '9': configurar_nginx.ejecutar()
-        elif op == '0': break
+        console.print("[1] Servicios por Dominio")
+        console.print("[2] Servicios por IP")
+        console.print("[0] Volver al Menú Principal")
+        
+        op = Prompt.ask("Selecciona una opción", default="1")
+        
+        if op == "1":
+            ejecutar_servicios("dominio")
+        elif op == "2":
+            ejecutar_servicios("ip")
+        elif op == "0":
+            break
+        else:
+            console.print("[red]Opción no válida.[/red]")
