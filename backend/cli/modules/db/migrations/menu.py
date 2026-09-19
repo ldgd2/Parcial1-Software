@@ -6,7 +6,8 @@ from rich.prompt import Prompt
 def ejecutar_comando_alembic(comando: list):
     console.print(f"\n[dim]Ejecutando: alembic {' '.join(comando)}[/dim]")
     try:
-        resultado = subprocess.run([sys.executable, "-m", "alembic"] + comando, capture_output=True, text=True, cwd="backend")
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../"))
+        resultado = subprocess.run([sys.executable, "-m", "alembic"] + comando, capture_output=True, text=True, cwd=base_dir)
         if resultado.returncode == 0:
             console.print("[bold green]Comando ejecutado con éxito.[/bold green]")
             if resultado.stdout:
