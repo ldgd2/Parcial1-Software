@@ -149,7 +149,7 @@ server {{
     # 4. Habilitar todo (Ejecución real en Ubuntu)
     if os.name != 'nt':
         console.print("[cyan]Haciendo build del Frontend...[/cyan]")
-        subprocess.run(["npm", "run", "build"], cwd=os.path.join(BASE_DIR, "frontend"), shell=True)
+        subprocess.run("npm run build", cwd=os.path.join(BASE_DIR, "frontend"), shell=True)
         
         console.print("[cyan]Aplicando configuraciones NGINX y Systemd...[/cyan]")
         os.system(f"sudo cp {SERVICE_DIR}/*.service /etc/systemd/system/")
@@ -174,7 +174,7 @@ def reiniciar_todo():
     
     if os.name != 'nt':
         console.print("[cyan]Haciendo rebuild del Frontend...[/cyan]")
-        subprocess.run(["npm", "run", "build"], cwd=os.path.join(BASE_DIR, "frontend"), shell=True)
+        subprocess.run("npm run build", cwd=os.path.join(BASE_DIR, "frontend"), shell=True)
         console.print("[cyan]Reiniciando servicios...[/cyan]")
         os.system("sudo systemctl restart backend-app frontend-app nginx")
         console.print("[bold green]✔ Servicios reiniciados.[/bold green]")
