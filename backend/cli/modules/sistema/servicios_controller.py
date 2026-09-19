@@ -5,7 +5,7 @@ from backend.cli.console import console
 from rich.prompt import Prompt
 from rich.panel import Panel
 
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../../"))
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../"))
 SERVICE_DIR = os.path.join(BASE_DIR, "systemd_services")
 NGINX_CONF_DIR = os.path.join(BASE_DIR, "nginx_configs")
 
