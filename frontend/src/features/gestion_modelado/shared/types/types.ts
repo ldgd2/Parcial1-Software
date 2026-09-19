@@ -163,5 +163,6 @@ export interface SalaInfo {
   proyecto_nombre: string;
   codigo_acceso: string;
   lienzo_json: string | null;
+  github_repo_url?: string | null;
 }
 

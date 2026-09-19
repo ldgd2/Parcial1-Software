@@ -63,11 +63,11 @@ export const usePromptGeneration = () => {
         }
     };
 
-    const generateDiagram = async (prompt: string): Promise<PromptResponse | null> => {
+    const generateDiagram = async (prompt: string, context: string | null = null): Promise<PromptResponse | null> => {
         setIsLoading(true);
         setError(null);
         try {
-            const data = await generarDiagramaPorPrompt(prompt);
+            const data = await generarDiagramaPorPrompt(prompt, context);
             return data;
         } catch (err: any) {
             setError(err.message || "Error desconocido al generar diagrama");

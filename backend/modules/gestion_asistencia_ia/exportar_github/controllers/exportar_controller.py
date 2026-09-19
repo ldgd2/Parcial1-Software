@@ -58,31 +58,63 @@ async def exportar_proyecto(
 ):
     """
     Exporta el proyecto usando el token guardado en la base de datos.
+    Si ya tiene repositorio vinculado, hace commit con IA y push.
     """
     try:
-        # 1. Buscamos el vínculo en la BD
+        # 1. Buscamos el proyecto
+        from backend.modules.gestion_proyectos.models import Proyecto
+        result_proj = await db.execute(select(Proyecto).where(Proyecto.id == payload.proyecto_id))
+        proyecto = result_proj.scalars().first()
+        
+        if not proyecto:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado.")
+
+        # 2. Buscamos el vínculo con GitHub
         result = await db.execute(select(UsuarioGitHub).where(UsuarioGitHub.usuario_id == current_user.id))
         vinculo = result.scalars().first()
         
         if not vinculo:
             raise HTTPException(status_code=400, detail="Debes vincular tu cuenta de GitHub primero.")
             
-        # 2. Desencriptamos el token
+        # 3. Desencriptamos el token
         token_real = desencriptar_dato(vinculo.encrypted_token)
         
-        # 3. Generar código en carpeta temporal
-        carpeta_temporal = await generar_spring_boot(payload.diagram_json)
+        # 4. Generar código en carpeta temporal
+        carpeta_temporal = await generar_spring_boot(payload.diagram_json, payload.nombre_repo)
         
-        # 4. Crear repositorio en GitHub
-        url_repositorio = await crear_repo_github(token_real, payload.nombre_repo)
-        
-        # 5. Hacer push con Git
-        subir_codigo_a_github(carpeta_temporal, url_repositorio, token_real)
-        
-        return ExportarProyectoResponse(
-            url_repositorio=url_repositorio,
-            mensaje=f"¡Éxito! Tu código está en: {url_repositorio}"
-        )
+        if proyecto.github_repo_url:
+            # 5a. Ya tiene repo: Actualizar código
+            from backend.modules.gestion_asistencia_ia.exportar_github.services.git_service import actualizar_codigo_en_github
+            mensaje = await actualizar_codigo_en_github(carpeta_temporal, proyecto.github_repo_url, token_real)
+            
+            # Notificar al webhook (asíncrono, no bloqueante)
+            from backend.modules.gestion_proyectos.notificar_despliegue.services.webhook_service import notificar_deployer
+            import asyncio
+            asyncio.create_task(notificar_deployer(proyecto.id, proyecto.github_repo_url))
+
+            return ExportarProyectoResponse(
+                url_repositorio=proyecto.github_repo_url,
+                mensaje=f"Código actualizado en GitHub y despliegue iniciado. Detalle: {mensaje}"
+            )
+        else:
+            # 5b. No tiene repo: Crear y subir inicial
+            url_repositorio = await crear_repo_github(token_real, payload.nombre_repo)
+            subir_codigo_a_github(carpeta_temporal, url_repositorio, token_real)
+            
+            # Guardar la URL en el proyecto
+            proyecto.github_repo_url = url_repositorio
+            await db.commit()
+            
+            # Notificar al webhook (asíncrono, no bloqueante)
+            from backend.modules.gestion_proyectos.notificar_despliegue.services.webhook_service import notificar_deployer
+            import asyncio
+            asyncio.create_task(notificar_deployer(proyecto.id, url_repositorio))
+            
+            return ExportarProyectoResponse(
+                url_repositorio=url_repositorio,
+                mensaje=f"¡Éxito! Tu código está en: {url_repositorio} y el despliegue se ha iniciado."
+            )
+            
     except HTTPException as e:
         raise e
     except Exception as e:

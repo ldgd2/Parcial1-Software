@@ -201,20 +201,39 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
     if (jsonFileInputRef.current) jsonFileInputRef.current.value = '';
   };
 
+  const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
+
+  const showNotification = (type: 'success' | 'error', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 5000);
+  };
+
   const handleExportarGithub = async () => {
     if (!githubUsername) {
-        alert("Por favor vincula tu cuenta de GitHub primero desde 'Herramientas'.");
+        showNotification('error', "Por favor vincula tu cuenta de GitHub primero desde 'Herramientas'.");
         return;
     }
-    const repoName = prompt("Ingresa el nombre para tu nuevo repositorio en GitHub:", sala.proyecto_nombre.toLowerCase().replace(/\s+/g, '-'));
-    if (!repoName) return;
+
+    let repoName = "";
+    if (!sala.github_repo_url) {
+        repoName = prompt("Ingresa el nombre para tu nuevo repositorio en GitHub:", sala.proyecto_nombre.toLowerCase().replace(/\s+/g, '-')) || "";
+        if (!repoName) return;
+    } else {
+        const confirmar = confirm("¿Deseas actualizar el código en el repositorio existente en GitHub?");
+        if (!confirmar) return;
+        repoName = "update"; 
+    }
 
     const state = getDiagramState();
     try {
-        const res = await exportarProyecto(repoName, state);
-        if (res) alert(res.mensaje);
+        const res = await exportarProyecto(sala.proyecto_id, repoName, state);
+        if (res) showNotification('success', res.mensaje);
+        
+        if (!sala.github_repo_url && res && res.url_repositorio) {
+            setTimeout(() => window.location.reload(), 2000);
+        }
     } catch (err: any) {
-        alert("Error al exportar: " + (err.message || "Revisa la consola"));
+        showNotification('error', "Error al exportar: " + (err.message || "Revisa la consola"));
     }
   };
 
@@ -260,7 +279,7 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
           label: githubUsername ? `GitHub: Conectado como ${githubUsername}` : (isLoadingStatus ? 'Cargando GitHub...' : 'Vincular con GitHub'), 
           action: () => { if(!githubUsername && !isLoadingStatus) iniciarVinculacion(); setOpenMenu(null); } 
         },
-        { label: isExporting ? 'Subiendo a GitHub...' : 'Generar Backend (GitHub)', action: () => { handleExportarGithub(); setOpenMenu(null); } },
+        { label: isExporting ? (sala.github_repo_url ? 'Actualizando en GitHub...' : 'Subiendo a GitHub...') : (sala.github_repo_url ? 'Actualizar Backend (GitHub)' : 'Generar Backend (GitHub)'), action: () => { handleExportarGithub(); setOpenMenu(null); } },
       ]
     }
   ];
@@ -364,12 +383,37 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
       </div>
     </div>
     
-    {showPermisos && (
-      <PermisosModal 
-        onClose={() => setShowPermisos(false)} 
-        proyectoId={sala.proyecto_id}
-      />
-    )}
+      {showPermisos && (
+        <PermisosModal 
+          onClose={() => setShowPermisos(false)} 
+          proyectoId={sala.proyecto_id}
+        />
+      )}
+
+      {/* OVERLAY DE CARGA */}
+      {isExporting && (
+        <div className="menustrip__loading-overlay">
+          <div className="menustrip__spinner"></div>
+          <div className="menustrip__loading-text">
+            Procesando y exportando a GitHub...
+          </div>
+        </div>
+      )}
+
+      {/* NOTIFICACIONES TOAST */}
+      {notification && (
+        <div className={`menustrip__toast menustrip__toast--${notification.type}`}>
+          <div className="menustrip__toast-icon">
+            {notification.type === 'success' ? (
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+            ) : (
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            )}
+          </div>
+          <div className="menustrip__toast-message">{notification.message}</div>
+          <button className="menustrip__toast-close" onClick={() => setNotification(null)}>&times;</button>
+        </div>
+      )}
     </>
   );
 };

@@ -56,7 +56,7 @@ export const useExportarGithub = () => {
         }
     };
 
-    const exportarProyecto = async (nombreRepo: string, diagramJson: any) => {
+    const exportarProyecto = async (proyectoId: number, nombreRepo: string, diagramJson: any) => {
         if (!githubUsername) {
             setError('No estás vinculado a GitHub. Por favor, vincúlate primero.');
             return null;
@@ -65,7 +65,7 @@ export const useExportarGithub = () => {
         try {
             setIsExporting(true);
             setError(null);
-            const response = await exportarGithubApi.exportarProyecto(nombreRepo, diagramJson);
+            const response = await exportarGithubApi.exportarProyecto(proyectoId, nombreRepo, diagramJson);
             setIsExporting(false);
             return response;
         } catch (err: any) {

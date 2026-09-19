@@ -28,7 +28,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     
-    const { addNode, addRelation, nodes } = useDiagram();
+    const { addNode, updateNode, addRelation, nodes, getDiagramState } = useDiagram();
     
     // Hooks de IA
     const { 
@@ -56,38 +56,65 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
         let maxX = 0;
         let maxY = 0;
         
-        // Encontrar los límites actuales del lienzo para insertar los nuevos nodos a la derecha/abajo
+        // Encontrar los límites actuales del lienzo para insertar los nuevos nodos a la derecha
         nodes.forEach(n => {
             if (n.x > maxX) maxX = n.x;
             if (n.y > maxY) maxY = n.y;
         });
 
         const offsetX = maxX > 0 ? maxX + 300 : 100;
-        const offsetY = maxY > 0 ? maxY : 100;
+        let startY = 100;
+        const GRID_SPACING_X = 250;
+        const GRID_SPACING_Y = 250;
+        let col = 0;
+        let row = 0;
 
-        // Insert nodes
+        // Insert nodes or Update them
         result.nodes.forEach(node => {
-            const newId = crypto.randomUUID();
-            nodeMap.set(node.id, newId);
-            
-            const nodeData: any = {
-                id: newId,
-                type: (node.type || 'class') as NodeType,
-                nombre: node.name || 'SinNombre',
-                atributos: (node.attributes || []).map((attr: string) => ({ id: crypto.randomUUID(), visibilidad: '-', nombre: attr, tipo: 'String', version: 0 })),
-                metodos: (node.methods || []).map((met: string) => ({ id: crypto.randomUUID(), visibilidad: '+', nombre: met, parametros: '', retorno: 'void', version: 0 })),
-                color: '#ed8936',
-                x: offsetX + (Math.random() * 200), 
-                y: offsetY + (Math.random() * 200),
-                width: 220,
-                hash: '',
-                version: 0
-            };
-            
-            generateDeterministicHash(nodeData).then((hash: string) => {
-                nodeData.hash = hash;
-                addNode(nodeData.type, nodeData);
-            });
+            const existingNode = nodes.find(n => n.id === node.id);
+            if (existingNode) {
+                // Actualizar nodo existente
+                nodeMap.set(node.id, existingNode.id);
+                
+                const updatedData: any = {
+                    nombre: node.name || existingNode.nombre,
+                    atributos: (node.attributes || []).map((attr: string) => ({ id: crypto.randomUUID(), visibilidad: '-', nombre: attr, tipo: 'String', version: 0 })),
+                    metodos: (node.methods || []).map((met: string) => ({ id: crypto.randomUUID(), visibilidad: '+', nombre: met, parametros: '', retorno: 'void', version: 0 }))
+                };
+                updateNode(existingNode.id, updatedData);
+            } else {
+                // Crear nuevo nodo con Grid Layout
+                const newId = crypto.randomUUID();
+                nodeMap.set(node.id, newId);
+                
+                const xPos = offsetX + (col * GRID_SPACING_X);
+                const yPos = startY + (row * GRID_SPACING_Y);
+                
+                col++;
+                if (col > 2) {
+                    col = 0;
+                    row++;
+                }
+
+                const nodeData: any = {
+                    id: newId,
+                    type: (node.type || 'class') as NodeType,
+                    nombre: node.name || 'SinNombre',
+                    atributos: (node.attributes || []).map((attr: string) => ({ id: crypto.randomUUID(), visibilidad: '-', nombre: attr, tipo: 'String', version: 0 })),
+                    metodos: (node.methods || []).map((met: string) => ({ id: crypto.randomUUID(), visibilidad: '+', nombre: met, parametros: '', retorno: 'void', version: 0 })),
+                    color: '#ed8936',
+                    x: xPos, 
+                    y: yPos,
+                    width: 220,
+                    hash: '',
+                    version: 0
+                };
+                
+                generateDeterministicHash(nodeData).then((hash: string) => {
+                    nodeData.hash = hash;
+                    addNode(nodeData.type, nodeData);
+                });
+            }
         });
 
         // Insert relations
@@ -124,10 +151,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
         setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'user', text: userText }]);
         
         try {
-            const result = await generateDiagram(userText);
+            const currentState = getDiagramState();
+            const contextStr = JSON.stringify(currentState);
+            const result = await generateDiagram(userText, contextStr);
             if (!result) throw new Error("No se pudo generar el diagrama.");
             injectResultToDiagram(result);
-            setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', text: `¡Listo! He añadido ${result.nodes.length} clases y ${result.relations.length} relaciones al lienzo basado en tu solicitud.` }]);
+            setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', text: `¡Listo! He procesado ${result.nodes.length} clases y ${result.relations.length} relaciones basado en tu solicitud.` }]);
         } catch (err: any) {
             setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', text: `Ocurrió un error: ${err.message || 'Intenta de nuevo más tarde.'}`, isError: true }]);
         }
@@ -139,7 +168,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
         
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         if (!SpeechRecognition) {
-            alert('Tu navegador no soporta el reconocimiento de voz.');
+            alert('Tu navegador no soporta el reconocimiento de voz. Intenta usar Chrome o Edge.');
             return;
         }
 
@@ -152,10 +181,22 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
             const transcript = event.results[0][0].transcript;
             setPrompt(prev => prev + (prev ? ' ' : '') + transcript);
         };
-        recognition.onerror = () => setIsListening(false);
+        recognition.onerror = (event: any) => {
+            console.error("Error de micrófono:", event.error);
+            if (event.error === 'not-allowed') {
+                alert('Permiso de micrófono denegado. Por favor permite el acceso al micrófono en tu navegador.');
+            } else {
+                alert('Ocurrió un error con el reconocimiento de voz: ' + event.error);
+            }
+            setIsListening(false);
+        };
         recognition.onend = () => setIsListening(false);
 
-        recognition.start();
+        try {
+            recognition.start();
+        } catch (e: any) {
+            alert('No se pudo iniciar el reconocimiento de voz: ' + e.message);
+        }
     };
 
     // ---- IMAGEN ----

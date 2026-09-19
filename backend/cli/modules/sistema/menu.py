@@ -1,6 +1,6 @@
 from backend.cli.console import console, print_header
 from rich.prompt import Prompt
-from . import crear, editar, eliminar, ver_estado, ver_log_tiempo_real, iniciar, detener, reiniciar
+from . import crear, editar, eliminar, ver_estado, ver_log_tiempo_real, iniciar, detener, reiniciar, configurar_nginx
 
 def menu_sistema():
     while True:
@@ -13,9 +13,10 @@ def menu_sistema():
         console.print('[6] Eliminar Servicio')
         console.print('[7] Ver Estado')
         console.print('[8] Ver Log (Tiempo Real)')
+        console.print('[9] Configurar Nginx (y crear servicios)')
         console.print('[0] Volver')
         
-        op = Prompt.ask('- Selecciona', choices=['1','2','3','4','5','6','7','8','0'], default='0')
+        op = Prompt.ask('- Selecciona', choices=['1','2','3','4','5','6','7','8','9','0'], default='0')
         if op == '1': crear.ejecutar()
         elif op == '2': iniciar.ejecutar()
         elif op == '3': detener.ejecutar()
@@ -24,4 +25,5 @@ def menu_sistema():
         elif op == '6': eliminar.ejecutar()
         elif op == '7': ver_estado.ejecutar()
         elif op == '8': ver_log_tiempo_real.ejecutar()
+        elif op == '9': configurar_nginx.ejecutar()
         elif op == '0': break

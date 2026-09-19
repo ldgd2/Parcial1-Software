@@ -91,7 +91,8 @@ async def unirse_sala(
         "proyecto_id": proyecto.id,
         "proyecto_nombre": proyecto.nombre,
         "codigo_acceso": proyecto.codigo_acceso,
-        "lienzo_json": proyecto.lienzo_json
+        "lienzo_json": proyecto.lienzo_json,
+        "github_repo_url": proyecto.github_repo_url
     }
 
 
@@ -127,7 +128,8 @@ async def cargar_lienzo(
         "proyecto_nombre": proyecto.nombre,
         "codigo_acceso": proyecto.codigo_acceso,
         "lienzo_json": proyecto.lienzo_json or "null",
-        "rol_proyecto": colaborador.rol_proyecto
+        "rol_proyecto": colaborador.rol_proyecto,
+        "github_repo_url": proyecto.github_repo_url
     }
 
 

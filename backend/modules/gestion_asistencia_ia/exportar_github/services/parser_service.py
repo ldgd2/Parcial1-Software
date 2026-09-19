@@ -1,7 +1,32 @@
 import os
+import re
 from jinja2 import Environment, FileSystemLoader
 
-def inicializar_estructura_spring(temp_dir: str):
+def sanitize_identifier(name: str) -> str:
+    """Convierte un string a camelCase válido para Java"""
+    if not name:
+        return "unnamed"
+    name = re.sub(r'[^a-zA-Z0-9]', ' ', name)
+    parts = name.split()
+    if not parts:
+        return "unnamed"
+    res = parts[0].lower() + ''.join(p.capitalize() for p in parts[1:])
+    if res[0].isdigit():
+        res = "attr" + res
+    return res
+
+def map_java_type(tipo_uml: str) -> str:
+    """Mapea tipos UML genéricos a tipos Java"""
+    t = str(tipo_uml).lower().strip()
+    if "int" in t or "entero" in t: return "Integer"
+    if "string" in t or "varchar" in t or "texto" in t or "char" in t: return "String"
+    if "bool" in t or "logico" in t: return "Boolean"
+    if "float" in t or "decimal" in t or "double" in t or "real" in t: return "Double"
+    if "date" in t or "fecha" in t: return "java.time.LocalDate"
+    return "String"
+
+
+def inicializar_estructura_spring(temp_dir: str, nombre_repo: str = "proyecto_db"):
     """
     Crea la estructura de carpetas y archivos base (pom.xml, Application.java, properties)
     para un proyecto Spring Boot estándar sin depender de un .zip
@@ -93,11 +118,16 @@ def inicializar_estructura_spring(temp_dir: str):
 </project>
 ''')
 
+    # Sanitizar el nombre para DB (minúsculas, reemplazar guiones por guiones bajos)
+    db_name_sanitizado = re.sub(r'[^a-z0-9_]', '_', str(nombre_repo).lower())
+    if not db_name_sanitizado:
+        db_name_sanitizado = "proyecto_db"
+
     # .env.example
     with open(os.path.join(temp_dir, ".env.example"), "w", encoding="utf-8") as f:
-        f.write('''DB_IP=127.0.0.1
+        f.write(f'''DB_IP=127.0.0.1
 DB_PORT=5432
-DB_NAME=dbname
+DB_NAME={db_name_sanitizado}
 DB_USER=postgres
 DB_PASSWORD=password
 ''')
@@ -316,12 +346,44 @@ def generar_archivos_java(diagram_json: dict, temp_dir: str):
     nodos = diagram_json.get("nodes", [])
     
     for nodo in nodos:
-        # Solo procesamos clases e interfaces (por ahora clases)
         if nodo.get("type") in ["class", "interface"]:
+            nombre_clase = nodo.get("nombre", "EntidadDesconocida")
+            nombre_clase = re.sub(r'[^a-zA-Z0-9]', '', nombre_clase)
+            nombre_clase = nombre_clase.capitalize() if nombre_clase else "Entidad"
+
+            atributos_sanitizados = []
+            for a in nodo.get("atributos", []):
+                nuevo_a = dict(a)
+                nuevo_nombre = sanitize_identifier(a.get("nombre", ""))
+                nuevo_a["nombre"] = nuevo_nombre
+                nuevo_a["nombre_capitalizado"] = nuevo_nombre[0].upper() + nuevo_nombre[1:] if nuevo_nombre else ""
+                
+                if a.get("visibilidad") != "PK":
+                    nuevo_a["tipo"] = map_java_type(a.get("tipo", ""))
+                else:
+                    nuevo_a["tipo"] = "UUID"
+                atributos_sanitizados.append(nuevo_a)
+
+            metodos_sanitizados = []
+            for m in nodo.get("metodos", []):
+                nuevo_m = dict(m)
+                nuevo_m["nombre"] = sanitize_identifier(m.get("nombre", ""))
+                tipo_ret = str(m.get("retorno", "void")).strip()
+                if tipo_ret.lower() != "void":
+                    nuevo_m["retorno"] = map_java_type(tipo_ret)
+                else:
+                    nuevo_m["retorno"] = "void"
+                
+                # Sanitización muy básica de parámetros (remover caracteres que rompan)
+                params = str(m.get("parametros", "")).strip()
+                nuevo_m["parametros"] = re.sub(r'[^a-zA-Z0-9\s,]', '', params)
+                
+                metodos_sanitizados.append(nuevo_m)
+
             clase_data = {
-                "nombre": nodo.get("nombre", "EntidadDesconocida").replace(" ", ""),
-                "atributos": nodo.get("atributos", []),
-                "metodos": nodo.get("metodos", [])
+                "nombre": nombre_clase,
+                "atributos": atributos_sanitizados,
+                "metodos": metodos_sanitizados
             }
             
             # Entity
@@ -353,9 +415,9 @@ def generar_archivos_java(diagram_json: dict, temp_dir: str):
             with open(os.path.join(src_main_java, "dtos", f"{clase_data['nombre']}ResponseDTO.java"), "w", encoding="utf-8") as f:
                 f.write(codigo_res_dto)
 
-def parsear_diagrama(diagram_json: dict, temp_dir: str):
+def parsear_diagrama(diagram_json: dict, temp_dir: str, nombre_repo: str = "proyecto_db"):
     """
     Orquestador del parser.
     """
-    inicializar_estructura_spring(temp_dir)
+    inicializar_estructura_spring(temp_dir, nombre_repo)
     generar_archivos_java(diagram_json, temp_dir)

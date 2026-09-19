@@ -6,7 +6,7 @@ from backend.modules.gestion_asistencia_ia.exportar_github.services.parser_servi
 from backend.modules.gestion_asistencia_ia.exportar_github.services.migrations_service import generar_migracion_sql
 from backend.modules.gestion_asistencia_ia.exportar_github.services.ia_injection_service import inyectar_logica_ia
 
-async def generar_spring_boot(diagram_json: dict) -> str:
+async def generar_spring_boot(diagram_json: dict, nombre_repo: str = "proyecto_db") -> str:
     """
     Orquesta las 3 Fases del motor de generación IA:
     1. Parser Determinista (Jinja2)
@@ -19,7 +19,7 @@ async def generar_spring_boot(diagram_json: dict) -> str:
     temp_dir = tempfile.mkdtemp(prefix=f"proyecto_ia_{uuid.uuid4().hex[:8]}_")
     
     # Fase 1: Parsing
-    parsear_diagrama(diagram_json, temp_dir)
+    parsear_diagrama(diagram_json, temp_dir, nombre_repo)
     
     # Fase 2: SQL y Relaciones con IA
     await generar_migracion_sql(diagram_json, temp_dir)

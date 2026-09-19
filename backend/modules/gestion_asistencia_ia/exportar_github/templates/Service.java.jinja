@@ -56,9 +56,9 @@ public class {{ clase.nombre }}Service {
     private {{ clase.nombre }}ResponseDTO mapToResponseDTO({{ clase.nombre }} entity) {
         {{ clase.nombre }}ResponseDTO dto = new {{ clase.nombre }}ResponseDTO();
         {% for attr in clase.atributos %}{% if attr.visibilidad == 'PK' %}
-        dto.set{{ attr.nombre | capitalize }}(entity.get{{ attr.nombre | capitalize }}());
+        dto.set{{ attr.nombre_capitalizado }}(entity.get{{ attr.nombre_capitalizado }}());
         {% else %}
-        dto.set{{ attr.nombre | capitalize }}(entity.get{{ attr.nombre | capitalize }}());
+        dto.set{{ attr.nombre_capitalizado }}(entity.get{{ attr.nombre_capitalizado }}());
         {% endif %}{% endfor %}
         dto.setCreatedAt(entity.getCreatedAt());
         dto.setUpdatedAt(entity.getUpdatedAt());
@@ -68,7 +68,7 @@ public class {{ clase.nombre }}Service {
 
     private void mapToEntity({{ clase.nombre }}RequestDTO dto, {{ clase.nombre }} entity) {
         {% for attr in clase.atributos %}{% if attr.visibilidad != 'PK' %}
-        entity.set{{ attr.nombre | capitalize }}(dto.get{{ attr.nombre | capitalize }}());
+        entity.set{{ attr.nombre_capitalizado }}(dto.get{{ attr.nombre_capitalizado }}());
         {% endif %}{% endfor %}
     }
 

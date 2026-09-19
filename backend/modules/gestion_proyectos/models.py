@@ -37,5 +37,8 @@ class Proyecto(Base):
     # Estado del lienzo de diagramas (JSON serializado)
     lienzo_json = Column(Text, nullable=True, default=None)
     
+    # URL del repositorio de GitHub vinculado
+    github_repo_url = Column(String, nullable=True, default=None)
+    
     # Carga eager o lazy según necesidad
     colaboradores = relationship("ColaboradorProyecto", back_populates="proyecto", cascade="all, delete-orphan")

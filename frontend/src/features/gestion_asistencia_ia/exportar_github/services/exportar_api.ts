@@ -43,11 +43,12 @@ export const exportarGithubApi = {
         return response.json();
     },
 
-    exportarProyecto: async (nombre_repo: string, diagram_json: any): Promise<{ url_repositorio: string, mensaje: string }> => {
+    exportarProyecto: async (proyecto_id: number, nombre_repo: string, diagram_json: any): Promise<{ url_repositorio: string, mensaje: string }> => {
         const response = await fetch(`${API_URL}/exportar-github/exportar`, {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify({
+                proyecto_id,
                 nombre_repo,
                 diagram_json
             }),

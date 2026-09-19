@@ -6,7 +6,7 @@ from backend.core.config import settings
 async def digitalizar_diagrama_desde_imagen(image_base64: str) -> dict:
     if settings.IA_SERVICE == "googlecloud":
         return await _llamar_gemini_vision(image_base64)
-    elif settings.IA_SERVICE == "openroute":
+    elif settings.IA_SERVICE == "openrouter":
         return await _llamar_openrouter_vision(image_base64)
     else:
         raise HTTPException(status_code=500, detail="Servicio de IA no configurado correctamente")
@@ -120,7 +120,7 @@ async def _llamar_openrouter_vision(image_base64: str) -> dict:
     }
     
     payload = {
-        "model": "google/gemini-pro-vision", # O gpt-4-vision-preview dependiendo del config
+        "model": settings.IA_MODEL, # Usar el modelo del config en vez de hardcodear google/gemini-pro-vision
         "messages": [
             {"role": "system", "content": system_instruction},
             {

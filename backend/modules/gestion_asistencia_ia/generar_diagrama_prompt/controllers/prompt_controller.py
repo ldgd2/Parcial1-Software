@@ -10,5 +10,5 @@ async def generar_diagrama(
     request: PromptRequest,
     current_user: dict = Depends(get_current_user)
 ):
-    resultado = await generar_diagrama_desde_prompt(request.prompt)
+    resultado = await generar_diagrama_desde_prompt(request.prompt, request.context)
     return PromptResponse(nodes=resultado.get("nodes", []), relations=resultado.get("relations", []))

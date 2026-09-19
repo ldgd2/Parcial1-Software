@@ -73,7 +73,11 @@ async def pedir_codigo_ia(prompt: str, client: httpx.AsyncClient) -> str:
         "Eres un experto arquitecto de Spring Boot y Java 17. "
         "Escribe el interior del método basándote en la solicitud del usuario. "
         "Devuelve SOLO el código Java válido (sin firmas de método extra, sin markdown, sin explicaciones). "
-        "Solo la lógica interna que va entre las llaves { } del método."
+        "Solo la lógica interna que va entre las llaves { } del método.\n"
+        "REGLAS CRÍTICAS:\n"
+        "- Si el método requiere usar variables, dependencias o parámetros que NO existen explícitamente en la firma que recibes, NO las inventes.\n"
+        "- Si la lógica es incierta o requiere clases que no puedes deducir, limítate a retornar null, un valor por defecto o lanzar una excepción como: throw new UnsupportedOperationException(\"Lógica pendiente\");\n"
+        "- Asegúrate de que tu código siempre compile perfectamente."
     )
     
     headers = {
