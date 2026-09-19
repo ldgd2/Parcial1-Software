@@ -42,7 +42,8 @@ starlette==1.6.0
 typing-inspection==0.4.4
 typing_extensions==4.16.0
 urllib3==2.7.0
-uvicorn==0.52.4
+uvicorn[standard]==0.52.4
+websockets==14.1
 yagmail==0.16.0
 pydantic-settings==2.15.0
 rich==13.7.1
