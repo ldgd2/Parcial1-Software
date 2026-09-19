@@ -1,6 +1,6 @@
 import { TokenService } from '@/shared/lib/TokenService';
 
-const API_URL = "http://localhost:8000"; // Asegúrate de que esto coincida con la URL de tu backend
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 const getAuthHeaders = () => {
     const token = TokenService.getToken();
