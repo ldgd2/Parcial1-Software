@@ -1,39 +1,64 @@
 #!/bin/bash
 
 # Script de instalación automática del entorno de desarrollo (Backend y Frontend)
+# Ahora con PostgreSQL y fix de permisos (SUDO_USER)
 
 echo "==================================================="
-echo " 🚀 AUTOMATED SETUP PARA DIAGRAMADOR "
+echo " 🚀 AUTOMATED SETUP PARA DIAGRAMADOR"
 echo "==================================================="
 
-# Detectar OS para instalar dependencias de sistema si es Linux
-echo -e "\n[1/4] Verificando dependencias del sistema (Python, Node, SQLite)..."
+# Obtener el usuario original si se ejecutó con sudo
+REAL_USER=${SUDO_USER:-$USER}
+
+# 1. Instalar dependencias del sistema y PostgreSQL
+echo -e "\n[1/4] Instalando dependencias del sistema..."
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    echo "Sistema Linux detectado. Instalando paquetes base..."
     sudo apt-get update
-    sudo apt-get install -y python3 python3-venv python3-pip nodejs npm sqlite3
+    sudo apt-get install -y python3 python3-venv python3-pip nodejs npm postgresql postgresql-contrib
 elif [[ "$OSTYPE" == "darwin"* ]]; then
-    echo "Sistema macOS detectado. Instalando paquetes base (requiere Homebrew)..."
-    brew install python node sqlite
+    brew install python node postgresql
 else
-    echo "⚠️ Sistema Windows/Otro detectado. Se asume que Python y Node.js ya están instalados globalmente."
+    echo "⚠️ Sistema Windows/Otro detectado. Se asume que Python, Node y PostgreSQL ya están listos."
+fi
+
+# ==========================================
+# SETUP POSTGRESQL
+# ==========================================
+echo -e "\n[2/4] Configurando PostgreSQL..."
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    read -p "Ingresa el nombre del usuario de la DB [postgres]: " DB_USER
+    DB_USER=${DB_USER:-postgres}
+    
+    read -p "Ingresa la contraseña para $DB_USER [postgres]: " DB_PASS
+    DB_PASS=${DB_PASS:-postgres}
+    
+    read -p "Ingresa el nombre de la base de datos [diagramador]: " DB_NAME
+    DB_NAME=${DB_NAME:-diagramador}
+
+    echo "[*] Creando usuario y base de datos..."
+    # Si el rol ya existe, ignoramos el error, pero intentamos crearlo de todos modos
+    sudo -u postgres psql -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASS';" || true
+    sudo -u postgres psql -c "ALTER USER $DB_USER WITH PASSWORD '$DB_PASS';"
+    sudo -u postgres psql -c "CREATE DATABASE $DB_NAME OWNER $DB_USER;" || true
+else
+    echo "En Windows/Mac, por favor crea la base de datos manualmente o asegúrate de que esté corriendo."
+    DB_USER="postgres"
+    DB_PASS="postgres"
+    DB_NAME="diagramador"
 fi
 
 # ==========================================
 # SETUP BACKEND
 # ==========================================
-echo -e "\n[2/4] Configurando el Backend (FastAPI)..."
+echo -e "\n[3/4] Configurando el Backend (FastAPI)..."
 cd backend
 
 if [ ! -d "venv" ]; then
-    echo "Creando entorno virtual de Python..."
+    echo "Creando entorno virtual..."
     python3 -m venv venv || python -m venv venv
-else
-    echo "El entorno virtual (venv) ya existe."
 fi
 
 echo "Instalando dependencias de Python..."
-# Activación cruzada (Windows con Git Bash vs Linux/Mac)
 if [ -f "venv/Scripts/activate" ]; then
     source venv/Scripts/activate
 else
@@ -43,48 +68,48 @@ fi
 pip install --upgrade pip
 pip install -r requirements.txt
 
-# Configurar variables de entorno iniciales
+# Configurar variables de entorno con la info de PostgreSQL
 if [ ! -f ".env" ]; then
-    echo "Creando archivo .env a partir de .env.example..."
-    if [ -f ".env.example" ]; then
-        cp .env.example .env
-    else
-        echo "API_V1_STR=/api/v1" > .env
-        echo "PROJECT_NAME=\"Diagramador API\"" >> .env
-        echo "MAIN_DB_URL=sqlite+aiosqlite:///./local_database.db" >> .env
-    fi
+    echo "Generando archivo .env con configuración de PostgreSQL..."
+    cat <<EOF > .env
+# Database
+DB_IP=127.0.0.1
+DB_PORT=5432
+DB_USER=$DB_USER
+DB_PASSWORD=$DB_PASS
+DB_NAME=$DB_NAME
+
+# Security
+SECRET_KEY=supersecretkey_change_in_production
+
+# GitHub OAuth App (Completar luego)
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+ENCRYPTION_MASTER_KEY=
+EOF
+else
+    echo "El archivo .env ya existe. Recuerda configurarlo para apuntar a PostgreSQL."
 fi
 
 # ==========================================
 # SETUP FRONTEND
 # ==========================================
-echo -e "\n[3/4] Configurando el Frontend (React/Vite)..."
+echo -e "\n[4/4] Configurando el Frontend (React/Vite)..."
 cd ../frontend
-
-echo "Instalando dependencias de Node.js (esto puede tardar unos minutos)..."
 npm install
 
 # ==========================================
-# BASE DE DATOS (MIGRACIONES)
+# FIX PERMISOS (Para que no dé Permission Denied al usuario normal)
 # ==========================================
-echo -e "\n[4/4] Verificando Base de Datos..."
-cd ../backend
-echo "Ejecutando migraciones de Alembic si aplican (asegúrate de que la DB esté lista)..."
-# alembic upgrade head || echo "⚠️ Revisa la conexión de tu base de datos si esto falla."
+cd ..
+if [ -n "$SUDO_USER" ]; then
+    echo "[*] Ajustando permisos de los archivos creados para el usuario $REAL_USER..."
+    sudo chown -R $REAL_USER:$REAL_USER backend/venv backend/.env frontend/node_modules 2>/dev/null || true
+fi
 
 echo -e "\n==================================================="
 echo " 🎉 ¡SETUP COMPLETADO CON ÉXITO! 🎉"
 echo "==================================================="
-echo "Tu entorno de desarrollo está listo."
-echo ""
-echo "💻 PARA EJECUTAR EL BACKEND:"
-echo "   cd backend"
-echo "   # En Windows: source venv/Scripts/activate"
-echo "   # En Linux: source venv/bin/activate"
-echo "   uvicorn main:app --reload"
-echo "   (o usar tu manager: python manager.py)"
-echo ""
-echo "🌐 PARA EJECUTAR EL FRONTEND:"
-echo "   cd frontend"
-echo "   npm run dev"
+echo "Para solucionar el error de 'Permission denied' en tu .env actual, ejecuta:"
+echo "sudo chown ubuntu:ubuntu backend/.env"
 echo "==================================================="
