@@ -103,7 +103,7 @@ WantedBy=multi-user.target
 """
         conf_backend = """server {
     listen 80;
-    server_name api.diagramador.gerlextech.com;
+    server_name api-diagramador.gerlextech.com;
 
     location / {
         proxy_pass http://localhost:8000;
