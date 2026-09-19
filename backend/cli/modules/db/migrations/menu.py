@@ -1,5 +1,6 @@
 import subprocess
 import sys
+import os
 from backend.cli.console import console, print_header
 from rich.prompt import Prompt
 
