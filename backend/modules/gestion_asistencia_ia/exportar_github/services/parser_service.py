@@ -1,5 +1,7 @@
 import os
 import re
+import uuid
+from datetime import date
 from jinja2 import Environment, FileSystemLoader
 
 def sanitize_identifier(name: str) -> str:
@@ -35,15 +37,15 @@ def obtener_ejemplo_atributo_raw(nombre: str, tipo: str) -> str:
     t = str(tipo).lower().strip()
     
     if n == "id" or "uuid" in t:
-        return "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+        return str(uuid.uuid4())
     if "bool" in t:
         return "true"
     if "int" in t or "integer" in t or "long" in t or "short" in t:
-        return "10"
+        return "1"
     if "double" in t or "float" in t or "decimal" in t:
-        return "99.50"
+        return "0.0"
     if "date" in t or "time" in t:
-        return "2026-09-20"
+        return str(date.today())
     return f"ejemplo_{n}"
 
 
