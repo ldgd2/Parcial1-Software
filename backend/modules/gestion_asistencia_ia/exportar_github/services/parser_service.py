@@ -21,13 +21,19 @@ def sanitize_identifier(name: str) -> str:
     return res
 
 def map_java_type(tipo_uml: str) -> str:
-    """Mapea tipos UML genéricos a tipos Java"""
+    """Mapea tipos UML genéricos y de base de datos a tipos Java estándar"""
     t = str(tipo_uml).lower().strip()
-    if "int" in t or "entero" in t: return "Integer"
-    if "string" in t or "varchar" in t or "texto" in t or "char" in t: return "String"
-    if "bool" in t or "logico" in t: return "Boolean"
-    if "float" in t or "decimal" in t or "double" in t or "real" in t: return "Double"
+    if "uuid" in t or "guid" in t: return "UUID"
+    if "datetime" in t or "timestamp" in t or "fechahora" in t: return "java.time.LocalDateTime"
     if "date" in t or "fecha" in t: return "java.time.LocalDate"
+    if "time" in t or "hora" in t: return "java.time.LocalTime"
+    if "bigint" in t or "long" in t: return "Long"
+    if "short" in t or "smallint" in t: return "Short"
+    if "int" in t or "integer" in t or "entero" in t or "number" in t or "numero" in t: return "Integer"
+    if "bool" in t or "logico" in t or "bit" in t: return "Boolean"
+    if "decimal" in t or "numeric" in t or "money" in t: return "java.math.BigDecimal"
+    if "float" in t or "double" in t or "real" in t: return "Double"
+    if "string" in t or "varchar" in t or "texto" in t or "char" in t or "text" in t: return "String"
     return "String"
 
 
@@ -36,16 +42,22 @@ def obtener_ejemplo_atributo_raw(nombre: str, tipo: str) -> str:
     n = str(nombre).lower().strip()
     t = str(tipo).lower().strip()
     
-    if n == "id" or "uuid" in t:
+    if n == "id" or "uuid" in t or "guid" in t:
         return str(uuid.uuid4())
-    if "bool" in t:
+    if "bool" in t or "logico" in t or "bit" in t:
         return "true"
-    if "int" in t or "integer" in t or "long" in t or "short" in t:
+    if "bigint" in t or "long" in t:
+        return "100"
+    if "int" in t or "integer" in t or "entero" in t or "short" in t or "smallint" in t or "number" in t:
         return "1"
-    if "double" in t or "float" in t or "decimal" in t:
+    if "double" in t or "float" in t or "decimal" in t or "real" in t or "numeric" in t:
         return "0.0"
-    if "date" in t or "time" in t:
+    if "datetime" in t or "timestamp" in t or "fechahora" in t:
+        return "2026-09-20T12:00:00"
+    if "date" in t or "fecha" in t:
         return str(date.today())
+    if "time" in t or "hora" in t:
+        return "12:00:00"
     return f"ejemplo_{n}"
 
 
@@ -53,7 +65,7 @@ def obtener_ejemplo_atributo_json(nombre: str, tipo: str) -> str:
     """Genera un valor formateado para JSON (con comillas si es string/date, sin comillas si es número/bool)."""
     val = obtener_ejemplo_atributo_raw(nombre, tipo)
     t = str(tipo).lower().strip()
-    if val in ["true", "false"] or t in ["integer", "int", "double", "float", "long", "short"]:
+    if val in ["true", "false"] or t in ["integer", "int", "double", "float", "long", "short", "bigdecimal", "bigint"]:
         return val
     return f'"{val}"'
 
@@ -63,12 +75,16 @@ def obtener_ejemplo_retorno(tipo_retorno: str) -> str:
     t = str(tipo_retorno).lower().strip()
     if t == "void":
         return "{\\n  \\\"status\\\": \\\"OK\\\",\\n  \\\"message\\\": \\\"Operación ejecutada con éxito\\\"\\n}"
-    if "int" in t or "integer" in t:
-        return "10"
+    if "datetime" in t or "timestamp" in t:
+        return "\\\"2026-09-20T12:00:00\\\""
+    if "date" in t:
+        return f"\\\"{date.today()}\\\""
+    if "int" in t or "integer" in t or "long" in t or "short" in t:
+        return "1"
     if "bool" in t:
         return "true"
-    if "double" in t or "float" in t:
-        return "99.5"
+    if "double" in t or "float" in t or "decimal" in t:
+        return "0.0"
     if "string" in t:
         return "\\\"Resultado de la operación\\\""
     return "{\\n  \\\"result\\\": \\\"Operación exitosa\\\"\\n}"
