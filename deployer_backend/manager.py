@@ -34,15 +34,15 @@ def clean_workspace():
 def init_alembic():
     if not os.path.exists("alembic"):
         console.print("[cyan]Inicializando Alembic para SQLite interno...[/cyan]")
-        subprocess.run(["alembic", "init", "-t", "async", "alembic"])
+        subprocess.run([sys.executable, "-m", "alembic", "init", "-t", "async", "alembic"])
     else:
         console.print("[yellow]Alembic ya está inicializado.[/yellow]")
     
     op = Prompt.ask("¿Crear y aplicar migración inicial?", choices=["s", "n"], default="s")
     if op == 's':
         msg = Prompt.ask("Mensaje de migración", default="init")
-        subprocess.run(["alembic", "revision", "--autogenerate", "-m", msg])
-        subprocess.run(["alembic", "upgrade", "head"])
+        subprocess.run([sys.executable, "-m", "alembic", "revision", "--autogenerate", "-m", msg])
+        subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"])
 
 def main_menu():
     while True:
