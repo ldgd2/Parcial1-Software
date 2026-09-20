@@ -20,4 +20,5 @@ export interface PromptRelation {
 export interface PromptResponse {
     nodes: PromptNode[];
     relations: PromptRelation[];
+    summary?: string;
 }

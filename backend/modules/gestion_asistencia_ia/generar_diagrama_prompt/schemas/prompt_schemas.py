@@ -8,3 +8,4 @@ class PromptRequest(BaseModel):
 class PromptResponse(BaseModel):
     nodes: List[Dict[str, Any]]
     relations: List[Dict[str, Any]]
+    summary: str | None = None

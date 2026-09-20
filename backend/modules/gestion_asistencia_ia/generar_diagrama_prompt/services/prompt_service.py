@@ -3,8 +3,28 @@ import httpx
 from fastapi import HTTPException
 from backend.core.config import settings
 
+def deduplicar_resultado(resultado: dict) -> dict:
+    """Elimina relaciones duplicadas entre el mismo par de nodos."""
+    relations = resultado.get("relations", [])
+    seen_relations = set()
+    unique_relations = []
+    
+    for r in relations:
+        s_id = r.get("sourceId") or r.get("origen") or r.get("source")
+        t_id = r.get("targetId") or r.get("destino") or r.get("target")
+        if not s_id or not t_id:
+            continue
+        pair_key = tuple(sorted([str(s_id), str(t_id)]))
+        if pair_key not in seen_relations:
+            seen_relations.add(pair_key)
+            unique_relations.append(r)
+            
+    resultado["relations"] = unique_relations
+    return resultado
+
 async def generar_diagrama_desde_prompt(prompt: str, context: str | None = None) -> dict:
-    return await _llamar_gemini(prompt, context)
+    res = await _llamar_gemini(prompt, context)
+    return deduplicar_resultado(res)
 
 async def _llamar_gemini(prompt: str, context: str | None = None) -> dict:
     api_key = settings.GEMINI_API
@@ -14,19 +34,25 @@ async def _llamar_gemini(prompt: str, context: str | None = None) -> dict:
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
     
     system_instruction = (
-        "Eres un experto arquitecto de software UML. El usuario te dará un requerimiento para modificar o crear un diagrama UML.\n"
-        "Se te puede proporcionar el 'Contexto Actual' (el diagrama existente). Si el requerimiento es MODIFICAR una clase existente, "
-        "devuelve esa clase con su MISMO 'id' original y sus nuevos atributos/métodos. Si es CREAR algo nuevo, genera un 'id' temporal.\n"
-        "IMPORTANTE: En los elementos de 'attributes' y 'methods', NO incluyas los símbolos de visibilidad (-, +, #) dentro del string.\n"
-        "Formato exacto de atributo: 'nombre: tipo' (ejemplo: 'id: int', 'username: string').\n"
-        "Formato exacto de método: 'nombre(parametros): retorno' (ejemplo: 'save(): void', 'findById(id: int): User').\n"
-        "Devuelve SOLO un JSON válido con esta estructura exacta (sin markdown ni explicaciones):\n"
+        "Eres un experto arquitecto de software UML y modelador de datos.\n"
+        "Analiza el requerimiento del usuario y modifica o crea un diagrama UML con 'nodes' (clases/interfaces) y 'relations'.\n"
+        "Se te proporciona el 'Contexto Actual' del diagrama existente.\n\n"
+        "REGLAS CRÍTICAS:\n"
+        "1. Revisa detenidamente el 'Contexto Actual' antes de crear o editar.\n"
+        "2. Si vas a modificar una clase existente, REUTILIZA SU MISMO 'id' original.\n"
+        "3. PROHIBIDO duplicar relaciones entre las mismas dos clases (sourceId y targetId). Si ya están relacionadas, NO agregues otra relación duplicada.\n"
+        "4. Si se solicita conectar una clase que está suelta, conéctala de forma coherente con la clase más apropiada.\n"
+        "5. Formato de 'attributes': 'nombre: tipo' (sin -, +, #).\n"
+        "6. Formato de 'methods': 'nombre(parametros): retorno' (sin -, +, #).\n"
+        "7. Incluye OBLIGATORIAMENTE un campo 'summary' en español que describa con claridad y precisión los cambios que realizaste en el diagrama.\n\n"
+        "ESTRUCTURA DE RESPUESTA JSON:\n"
         "{\n"
+        "  \"summary\": \"Resumen amigable y claro en español de las adiciones, modificaciones y relaciones creadas...\",\n"
         "  \"nodes\": [\n"
-        "    { \"id\": \"ClaseA_o_ID_existente\", \"type\": \"class\", \"name\": \"ClaseA\", \"attributes\": [\"id: int\", \"name: string\"], \"methods\": [\"save(): void\"] }\n"
+        "    { \"id\": \"id_existente_o_nuevo\", \"type\": \"class\", \"name\": \"NombreClase\", \"attributes\": [\"id: int\", \"nombre: string\"], \"methods\": [\"metodo(): void\"] }\n"
         "  ],\n"
         "  \"relations\": [\n"
-        "    { \"id\": \"rel1\", \"sourceId\": \"ID_fuente\", \"targetId\": \"ID_destino\", \"type\": \"association\", \"label\": \"1..*\" }\n"
+        "    { \"id\": \"rel1\", \"sourceId\": \"id_fuente\", \"targetId\": \"id_destino\", \"type\": \"association\", \"label\": \"1..*\" }\n"
         "  ]\n"
         "}"
     )
@@ -92,18 +118,22 @@ async def _llamar_openrouter(prompt: str, context: str | None = None) -> dict:
     url = "https://openrouter.ai/api/v1/chat/completions"
     
     system_instruction = (
-        "Eres un experto arquitecto de software UML. Se te dará un requerimiento y opcionalmente el diagrama actual.\n"
-        "Si debes modificar una clase, devuelve la clase modificada usando su MISMO 'id' original. Si creas clases nuevas, inventa un nuevo 'id'.\n"
-        "IMPORTANTE: En los elementos de 'attributes' y 'methods', NO incluyas los símbolos de visibilidad (-, +, #) dentro del string.\n"
-        "Formato exacto de atributo: 'nombre: tipo' (ejemplo: 'id: int', 'username: string').\n"
-        "Formato exacto de método: 'nombre(parametros): retorno' (ejemplo: 'save(): void', 'findById(id: int): User').\n"
-        "Devuelve SOLO el JSON:\n"
+        "Eres un experto arquitecto de software UML y modelador de datos.\n"
+        "Analiza el requerimiento del usuario y modifica o crea un diagrama UML con 'nodes' y 'relations'.\n"
+        "Se te proporciona el 'Contexto Actual' del diagrama existente.\n\n"
+        "REGLAS CRÍTICAS:\n"
+        "1. Revisa detenidamente el 'Contexto Actual' antes de crear o editar.\n"
+        "2. Si vas a modificar una clase existente, REUTILIZA SU MISMO 'id' original.\n"
+        "3. PROHIBIDO duplicar relaciones entre las mismas dos clases.\n"
+        "4. Incluye OBLIGATORIAMENTE un campo 'summary' en español que describa con claridad los cambios realizados.\n\n"
+        "ESTRUCTURA DE RESPUESTA JSON:\n"
         "{\n"
+        "  \"summary\": \"Resumen claro en español...\",\n"
         "  \"nodes\": [\n"
-        "    { \"id\": \"uuid1_o_existente\", \"type\": \"class\", \"name\": \"ClaseA\", \"attributes\": [\"id: int\", \"name: string\"], \"methods\": [\"save(): void\"] }\n"
+        "    { \"id\": \"id_existente\", \"type\": \"class\", \"name\": \"ClaseA\", \"attributes\": [\"id: int\"], \"methods\": [\"metodo(): void\"] }\n"
         "  ],\n"
         "  \"relations\": [\n"
-        "    { \"id\": \"rel1\", \"sourceId\": \"uuid1\", \"targetId\": \"uuid2\", \"type\": \"association\", \"label\": \"1..*\" }\n"
+        "    { \"id\": \"rel1\", \"sourceId\": \"id1\", \"targetId\": \"id2\", \"type\": \"association\", \"label\": \"1..*\" }\n"
         "  ]\n"
         "}"
     )
@@ -118,7 +148,7 @@ async def _llamar_openrouter(prompt: str, context: str | None = None) -> dict:
     }
     
     payload = {
-        "model": settings.IA_MODEL, # modelo configurable desde .env
+        "model": settings.IA_MODEL,
         "messages": [
             {"role": "system", "content": system_instruction},
             {"role": "user", "content": full_prompt}
@@ -137,7 +167,6 @@ async def _llamar_openrouter(prompt: str, context: str | None = None) -> dict:
             data = response.json()
             texto_respuesta = data["choices"][0]["message"]["content"]
             
-            # Limpiar posible markdown residual (```json ... ```)
             texto_respuesta = texto_respuesta.strip()
             if texto_respuesta.startswith("```"):
                 lines = texto_respuesta.split("\n")

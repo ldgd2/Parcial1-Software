@@ -118,26 +118,35 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
             }
         });
 
-        // Insert relations
+        // Insert relations (evitando duplicados)
+        const currentRelations = getDiagramState().relations || [];
+        
         result.relations.forEach(rel => {
-            const sourceId = nodeMap.get(rel.sourceId);
-            const targetId = nodeMap.get(rel.targetId);
-            if (sourceId && targetId) {
-                const relData: any = {
-                    id: crypto.randomUUID(),
-                    sourceId,
-                    targetId,
-                    type: rel.type || 'association',
-                    label: rel.label || '',
-                    sourceLabel: '',
-                    targetLabel: '',
-                    hash: '',
-                    version: 0
-                };
-                generateDeterministicHash({ type: 'relation', data: relData }).then((hash: string) => {
-                    relData.hash = hash;
-                    addRelation(relData);
-                });
+            const sourceId = nodeMap.get(rel.sourceId) || rel.sourceId;
+            const targetId = nodeMap.get(rel.targetId) || rel.targetId;
+            if (sourceId && targetId && sourceId !== targetId) {
+                const alreadyExists = currentRelations.some((existing: any) => 
+                    (existing.sourceId === sourceId && existing.targetId === targetId) ||
+                    (existing.sourceId === targetId && existing.targetId === sourceId)
+                );
+                
+                if (!alreadyExists) {
+                    const relData: any = {
+                        id: crypto.randomUUID(),
+                        sourceId,
+                        targetId,
+                        type: rel.type || 'association',
+                        label: rel.label || '',
+                        sourceLabel: '',
+                        targetLabel: '',
+                        hash: '',
+                        version: 0
+                    };
+                    generateDeterministicHash({ type: 'relation', data: relData }).then((hash: string) => {
+                        relData.hash = hash;
+                        addRelation(relData);
+                    });
+                }
             }
         });
     };
@@ -157,7 +166,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
             const result = await generateDiagram(userText, contextStr);
             if (!result) throw new Error("No se pudo generar el diagrama.");
             injectResultToDiagram(result);
-            setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', text: `¡Listo! He procesado ${result.nodes.length} clases y ${result.relations.length} relaciones basado en tu solicitud.` }]);
+            
+            const responseText = result.summary || `¡Listo! He procesado ${result.nodes.length} clases y ${result.relations.length} relaciones basado en tu solicitud.`;
+            setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', text: responseText }]);
         } catch (err: any) {
             setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', text: `Ocurrió un error: ${err.message || 'Intenta de nuevo más tarde.'}`, isError: true }]);
         }
