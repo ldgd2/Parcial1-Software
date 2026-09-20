@@ -226,6 +226,7 @@ spring.jpa.hibernate.ddl-auto=update
 spring.flyway.enabled=true
 spring.flyway.baseline-on-migrate=true
 spring.flyway.out-of-order=true
+spring.flyway.validate-on-migrate=false
 server.forward-headers-strategy=framework
 springdoc.swagger-ui.path=/help
 springdoc.api-docs.path=/v3/api-docs
