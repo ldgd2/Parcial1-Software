@@ -72,9 +72,10 @@ WantedBy=multi-user.target
 
     # 3. Crear NGINX configs
     if modo == "dominio":
+        dominio_base = Prompt.ask("Ingresa tu dominio base (ej: gerlextech.com o example.com)")
         conf_frontend = f"""server {{
     listen 80;
-    server_name diagramador.example.com;
+    server_name diagramador.{dominio_base};
     
     root {os.path.join(BASE_DIR, "frontend", "dist")};
     index index.html;
@@ -84,11 +85,11 @@ WantedBy=multi-user.target
     }}
 }}
 """
-        conf_backend = """server {
+        conf_backend = f"""server {{
     listen 80;
-    server_name api-diagramador.example.com;
+    server_name api-diagramador.{dominio_base};
 
-    location / {
+    location / {{
         proxy_pass http://localhost:8000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
@@ -183,8 +184,8 @@ def eliminar_todo():
     if confirm == 's':
         if os.name != 'nt':
             console.print("[cyan]Eliminando servicios Systemd...[/cyan]")
-            os.system("sudo systemctl stop backend-app")
-            os.system("sudo systemctl disable backend-app")
+            os.system("sudo systemctl stop backend-app frontend-app 2>/dev/null")
+            os.system("sudo systemctl disable backend-app frontend-app 2>/dev/null")
             os.system("sudo rm -f /etc/systemd/system/backend-app.service /etc/systemd/system/frontend-app.service")
             os.system("sudo systemctl daemon-reload")
             
