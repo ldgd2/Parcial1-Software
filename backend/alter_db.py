@@ -10,24 +10,32 @@ from core.config import settings
 
 async def alter_table():
     engine = create_async_engine(settings.DATABASE_URL, echo=True)
-    async with engine.begin() as conn:
+    
+    async def run_query(query: str, success_msg: str, error_msg: str):
         try:
-            await conn.execute(text("ALTER TABLE usuarios ADD COLUMN db_password_encrypted VARCHAR;"))
-            print("Columna db_password_encrypted añadida.")
+            async with engine.begin() as conn:
+                await conn.execute(text(query))
+            print(success_msg)
         except Exception as e:
-            print(f"Error en usuarios (quizá ya existe): {e}")
-            
-        try:
-            await conn.execute(text("ALTER TABLE proyectos ADD COLUMN github_repo_url VARCHAR;"))
-            print("Columna github_repo_url añadida.")
-        except Exception as e:
-            print(f"Error en proyectos github (quizá ya existe): {e}")
+            print(f"{error_msg}: {e}")
 
-        try:
-            await conn.execute(text("ALTER TABLE proyectos ADD COLUMN deployment_url VARCHAR;"))
-            print("Columna deployment_url añadida.")
-        except Exception as e:
-            print(f"Error en proyectos deploy (quizá ya existe): {e}")
+    await run_query(
+        "ALTER TABLE usuarios ADD COLUMN db_password_encrypted VARCHAR;",
+        "Columna db_password_encrypted añadida.",
+        "Error en usuarios (quizá ya existe)"
+    )
+    
+    await run_query(
+        "ALTER TABLE proyectos ADD COLUMN github_repo_url VARCHAR;",
+        "Columna github_repo_url añadida.",
+        "Error en proyectos github (quizá ya existe)"
+    )
+
+    await run_query(
+        "ALTER TABLE proyectos ADD COLUMN deployment_url VARCHAR;",
+        "Columna deployment_url añadida.",
+        "Error en proyectos deploy (quizá ya existe)"
+    )
 
 if __name__ == "__main__":
     asyncio.run(alter_table())
