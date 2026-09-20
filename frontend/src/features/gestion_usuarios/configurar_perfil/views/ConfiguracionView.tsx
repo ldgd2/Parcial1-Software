@@ -57,9 +57,60 @@ export const ConfiguracionView: React.FC = () => {
     }
   };
 
+  // Browser Permissions State
+  const [micPermissionStatus, setMicPermissionStatus] = useState<'prompt' | 'granted' | 'denied'>('prompt');
+  const [notificationPermission, setNotificationPermission] = useState<'default' | 'granted' | 'denied'>('default');
+  const [checkingMic, setCheckingMic] = useState(false);
+
   useEffect(() => {
     fetchConfig();
+    if ('Notification' in window) {
+      setNotificationPermission(Notification.permission);
+    }
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'microphone' as PermissionName })
+        .then((result) => {
+          setMicPermissionStatus(result.state as any);
+          result.onchange = () => setMicPermissionStatus(result.state as any);
+        })
+        .catch(() => {});
+    }
   }, []);
+
+  const handleSolicitarMicrofono = async () => {
+    setCheckingMic(true);
+    setBanner(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((track) => track.stop());
+      setMicPermissionStatus('granted');
+      setBanner({ type: 'success', text: '¡Permiso de micrófono concedido exitosamente!' });
+    } catch (err: any) {
+      setMicPermissionStatus('denied');
+      setBanner({ type: 'error', text: 'Permiso de micrófono denegado o no disponible en este dispositivo.' });
+    } finally {
+      setCheckingMic(false);
+    }
+  };
+
+  const handleSolicitarNotificaciones = async () => {
+    setBanner(null);
+    if (!('Notification' in window)) {
+      setBanner({ type: 'error', text: 'Este navegador no soporta notificaciones de escritorio.' });
+      return;
+    }
+    try {
+      const perm = await Notification.requestPermission();
+      setNotificationPermission(perm);
+      if (perm === 'granted') {
+        setBanner({ type: 'success', text: '¡Notificaciones web concedidas correctamente!' });
+      } else {
+        setBanner({ type: 'error', text: 'Permiso de notificaciones denegado por el navegador.' });
+      }
+    } catch {
+      setBanner({ type: 'error', text: 'Error al solicitar permisos de notificaciones.' });
+    }
+  };
 
   // Handlers for Host DB Password
   const handleSolicitarOtpDb = async () => {
@@ -578,27 +629,132 @@ export const ConfiguracionView: React.FC = () => {
                 </div>
               )}
 
-              {/* TAB 5: Preferencias de Sistema */}
+              {/* TAB 5: Preferencias de Sistema & Permisos del Navegador */}
               {activeTab === 'preferencias' && (
                 <div className="tab-pane fadeIn">
                   <div className="pane-header">
-                    <h2>Preferencias del Sistema</h2>
-                    <p>Opciones generales del entorno de trabajo y persistencia local.</p>
+                    <h2>Preferencias del Sistema & Permisos</h2>
+                    <p>Configura los accesos de hardware y navegador para audio, voz, archivos y notificaciones.</p>
                   </div>
 
                   <div className="config-card">
+                    {/* Permiso de Micrófono / Audio */}
                     <div className="pref-row">
-                      <div>
-                        <strong>Tema del Entorno</strong>
-                        <p>Paleta oscura de alto contraste (Gerlextech Premium Dark).</p>
+                      <div className="pref-info">
+                        <div className="pref-icon">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+                        </div>
+                        <div>
+                          <strong>Permiso de Micrófono (Dictado por Voz)</strong>
+                          <p>Permite enviar instrucciones y comandos de voz al Asistente IA para generar diagramas.</p>
+                        </div>
+                      </div>
+
+                      <div className="pref-action">
+                        {micPermissionStatus === 'granted' ? (
+                          <span className="pref-badge active">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
+                            Concedido
+                          </span>
+                        ) : micPermissionStatus === 'denied' ? (
+                          <span className="pref-badge danger">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            Denegado
+                          </span>
+                        ) : (
+                          <span className="pref-badge">Pendiente</span>
+                        )}
+
+                        <button
+                          type="button"
+                          className="btn-secondary btn-sm"
+                          onClick={handleSolicitarMicrofono}
+                          disabled={checkingMic}
+                        >
+                          {checkingMic ? 'Probando...' : 'Activar / Probar Micrófono'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Permisos de Archivos & Carga */}
+                    <div className="pref-row">
+                      <div className="pref-info">
+                        <div className="pref-icon">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        </div>
+                        <div>
+                          <strong>Subida & Exportación de Archivos</strong>
+                          <p>Habilita la lectura de imágenes, archivos XML (Enterprise Architect) y JSON en el disco local.</p>
+                        </div>
+                      </div>
+
+                      <div className="pref-action">
+                        <span className="pref-badge active">Habilitado</span>
+                      </div>
+                    </div>
+
+                    {/* Permisos de Notificaciones Web */}
+                    <div className="pref-row">
+                      <div className="pref-info">
+                        <div className="pref-icon">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                        </div>
+                        <div>
+                          <strong>Notificaciones Web del Navegador</strong>
+                          <p>Recibe avisos de aprobación de ingreso a salas y finalización de despliegues.</p>
+                        </div>
+                      </div>
+
+                      <div className="pref-action">
+                        {notificationPermission === 'granted' ? (
+                          <span className="pref-badge active">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
+                            Concedido
+                          </span>
+                        ) : notificationPermission === 'denied' ? (
+                          <span className="pref-badge danger">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            Denegado
+                          </span>
+                        ) : (
+                          <span className="pref-badge">Pendiente</span>
+                        )}
+
+                        {notificationPermission !== 'granted' && (
+                          <button
+                            type="button"
+                            className="btn-secondary btn-sm"
+                            onClick={handleSolicitarNotificaciones}
+                          >
+                            Activar Notificaciones
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Tema & Persistencia */}
+                    <div className="pref-row">
+                      <div className="pref-info">
+                        <div className="pref-icon">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                        </div>
+                        <div>
+                          <strong>Tema del Entorno</strong>
+                          <p>Paleta oscura de alto contraste (Gerlextech Premium Dark).</p>
+                        </div>
                       </div>
                       <span className="pref-badge">Oscuro (Predeterminado)</span>
                     </div>
 
                     <div className="pref-row">
-                      <div>
-                        <strong>Persistencia Offline (IndexedDB)</strong>
-                        <p>Los diagramas se sincronizan localmente en almacenamiento del navegador.</p>
+                      <div className="pref-info">
+                        <div className="pref-icon">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                        </div>
+                        <div>
+                          <strong>Persistencia Offline (IndexedDB)</strong>
+                          <p>Los diagramas se sincronizan automáticamente en almacenamiento IndexedDB local.</p>
+                        </div>
                       </div>
                       <span className="pref-badge active">Activo</span>
                     </div>
