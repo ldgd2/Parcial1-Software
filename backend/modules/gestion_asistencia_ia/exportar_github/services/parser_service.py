@@ -77,6 +77,7 @@ def inicializar_estructura_spring(temp_dir: str, nombre_repo: str = "proyecto_db
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-database-postgresql</artifactId>
+            <version>${flyway.version}</version>
         </dependency>
         <dependency>
             <groupId>org.postgresql</groupId>
