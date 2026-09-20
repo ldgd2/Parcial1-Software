@@ -122,7 +122,7 @@ async def exportar_proyecto(
                 url_auth = proyecto.github_repo_url.replace("https://", f"https://x-access-token:{token_real}@")
                 from backend.modules.gestion_proyectos.notificar_despliegue.services.webhook_service import notificar_deployer
                 import asyncio
-                asyncio.create_task(notificar_deployer(proyecto.id, url_auth, db_name, db_password, anfitrion.email))
+                asyncio.create_task(notificar_deployer(proyecto.id, url_auth, db_name, db_password, owner_prefix))
 
             return ExportarProyectoResponse(
                 url_repositorio=proyecto.github_repo_url,
@@ -143,7 +143,7 @@ async def exportar_proyecto(
                 url_auth = url_repositorio.replace("https://", f"https://x-access-token:{token_real}@")
                 from backend.modules.gestion_proyectos.notificar_despliegue.services.webhook_service import notificar_deployer
                 import asyncio
-                asyncio.create_task(notificar_deployer(proyecto.id, url_auth, db_name, db_password, anfitrion.email))
+                asyncio.create_task(notificar_deployer(proyecto.id, url_auth, db_name, db_password, owner_prefix))
             
             return ExportarProyectoResponse(
                 url_repositorio=url_repositorio,
