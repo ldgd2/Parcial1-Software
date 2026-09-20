@@ -281,9 +281,21 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
     else:
         process = subprocess.Popen(java_cmd, cwd=project_dir, stdout=log_file, stderr=log_file, start_new_session=True)
         
-    print(f"[{project_id}] Esperando 6 segundos a que Spring Boot inicie en puerto {deployment.port}...")
-    await asyncio.sleep(6)
-    
+    print(f"[{project_id}] Esperando a que Spring Boot inicie y escuche en el puerto {deployment.port}...")
+    ready = False
+    for _ in range(30):
+        await asyncio.sleep(0.5)
+        if process.poll() is not None:
+            break
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(0.2)
+                if s.connect_ex(('127.0.0.1', deployment.port)) == 0:
+                    ready = True
+                    break
+        except Exception:
+            pass
+
     if process.poll() is not None:
         print(f"[{project_id}] ERROR: El proceso de Spring Boot finalizó prematuramente (código: {process.returncode}).")
         try:
@@ -295,7 +307,7 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
         except Exception as log_err:
             print(f"[{project_id}] No se pudo leer app.log: {log_err}")
     else:
-        print(f"[{project_id}] El proceso de Spring Boot (PID {process.pid}) está activo en el puerto {deployment.port}.")
+        print(f"[{project_id}] El proceso de Spring Boot (PID {process.pid}) está activo y respondiendo en el puerto {deployment.port}.")
         
         # Otorgar permisos sobre todas las tablas recién creadas por Flyway/Hibernate al usuario del proyecto
         if db_name and owner_prefix:
@@ -327,6 +339,9 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
     proxy_set_header X-Forwarded-Prefix /host/{owner_prefix}/{db_name};
+    proxy_connect_timeout 60s;
+    proxy_read_timeout 60s;
+    proxy_send_timeout 60s;
 }}
 '''
             with open(nginx_conf_path, "w", encoding="utf-8") as f:
