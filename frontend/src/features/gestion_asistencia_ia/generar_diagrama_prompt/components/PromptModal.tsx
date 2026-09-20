@@ -14,18 +14,21 @@ export const PromptModal: React.FC<PromptModalProps> = ({ isOpen, onClose }) => 
         isLoading, 
         error, 
         generateDiagram, 
-        clearError 
+        isListening,
+        transcript,
+        setTranscript,
+        startListening,
+        stopListening
     } = usePromptGeneration();
     
     const { addNode, addRelation } = useDiagram();
-    const [prompt, setPrompt] = React.useState('');
 
     if (!isOpen) return null;
 
     const handleSubmit = async () => {
-        if (!prompt.trim()) return;
+        if (!transcript.trim()) return;
         
-        const result = await generateDiagram(prompt);
+        const result = await generateDiagram(transcript);
         
         if (result) {
             // Add nodes to diagram
