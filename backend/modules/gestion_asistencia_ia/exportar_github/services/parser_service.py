@@ -68,6 +68,8 @@ def parse_java_parameters(params_str: str) -> tuple[str, str, str]:
         
     return ", ".join(java_decls), ", ".join(call_args), ", ".join(spring_params)
 
+
+def inicializar_estructura_spring(temp_dir: str, nombre_repo: str = "proyecto_db", db_password: str = "password"):
     """
     Crea la estructura de carpetas y archivos base (pom.xml, Application.java, properties)
     para un proyecto Spring Boot estándar sin depender de un .zip
