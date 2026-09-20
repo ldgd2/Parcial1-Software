@@ -1,22 +1,32 @@
 package com.proyecto.dtos;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import java.util.UUID;
 import java.time.LocalDateTime;
 
 @Data
+@Schema(description = "Estructura de datos JSON devuelta por el servidor con los datos completos de {{ clase.nombre }}")
 public class {{ clase.nombre }}ResponseDTO {
 
+    @Schema(description = "UUID único de {{ clase.nombre }}", example = "3fa85f64-5717-4562-b3fc-2c963f66afa6")
     private UUID id;
 
     {% for attr in clase.atributos %}
     {% if attr.nombre | lower not in ['id', 'createdat', 'updatedat', 'isactive'] %}
+    @Schema(description = "Atributo {{ attr.nombre }}", example = "{{ attr.ejemplo_val }}")
     private {{ attr.tipo }} {{ attr.nombre }};
     {% endif %}
     {% endfor %}
     
+    @Schema(description = "Fecha y hora de creación", example = "2026-09-20T22:42:22.694Z")
     private LocalDateTime createdAt;
+
+    @Schema(description = "Fecha y hora de última modificación", example = "2026-09-20T22:42:22.694Z")
     private LocalDateTime updatedAt;
+
+    @Schema(description = "Estado de registro activo (true/false)", example = "true")
     private Boolean isActive;
 }
+
 

@@ -1,17 +1,22 @@
 package com.proyecto.dtos;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import java.util.UUID;
 import java.time.LocalDateTime;
 
 @Data
+@Schema(description = "Estructura de datos JSON enviada para crear o actualizar {{ clase.nombre }}")
 public class {{ clase.nombre }}RequestDTO {
 
+    @Schema(description = "UUID opcional de {{ clase.nombre }}", example = "3fa85f64-5717-4562-b3fc-2c963f66afa6")
     private UUID id;
 
     {% for attr in clase.atributos %}
     {% if attr.nombre | lower not in ['id', 'createdat', 'updatedat', 'isactive'] %}
+    @Schema(description = "Atributo {{ attr.nombre }}", example = "{{ attr.ejemplo_val }}")
     private {{ attr.tipo }} {{ attr.nombre }};
     {% endif %}
     {% endfor %}
 }
+

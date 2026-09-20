@@ -5,6 +5,10 @@ import com.proyecto.dtos.{{ clase.nombre }}ResponseDTO;
 import com.proyecto.services.{{ clase.nombre }}Service;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,54 +22,149 @@ import java.util.UUID;
 @CrossOrigin(originPatterns = "*", allowedHeaders = "*", allowCredentials = "true")
 @RestController
 @RequestMapping("/api/{{ clase.nombre | lower }}s")
-@Tag(name = "{{ clase.nombre }}", description = "API para la gestión de {{ clase.nombre }}")
+@Tag(name = "{{ clase.nombre }}", description = "API RESTful para la gestión y operaciones de {{ clase.nombre }}")
 public class {{ clase.nombre }}Controller {
 
     @Autowired
     private {{ clase.nombre }}Service service;
 
-    @Operation(summary = "Obtener todos", description = "Obtiene la lista completa de {{ clase.nombre }}")
+    @Operation(
+        summary = "Obtener todos los registros",
+        description = "Retorna la lista completa de registros de {{ clase.nombre }}."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200",
+            description = "Lista obtenida exitosamente",
+            content = @Content(schema = @Schema(implementation = {{ clase.nombre }}ResponseDTO.class))
+        )
+    })
     @GetMapping
     public ResponseEntity<List<{{ clase.nombre }}ResponseDTO>> getAll() {
         return ResponseEntity.ok(service.findAll());
     }
 
-    @Operation(summary = "Obtener por ID", description = "Busca un {{ clase.nombre }} por su UUID")
+    @Operation(
+        summary = "Obtener por ID",
+        description = "Obtiene los detalles completos de un {{ clase.nombre }} mediante su UUID de identificación."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200",
+            description = "Registro encontrado",
+            content = @Content(schema = @Schema(implementation = {{ clase.nombre }}ResponseDTO.class))
+        ),
+        @ApiResponse(responseCode = "404", description = "Registro no encontrado por el UUID proporcionado")
+    })
     @GetMapping("/{id}")
-    public ResponseEntity<{{ clase.nombre }}ResponseDTO> getById(@Parameter(description = "UUID de {{ clase.nombre }}") @PathVariable UUID id) {
+    public ResponseEntity<{{ clase.nombre }}ResponseDTO> getById(
+        @Parameter(description = "UUID único de {{ clase.nombre }}", example = "3fa85f64-5717-4562-b3fc-2c963f66afa6", required = true)
+        @PathVariable UUID id
+    ) {
         return ResponseEntity.ok(service.findById(id));
     }
 
-    @Operation(summary = "Crear nuevo", description = "Crea un nuevo {{ clase.nombre }} en el sistema")
+    @Operation(
+        summary = "Crear nuevo registro",
+        description = "Crea un nuevo {{ clase.nombre }} en el sistema enviando la estructura JSON indicada en el Request Body."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "201",
+            description = "Registro creado exitosamente",
+            content = @Content(schema = @Schema(implementation = {{ clase.nombre }}ResponseDTO.class))
+        ),
+        @ApiResponse(responseCode = "400", description = "JSON enviado es inválido o faltan campos obligatorios")
+    })
     @PostMapping
-    public ResponseEntity<{{ clase.nombre }}ResponseDTO> create(@Valid @RequestBody {{ clase.nombre }}RequestDTO dto) {
+    public ResponseEntity<{{ clase.nombre }}ResponseDTO> create(
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            description = "JSON con los datos del nuevo {{ clase.nombre }}",
+            required = true,
+            content = @Content(schema = @Schema(implementation = {{ clase.nombre }}RequestDTO.class))
+        )
+        @Valid @RequestBody {{ clase.nombre }}RequestDTO dto
+    ) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.create(dto));
     }
 
-    @Operation(summary = "Actualizar existente", description = "Actualiza un {{ clase.nombre }} de forma completa por su UUID")
+    @Operation(
+        summary = "Actualizar existente",
+        description = "Actualiza de forma completa todos los campos de un {{ clase.nombre }} existente especificado por su UUID."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200",
+            description = "Registro actualizado exitosamente",
+            content = @Content(schema = @Schema(implementation = {{ clase.nombre }}ResponseDTO.class))
+        ),
+        @ApiResponse(responseCode = "404", description = "Registro no encontrado")
+    })
     @PutMapping("/{id}")
-    public ResponseEntity<{{ clase.nombre }}ResponseDTO> update(@Parameter(description = "UUID de {{ clase.nombre }}") @PathVariable UUID id, @Valid @RequestBody {{ clase.nombre }}RequestDTO dto) {
+    public ResponseEntity<{{ clase.nombre }}ResponseDTO> update(
+        @Parameter(description = "UUID único de {{ clase.nombre }}", example = "3fa85f64-5717-4562-b3fc-2c963f66afa6", required = true)
+        @PathVariable UUID id,
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            description = "JSON con los campos actualizados de {{ clase.nombre }}",
+            required = true,
+            content = @Content(schema = @Schema(implementation = {{ clase.nombre }}RequestDTO.class))
+        )
+        @Valid @RequestBody {{ clase.nombre }}RequestDTO dto
+    ) {
         return ResponseEntity.ok(service.update(id, dto));
     }
 
-    @Operation(summary = "Actualización parcial", description = "Actualiza únicamente los campos provistos en el body de {{ clase.nombre }}")
+    @Operation(
+        summary = "Actualización parcial (PATCH)",
+        description = "Actualiza únicamente los campos provistos en el body JSON de {{ clase.nombre }} sin modificar el resto de atributos."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = "200",
+            description = "Actualización parcial realizada con éxito",
+            content = @Content(schema = @Schema(implementation = {{ clase.nombre }}ResponseDTO.class))
+        ),
+        @ApiResponse(responseCode = "404", description = "Registro no encontrado")
+    })
     @PatchMapping("/{id}")
-    public ResponseEntity<{{ clase.nombre }}ResponseDTO> patch(@Parameter(description = "UUID de {{ clase.nombre }}") @PathVariable UUID id, @RequestBody {{ clase.nombre }}RequestDTO dto) {
+    public ResponseEntity<{{ clase.nombre }}ResponseDTO> patch(
+        @Parameter(description = "UUID de {{ clase.nombre }}", example = "3fa85f64-5717-4562-b3fc-2c963f66afa6", required = true)
+        @PathVariable UUID id,
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            description = "JSON con únicamente los campos a modificar",
+            required = true,
+            content = @Content(schema = @Schema(implementation = {{ clase.nombre }}RequestDTO.class))
+        )
+        @RequestBody {{ clase.nombre }}RequestDTO dto
+    ) {
         return ResponseEntity.ok(service.patch(id, dto));
     }
 
-    @Operation(summary = "Eliminar por ID", description = "Elimina un {{ clase.nombre }} por su UUID")
+    @Operation(
+        summary = "Eliminar por ID",
+        description = "Elimina un {{ clase.nombre }} por su UUID."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "204", description = "Registro eliminado exitosamente"),
+        @ApiResponse(responseCode = "404", description = "Registro no encontrado")
+    })
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@Parameter(description = "UUID de {{ clase.nombre }} a eliminar") @PathVariable UUID id) {
+    public ResponseEntity<Void> delete(
+        @Parameter(description = "UUID de {{ clase.nombre }} a eliminar", example = "3fa85f64-5717-4562-b3fc-2c963f66afa6", required = true)
+        @PathVariable UUID id
+    ) {
         service.deleteById(id);
         return ResponseEntity.noContent().build();
     }
 
     {% for metodo in clase.metodos %}
     @Operation(
-        summary = "Lógica: {{ metodo.nombre }}",
-        description = "Operación de negocio personalizada '{{ metodo.nombre }}'. Parámetros esperados: {% if metodo.java_decl %}{{ metodo.java_decl }}{% else %}Ninguno{% endif %}. Retorno: {{ metodo.retorno }}."
+        summary = "Lógica de negocio: {{ metodo.nombre }}",
+        description = "Operación de negocio personalizada '{{ metodo.nombre }}'.\n\n- Parámetros esperados: {% if metodo.java_decl %}{{ metodo.java_decl }}{% else %}Ninguno{% endif %}.\n- Tipo de retorno: {{ metodo.retorno }}."
     )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Operación personalizada ejecutada exitosamente")
+    })
     {% if metodo.retorno == 'void' %}
     @PostMapping("/{{ metodo.nombre }}")
     public ResponseEntity<Void> {{ metodo.nombre }}({% if metodo.spring_params %}{{ metodo.spring_params }}{% endif %}) {
@@ -80,3 +179,4 @@ public class {{ clase.nombre }}Controller {
     {% endif %}
     {% endfor %}
 }
+

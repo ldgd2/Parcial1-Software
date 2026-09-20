@@ -29,18 +29,55 @@ def map_java_type(tipo_uml: str) -> str:
     return "String"
 
 
+def obtener_ejemplo_atributo_raw(nombre: str, tipo: str) -> str:
+    """Genera un valor de ejemplo realista en formato texto sin comillas envolventes."""
+    n = str(nombre).lower().strip()
+    t = str(tipo).lower().strip()
+    if "email" in n or "correo" in n:
+        return "usuario@ejemplo.com"
+    if "nombre" in n or "name" in n or "titulo" in n or "title" in n or "criterio" in n or "criterion" in n:
+        return f"Ejemplo {nombre.capitalize()}"
+    if "desc" in n or "description" in n:
+        return f"Descripción detallada de {nombre}"
+    if "telefono" in n or "phone" in n or "celular" in n:
+        return "+59171234567"
+    if "password" in n or "clave" in n or "pass" in n:
+        return "Secreto123!"
+    if "fecha" in n or "date" in n or "due" in n:
+        return "2026-09-20"
+    if "score" in n or "punto" in n or "nota" in n or "max" in n or "min" in n:
+        return "100"
+    if "bool" in t or "activo" in n or "is" in n or "group" in n:
+        return "true"
+    if "double" in t or "float" in t or "precio" in n or "monto" in n or "total" in n or "costo" in n:
+        return "99.50"
+    if "int" in t or "integer" in t or "edad" in n or "stock" in n or "cantidad" in n:
+        return "10"
+    if "uuid" in t or n == "id":
+        return "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+    return f"ejemplo_{n}"
+
+
+def obtener_ejemplo_atributo_json(nombre: str, tipo: str) -> str:
+    """Genera un valor formateado para JSON (con comillas si es string/date, sin comillas si es número/bool)."""
+    val = obtener_ejemplo_atributo_raw(nombre, tipo)
+    t = str(tipo).lower().strip()
+    if val in ["true", "false"] or t in ["integer", "int", "double", "float", "long", "short"]:
+        return val
+    return f'"{val}"'
+
+
 RESERVED_CRUD_METHODS = {'delete', 'deletebyid', 'remove', 'save', 'update', 'create', 'findall', 'findbyid', 'getid', 'setid'}
 
 def parse_java_parameters(params_str: str, method_name: str = "") -> tuple[str, str, str]:
     """
     Parsea parámetros UML o Java a (java_decl, call_args, spring_params).
-    Si los parámetros están vacíos pero el nombre del método sugiere una búsqueda (ej: getUser, buscar),
+    Si los parámetros están vacíos pero el nombre del método sugiere una búsqueda o criterio,
     deduce parámetros por defecto para que la API sea funcional y auto-documentada.
     """
     m_lower = method_name.lower().strip()
     
     if not params_str or not str(params_str).strip():
-        # Deducir parámetros inteligentes si el usuario no especificó parámetros en el diagrama
         if "email" in m_lower or "correo" in m_lower or "user" in m_lower or "usuario" in m_lower:
             params_str = "email: string"
         elif "codigo" in m_lower or "code" in m_lower:
@@ -49,6 +86,8 @@ def parse_java_parameters(params_str: str, method_name: str = "") -> tuple[str, 
             params_str = "nombre: string"
         elif "estado" in m_lower or "status" in m_lower:
             params_str = "estado: string"
+        elif "criterion" in m_lower or "criterio" in m_lower:
+            params_str = "criteriondescription: string"
         elif m_lower.startswith(("get", "find", "buscar", "filter", "search")):
             params_str = "query: string"
 
@@ -77,9 +116,10 @@ def parse_java_parameters(params_str: str, method_name: str = "") -> tuple[str, 
         if not p_name or p_name == "unnamed":
             p_name = f"arg{idx}"
             
+        ex_val = obtener_ejemplo_atributo_raw(p_name, p_type)
         java_decls.append(f"{p_type} {p_name}")
         call_args.append(p_name)
-        spring_params.append(f'@Parameter(description = "Parámetro {p_name} ({p_type})") @RequestParam(required = false) {p_type} {p_name}')
+        spring_params.append(f'@Parameter(description = "Parámetro {p_name} ({p_type})", example = "{ex_val}") @RequestParam(required = false) {p_type} {p_name}')
         
     return ", ".join(java_decls), ", ".join(call_args), ", ".join(spring_params)
 
@@ -547,6 +587,8 @@ def generar_archivos_java(diagram_json: dict, temp_dir: str):
                     nuevo_a["tipo"] = map_java_type(a.get("tipo", ""))
                 else:
                     nuevo_a["tipo"] = "UUID"
+                
+                nuevo_a["ejemplo_val"] = obtener_ejemplo_atributo_raw(nuevo_nombre, nuevo_a["tipo"])
                 atributos_sanitizados.append(nuevo_a)
 
             metodos_sanitizados = []
@@ -605,30 +647,6 @@ def generar_archivos_java(diagram_json: dict, temp_dir: str):
             with open(os.path.join(src_main_java, "dtos", f"{clase_data['nombre']}ResponseDTO.java"), "w", encoding="utf-8") as f:
                 f.write(codigo_res_dto)
 
-def obtener_ejemplo_atributo(nombre: str, tipo: str) -> str:
-    """Genera un valor de ejemplo realista según el nombre del campo y tipo de dato."""
-    n = str(nombre).lower().strip()
-    t = str(tipo).lower().strip()
-    if "email" in n or "correo" in n:
-        return '"usuario@ejemplo.com"'
-    if "nombre" in n or "name" in n or "titulo" in n or "title" in n:
-        return f'"Ejemplo {nombre.capitalize()}"'
-    if "telefono" in n or "phone" in n or "celular" in n:
-        return '"+59171234567"'
-    if "password" in n or "clave" in n or "pass" in n:
-        return '"Secreto123!"'
-    if "fecha" in n or "date" in n:
-        return '"2026-09-20"'
-    if "bool" in t or "activo" in n or "is" in n:
-        return 'true'
-    if "double" in t or "float" in t or "precio" in n or "monto" in n or "total" in n or "costo" in n:
-        return '99.50'
-    if "int" in t or "integer" in t or "edad" in n or "stock" in n or "cantidad" in n:
-        return '25'
-    if "uuid" in t or n == "id":
-        return '"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"'
-    return f'"ejemplo_{n}"'
-
 def generar_documentacion_md(diagram_json: dict, url_base: str, nombre_repo: str, descripcion_proyecto: str = "") -> str:
     """Genera la documentación en formato Markdown detallada con ejemplos prácticos de cURL, JSON y parámetros."""
     nodos = diagram_json.get("nodes", [])
@@ -647,7 +665,7 @@ def generar_documentacion_md(diagram_json: dict, url_base: str, nombre_repo: str
         if nodo.get("type") in ["class", "interface"]:
             nombre = sanitize_identifier(nodo.get("nombre", "Entidad")).capitalize()
             ruta = nombre.lower() + "s"
-            base_endpoint = f"{url_base}/api/v1/{ruta}"
+            base_endpoint = f"{url_base}/api/{ruta}"
             
             md += f"### Entidad: `{nombre}`\n"
             md += f"Ruta Base: `{base_endpoint}`\n\n"
@@ -660,18 +678,18 @@ def generar_documentacion_md(diagram_json: dict, url_base: str, nombre_repo: str
                 for a in atributos:
                     n = sanitize_identifier(a.get("nombre", ""))
                     t = map_java_type(a.get("tipo", ""))
-                    ex_val = obtener_ejemplo_atributo(n, t)
+                    ex_val = obtener_ejemplo_atributo_json(n, t)
                     json_example_lines.append(f'  "{n}": {ex_val}')
                 
                 if len(atributos) > 0:
                     first_attr = sanitize_identifier(atributos[0].get("nombre", ""))
                     first_type = map_java_type(atributos[0].get("tipo", ""))
-                    json_patch_example_lines.append(f'  "{first_attr}": {obtener_ejemplo_atributo(first_attr, first_type)}')
+                    json_patch_example_lines.append(f'  "{first_attr}": {obtener_ejemplo_atributo_json(first_attr, first_type)}')
             
             body_json_full = "{\n" + ",\n".join(json_example_lines) + "\n}" if json_example_lines else "{}"
             body_json_patch = "{\n" + ",\n".join(json_patch_example_lines) + "\n}" if json_patch_example_lines else "{}"
             
-            md += "**Estructura de Datos JSON (Ejemplo de Body):**\n```json\n" + body_json_full + "\n```\n\n"
+            md += "**Estructura de Datos JSON Body para POST/PUT (Petición):**\n```json\n" + body_json_full + "\n```\n\n"
             
             md += "#### 🛠️ Operaciones CRUD Estándar:\n\n"
             
@@ -683,7 +701,7 @@ def generar_documentacion_md(diagram_json: dict, url_base: str, nombre_repo: str
             # GET BY ID
             md += f"2. **`GET {base_endpoint}/{{id}}`** — Obtener por UUID\n"
             md += f"   - **Ejemplo `curl`:**\n"
-            md += f"     ```bash\n     curl -X GET \"{base_endpoint}/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11\"\n     ```\n\n"
+            md += f"     ```bash\n     curl -X GET \"{base_endpoint}/3fa85f64-5717-4562-b3fc-2c963f66afa6\"\n     ```\n\n"
             
             # POST
             md += f"3. **`POST {base_endpoint}`** — Crear nuevo registro\n"
@@ -695,18 +713,18 @@ def generar_documentacion_md(diagram_json: dict, url_base: str, nombre_repo: str
             md += f"4. **`PUT {base_endpoint}/{{id}}`** — Actualización completa por UUID\n"
             md += f"   - **Header:** `Content-Type: application/json`\n"
             md += f"   - **Ejemplo `curl`:**\n"
-            md += f"     ```bash\n     curl -X PUT \"{base_endpoint}/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11\" \\\n       -H \"Content-Type: application/json\" \\\n       -d '{body_json_full}'\n     ```\n\n"
+            md += f"     ```bash\n     curl -X PUT \"{base_endpoint}/3fa85f64-5717-4562-b3fc-2c963f66afa6\" \\\n       -H \"Content-Type: application/json\" \\\n       -d '{body_json_full}'\n     ```\n\n"
             
             # PATCH
             md += f"5. **`PATCH {base_endpoint}/{{id}}`** — Actualización parcial (solo campos enviados)\n"
             md += f"   - **Header:** `Content-Type: application/json`\n"
             md += f"   - **Ejemplo `curl`:**\n"
-            md += f"     ```bash\n     curl -X PATCH \"{base_endpoint}/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11\" \\\n       -H \"Content-Type: application/json\" \\\n       -d '{body_json_patch}'\n     ```\n\n"
+            md += f"     ```bash\n     curl -X PATCH \"{base_endpoint}/3fa85f64-5717-4562-b3fc-2c963f66afa6\" \\\n       -H \"Content-Type: application/json\" \\\n       -d '{body_json_patch}'\n     ```\n\n"
             
             # DELETE
             md += f"6. **`DELETE {base_endpoint}/{{id}}`** — Eliminar registro por UUID\n"
             md += f"   - **Ejemplo `curl`:**\n"
-            md += f"     ```bash\n     curl -X DELETE \"{base_endpoint}/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11\"\n     ```\n\n"
+            md += f"     ```bash\n     curl -X DELETE \"{base_endpoint}/3fa85f64-5717-4562-b3fc-2c963f66afa6\"\n     ```\n\n"
 
             metodos = nodo.get("metodos", [])
             if metodos:
@@ -718,13 +736,13 @@ def generar_documentacion_md(diagram_json: dict, url_base: str, nombre_repo: str
                     java_decl, call_args, _ = parse_java_parameters(str(m.get("parametros", "")), m_name)
                     ret_type = map_java_type(m.get("retorno", "void")) if str(m.get("retorno", "")).lower() != "void" else "void"
                     
-                    # Construir query string de ejemplo si recibe parametros
                     query_example = ""
                     if call_args:
                         params_list = [p.strip() for p in call_args.split(",") if p.strip()]
                         query_parts = []
                         for p in params_list:
-                            query_parts.append(f"{p}=ejemplo_{p}")
+                            ex = obtener_ejemplo_atributo_raw(p, "String")
+                            query_parts.append(f"{p}={ex}")
                         query_example = "?" + "&".join(query_parts)
 
                     method_endpoint = f"{base_endpoint}/{m_name}"
