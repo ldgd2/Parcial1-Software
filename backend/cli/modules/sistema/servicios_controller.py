@@ -68,38 +68,21 @@ WantedBy=multi-user.target
 """
     with open(os.path.join(SERVICE_DIR, "backend-app.service"), "w") as f: f.write(content_b)
 
-    # 2. Crear Systemd para Frontend
-    comando_f = "npm run preview -- --host 0.0.0.0 --port 4173"
-    content_f = f"""[Unit]
-Description=frontend-app Service
-After=network.target
-
-[Service]
-User=root
-WorkingDirectory={os.path.join(BASE_DIR, "frontend")}
-ExecStart={comando_f}
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-"""
-    with open(os.path.join(SERVICE_DIR, "frontend-app.service"), "w") as f: f.write(content_f)
+    # 2. (Eliminado) Frontend ya no usa Systemd, lo servirá NGINX directamente.
 
     # 3. Crear NGINX configs
     if modo == "dominio":
-        conf_frontend = """server {
+        conf_frontend = f"""server {{
     listen 80;
     server_name diagramador.example.com;
+    
+    root {os.path.join(BASE_DIR, "frontend", "dist")};
+    index index.html;
 
-    location / {
-        proxy_pass http://localhost:4173;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
+    location / {{
+        try_files $uri $uri/ /index.html;
+    }}
+}}
 """
         conf_backend = """server {
     listen 80;
@@ -125,13 +108,11 @@ server {{
     listen 80;
     server_name {ip_address};
 
+    root {os.path.join(BASE_DIR, "frontend", "dist")};
+    index index.html;
+
     location / {{
-        proxy_pass http://localhost:4173;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
+        try_files $uri $uri/ /index.html;
     }}
 }}
 
@@ -160,7 +141,7 @@ server {{
         console.print("[cyan]Aplicando configuraciones NGINX y Systemd...[/cyan]")
         os.system(f"sudo cp {SERVICE_DIR}/*.service /etc/systemd/system/")
         os.system("sudo systemctl daemon-reload")
-        os.system("sudo systemctl enable --now backend-app frontend-app")
+        os.system("sudo systemctl enable --now backend-app")
         
         os.system(f"sudo cp {NGINX_CONF_DIR}/* /etc/nginx/sites-available/")
         if modo == "dominio":
@@ -182,7 +163,7 @@ def reiniciar_todo():
         console.print("[cyan]Haciendo rebuild del Frontend...[/cyan]")
         subprocess.run("npm run build", cwd=os.path.join(BASE_DIR, "frontend"), shell=True)
         console.print("[cyan]Reiniciando servicios...[/cyan]")
-        os.system("sudo systemctl restart backend-app frontend-app nginx")
+        os.system("sudo systemctl restart backend-app nginx")
         console.print("[bold green]✔ Servicios reiniciados.[/bold green]")
     else:
         console.print("[bold green]✔ Mock de reinicio (Windows).[/bold green]")
@@ -191,7 +172,7 @@ def detener_todo():
     if not existe_servicio(): return console.print("[red]No hay servicios activos.[/red]")
     if os.name != 'nt':
         console.print("[cyan]Deteniendo servicios...[/cyan]")
-        os.system("sudo systemctl stop backend-app frontend-app")
+        os.system("sudo systemctl stop backend-app")
         console.print("[bold green]✔ Servicios detenidos.[/bold green]")
     else:
         console.print("[bold green]✔ Mock de detención (Windows).[/bold green]")
@@ -202,8 +183,8 @@ def eliminar_todo():
     if confirm == 's':
         if os.name != 'nt':
             console.print("[cyan]Eliminando servicios Systemd...[/cyan]")
-            os.system("sudo systemctl stop backend-app frontend-app")
-            os.system("sudo systemctl disable backend-app frontend-app")
+            os.system("sudo systemctl stop backend-app")
+            os.system("sudo systemctl disable backend-app")
             os.system("sudo rm -f /etc/systemd/system/backend-app.service /etc/systemd/system/frontend-app.service")
             os.system("sudo systemctl daemon-reload")
             
