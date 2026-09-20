@@ -1,0 +1,120 @@
+.url-copy-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--surface-color, #393E46);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+  border-radius: var(--radius-lg, 8px);
+  text-align: left;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.url-copy-card.highlight {
+  border-color: var(--primary, #DFD0B8);
+  box-shadow: 0 0 15px rgba(223, 208, 184, 0.12);
+  background: rgba(223, 208, 184, 0.04);
+}
+
+.url-copy-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.url-copy-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary, #ffffff);
+  font-size: 0.85rem;
+}
+
+.url-copy-card-title svg {
+  color: var(--primary, #DFD0B8);
+  flex-shrink: 0;
+}
+
+.url-copy-card-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: rgba(223, 208, 184, 0.15);
+  color: var(--primary, #DFD0B8);
+  border: 1px solid rgba(223, 208, 184, 0.3);
+}
+
+.url-copy-card-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-color, #222831);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+  border-radius: var(--radius-md, 6px);
+  padding: 4px;
+}
+
+.url-copy-card-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-primary, #ffffff);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8rem;
+  padding: 6px 8px;
+  outline: none;
+  user-select: all;
+  min-width: 0;
+}
+
+.url-copy-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.url-copy-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.url-copy-action-btn.copy-btn {
+  background: var(--primary, #DFD0B8);
+  color: var(--bg-color, #222831);
+}
+
+.url-copy-action-btn.copy-btn:hover {
+  background: var(--primary-hover, #eaddcb);
+}
+
+.url-copy-action-btn.copy-btn.copied {
+  background: #10b981;
+  color: #ffffff;
+}
+
+.url-copy-action-btn.open-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary, #DFD0B8);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+}
+
+.url-copy-action-btn.open-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}

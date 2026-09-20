@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useExportarGithub } from '@/features/gestion_asistencia_ia/exportar_github/hooks/useExportarGithub';
+import { UrlCopyCard } from '@/shared/components/ui/UrlCopyCard/UrlCopyCard';
 import './ExportModal.css';
 
 interface Props {
@@ -173,43 +174,48 @@ export const ExportModal: React.FC<Props> = ({
             <p className="success-message">{result.mensaje || 'Tu backend Spring Boot ha sido procesado exitosamente.'}</p>
 
             <div className="success-links-list">
+              {result.deployed_url && (
+                <UrlCopyCard
+                  label="URL para la API (Servicio Desplegado)"
+                  url={result.deployed_url}
+                  badgeText="API Online"
+                  highlight={true}
+                  icon={
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="2" y1="12" x2="22" y2="12" />
+                      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                    </svg>
+                  }
+                />
+              )}
+
+              {result.deployed_url && (
+                <UrlCopyCard
+                  label="Documentación Swagger UI"
+                  url={`${result.deployed_url.replace(/\/$/, '')}/help`}
+                  badgeText="Swagger"
+                  icon={
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                      <line x1="16" y1="13" x2="8" y2="13" />
+                      <line x1="16" y1="17" x2="8" y2="17" />
+                    </svg>
+                  }
+                />
+              )}
+
               {result.repo_url && (
-                <a href={result.repo_url} target="_blank" rel="noopener noreferrer" className="success-link-card">
-                  <div className="link-info">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 22v-4a48 48 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/></svg>
-                    <div>
-                      <strong>Repositorio GitHub</strong>
-                      <span>{result.repo_url}</span>
-                    </div>
-                  </div>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
-                </a>
-              )}
-
-              {result.deployed_url && (
-                <a href={result.deployed_url} target="_blank" rel="noopener noreferrer" className="success-link-card highlight">
-                  <div className="link-info">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                    <div>
-                      <strong>Servicio Desplegado (Base API)</strong>
-                      <span>{result.deployed_url}</span>
-                    </div>
-                  </div>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
-                </a>
-              )}
-
-              {result.deployed_url && (
-                <a href={`${result.deployed_url.replace(/\/$/, '')}/help`} target="_blank" rel="noopener noreferrer" className="success-link-card">
-                  <div className="link-info">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                    <div>
-                      <strong>Documentación Swagger UI</strong>
-                      <span>{result.deployed_url.replace(/\/$/, '')}/help</span>
-                    </div>
-                  </div>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
-                </a>
+                <UrlCopyCard
+                  label="Repositorio GitHub"
+                  url={result.repo_url}
+                  icon={
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M15 22v-4a48 48 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" />
+                    </svg>
+                  }
+                />
               )}
             </div>
 
