@@ -161,12 +161,35 @@ public class {{ clase.nombre }}Controller {
     {% for metodo in clase.metodos %}
     @Operation(
         summary = "Lógica de negocio: {{ metodo.nombre }}",
-        description = "Operación de negocio personalizada '{{ metodo.nombre }}'.\n\n- Parámetros requeridos: {% if metodo.java_decl %}{{ metodo.java_decl }}{% else %}Ninguno{% endif %}.\n- Tipo de retorno: {{ metodo.retorno }}."
+        description = "Operación de negocio personalizada '{{ metodo.nombre }}'.\n\n" +
+                      "**Parámetros requeridos:**\n" +
+                      "{% if metodo.java_decl %}- {{ metodo.java_decl }}\n{% else %}- Ninguno\n{% endif %}\n" +
+                      "**Tipo de retorno:** `{{ metodo.retorno }}`"
     )
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Operación personalizada '{{ metodo.nombre }}' ejecutada con éxito"),
-        @ApiResponse(responseCode = "400", description = "Parámetros de entrada inválidos para '{{ metodo.nombre }}'")
+        @ApiResponse(
+            responseCode = "200",
+            description = "Operación personalizada '{{ metodo.nombre }}' ejecutada con éxito"{% if metodo.return_json_example %},
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = Object.class), examples = @ExampleObject(name = "Respuesta {{ metodo.nombre }}", value = "{{ metodo.return_json_example }}")){% endif %}
+        ),
+        @ApiResponse(responseCode = "400", description = "Parámetros de entrada inválidos para '{{ metodo.nombre }}'"),
+        @ApiResponse(responseCode = "500", description = "Error interno ejecutando la lógica de negocio '{{ metodo.nombre }}'")
     })
+    {% if metodo.json_body_example %}
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+        description = "Estructura JSON del cuerpo de la petición (Body) para la operación '{{ metodo.nombre }}'",
+        required = false,
+        content = @Content(
+            mediaType = "application/json",
+            schema = @Schema(implementation = Object.class),
+            examples = @ExampleObject(
+                name = "Ejemplo {{ metodo.nombre }}",
+                summary = "Ejemplo de parámetros JSON para {{ metodo.nombre }}",
+                value = "{{ metodo.json_body_example }}"
+            )
+        )
+    )
+    {% endif %}
     {% if metodo.retorno == 'void' %}
     @PostMapping("/{{ metodo.nombre }}")
     public ResponseEntity<Void> {{ metodo.nombre }}({% if metodo.spring_params %}{{ metodo.spring_params }}{% endif %}) {
@@ -181,6 +204,7 @@ public class {{ clase.nombre }}Controller {
     {% endif %}
     {% endfor %}
 }
+
 
 
 
