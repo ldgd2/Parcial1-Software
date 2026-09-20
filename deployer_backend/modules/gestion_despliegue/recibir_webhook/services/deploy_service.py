@@ -112,13 +112,15 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
             pg_host = settings.PG_HOST
             psql_cmd = ["psql", "-U", "postgres", "-h", pg_host]
 
-            create_role_sql = f"DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '{db_user}') THEN CREATE ROLE \"{db_user}\" WITH LOGIN ENCRYPTED PASSWORD '{db_password}'; END IF; END $$;"
+            create_role_sql = f"DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '{db_user}') THEN CREATE ROLE \"{db_user}\" WITH LOGIN ENCRYPTED PASSWORD '{db_password}'; ELSE ALTER ROLE \"{db_user}\" WITH PASSWORD '{db_password}'; END IF; END $$;"
             subprocess.run(psql_cmd + ["-c", create_role_sql], env=env, check=True)
 
             check_result = subprocess.run(psql_cmd + ["-t", "-c", f"SELECT 1 FROM pg_database WHERE datname = '{db_name}';"], env=env, capture_output=True, text=True)
             if "1" not in check_result.stdout:
                 subprocess.run(psql_cmd + ["-c", f'CREATE DATABASE "{db_name}" OWNER "{db_user}";'], env=env, check=True)
-            print(f"[{project_id}] Base de datos {db_name} lista.")
+            
+            subprocess.run(psql_cmd + ["-c", f'GRANT ALL PRIVILEGES ON DATABASE "{db_name}" TO "{db_user}";'], env=env, check=True)
+            print(f"[{project_id}] Base de datos {db_name} lista y permisos otorgados a {db_user}.")
         except subprocess.CalledProcessError as e:
             print(f"[{project_id}] Error aprovisionando BD PostgreSQL: {e}")
             # Non-fatal error, but Spring Boot might fail to connect
@@ -201,6 +203,9 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
     else:
         # In Linux, nohup equivalent or just detaching
         process = subprocess.Popen(java_cmd, cwd=project_dir, stdout=log_file, stderr=log_file, start_new_session=True)
+        
+    print(f"[{project_id}] Esperando 6 segundos a que Spring Boot inicie en puerto {deployment.port}...")
+    await asyncio.sleep(6)
         
     # 6. Configurar Nginx Dinámicamente si hay owner_prefix
     deployment_url = f"http://{settings.SERVER_HOST}:{deployment.port}"
