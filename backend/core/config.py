@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_SECRET: str = ""
     ENCRYPTION_MASTER_KEY: str = ""
 
+    # Dominio publico donde se sirven las apps desplegadas (ej: https://host.gerlextech.com)
+    HOST_DOMAIN: str = "http://localhost"
+
     @property
     def DATABASE_URL(self) -> str:
         from urllib.parse import quote_plus

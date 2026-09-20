@@ -106,7 +106,7 @@ async def exportar_proyecto(
         owner_prefix = anfitrion.email.split("@")[0] if anfitrion.email else "user"
         if payload.auto_deploy:
             from backend.core.config import settings
-            url_base = f"{settings.DEPLOYER_URL}/host/{owner_prefix}/{db_name}"
+            url_base = f"{settings.HOST_DOMAIN}/host/{owner_prefix}/{db_name}"
         else:
             url_base = "http://localhost:8080"
             
