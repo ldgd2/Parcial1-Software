@@ -205,6 +205,19 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
         
     print(f"[{project_id}] Esperando 6 segundos a que Spring Boot inicie en puerto {deployment.port}...")
     await asyncio.sleep(6)
+    
+    if process.poll() is not None:
+        print(f"[{project_id}] ERROR: El proceso de Spring Boot finalizó prematuramente (código: {process.returncode}).")
+        try:
+            with open(os.path.join(project_dir, "app.log"), "r", encoding="utf-8", errors="ignore") as f:
+                logs = f.read()
+                print(f"[{project_id}] --- APP LOG INICIO ---")
+                print(logs[-2000:] if len(logs) > 2000 else logs)
+                print(f"[{project_id}] --- APP LOG FIN ---")
+        except Exception as log_err:
+            print(f"[{project_id}] No se pudo leer app.log: {log_err}")
+    else:
+        print(f"[{project_id}] El proceso de Spring Boot (PID {process.pid}) está activo en el puerto {deployment.port}.")
         
     # 6. Configurar Nginx Dinámicamente si hay owner_prefix
     deployment_url = f"http://{settings.SERVER_HOST}:{deployment.port}"
@@ -214,7 +227,7 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
             os.makedirs(nginx_conf_dir, exist_ok=True)
             
             nginx_conf_path = os.path.join(nginx_conf_dir, f"{project_id}.conf")
-            nginx_conf_content = f'''location /host/{owner_prefix}/{db_name}/ {{
+            nginx_conf_content = f'''location /host/{owner_prefix}/{db_name} {{
     proxy_pass http://localhost:{deployment.port};
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
