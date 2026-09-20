@@ -67,11 +67,27 @@ def obtener_ejemplo_atributo_json(nombre: str, tipo: str) -> str:
     return f'"{val}"'
 
 
+def obtener_ejemplo_retorno(tipo_retorno: str) -> str:
+    """Genera un string JSON de ejemplo formateado para Java annotation en respuestas de Swagger."""
+    t = str(tipo_retorno).lower().strip()
+    if t == "void":
+        return "{\\n  \\\"status\\\": \\\"OK\\\",\\n  \\\"message\\\": \\\"Operación ejecutada con éxito\\\"\\n}"
+    if "int" in t or "integer" in t:
+        return "10"
+    if "bool" in t:
+        return "true"
+    if "double" in t or "float" in t:
+        return "99.5"
+    if "string" in t:
+        return "\\\"Resultado de la operación\\\""
+    return "{\\n  \\\"result\\\": \\\"Operación exitosa\\\"\\n}"
+
+
 RESERVED_CRUD_METHODS = {'delete', 'deletebyid', 'remove', 'save', 'update', 'create', 'findall', 'findbyid', 'getid', 'setid'}
 
-def parse_java_parameters(params_str: str, method_name: str = "") -> tuple[str, str, str]:
+def parse_java_parameters(params_str: str, method_name: str = "") -> tuple[str, str, str, str]:
     """
-    Parsea parámetros UML o Java a (java_decl, call_args, spring_params).
+    Parsea parámetros UML o Java a (java_decl, call_args, spring_params, json_body_example).
     Si los parámetros están vacíos pero el nombre del método sugiere una búsqueda o criterio,
     deduce parámetros por defecto para que la API sea funcional y auto-documentada.
     """
@@ -88,16 +104,21 @@ def parse_java_parameters(params_str: str, method_name: str = "") -> tuple[str, 
             params_str = "estado: string"
         elif "criterion" in m_lower or "criterio" in m_lower:
             params_str = "criteriondescription: string"
+        elif "student" in m_lower or "estudiante" in m_lower or "enroll" in m_lower:
+            params_str = "student: string"
+        elif "assignment" in m_lower or "tarea" in m_lower:
+            params_str = "assignment: string"
         elif m_lower.startswith(("get", "find", "buscar", "filter", "search")):
             params_str = "query: string"
 
     if not params_str or not str(params_str).strip():
-        return "", "", ""
+        return "", "", "", ""
         
     raw_parts = [p.strip() for p in str(params_str).split(",") if p.strip()]
     java_decls = []
     call_args = []
     spring_params = []
+    json_lines = []
     
     for idx, part in enumerate(raw_parts):
         if ":" in part:
@@ -117,11 +138,14 @@ def parse_java_parameters(params_str: str, method_name: str = "") -> tuple[str, 
             p_name = f"arg{idx}"
             
         ex_val = obtener_ejemplo_atributo_raw(p_name, p_type)
+        json_val = obtener_ejemplo_atributo_json(p_name, p_type)
         java_decls.append(f"{p_type} {p_name}")
         call_args.append(p_name)
         spring_params.append(f'@Parameter(description = "Parámetro {p_name} ({p_type})", example = "{ex_val}") @RequestParam(required = false) {p_type} {p_name}')
+        json_lines.append(f'  \\"{p_name}\\": {json_val.replace('"', '\\"')}')
         
-    return ", ".join(java_decls), ", ".join(call_args), ", ".join(spring_params)
+    json_body_example = "{\\n" + ",\\n".join(json_lines) + "\\n}" if json_lines else ""
+    return ", ".join(java_decls), ", ".join(call_args), ", ".join(spring_params), json_body_example
 
 
 def inicializar_estructura_spring(temp_dir: str, nombre_repo: str = "proyecto_db", db_password: str = "password"):
@@ -605,10 +629,12 @@ def generar_archivos_java(diagram_json: dict, temp_dir: str):
                 else:
                     nuevo_m["retorno"] = "void"
                 
-                java_decl, call_args, spring_params = parse_java_parameters(str(m.get("parametros", "")), m_name)
+                java_decl, call_args, spring_params, json_body_example = parse_java_parameters(str(m.get("parametros", "")), m_name)
                 nuevo_m["java_decl"] = java_decl
                 nuevo_m["call_args"] = call_args
                 nuevo_m["spring_params"] = spring_params
+                nuevo_m["json_body_example"] = json_body_example
+                nuevo_m["return_json_example"] = obtener_ejemplo_retorno(nuevo_m["retorno"])
                 
                 metodos_sanitizados.append(nuevo_m)
 

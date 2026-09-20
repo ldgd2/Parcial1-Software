@@ -6,6 +6,7 @@ import com.proyecto.services.{{ clase.nombre }}Service;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -160,11 +161,23 @@ public class {{ clase.nombre }}Controller {
     {% for metodo in clase.metodos %}
     @Operation(
         summary = "Lógica de negocio: {{ metodo.nombre }}",
-        description = "Operación de negocio personalizada '{{ metodo.nombre }}'.\n\n- Parámetros esperados: {% if metodo.java_decl %}{{ metodo.java_decl }}{% else %}Ninguno{% endif %}.\n- Tipo de retorno: {{ metodo.retorno }}."
+        description = "Operación de negocio personalizada '{{ metodo.nombre }}'.\n\n- Parámetros requeridos: {% if metodo.java_decl %}{{ metodo.java_decl }}{% else %}Ninguno{% endif %}.\n- Tipo de retorno: {{ metodo.retorno }}."
     )
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Operación personalizada ejecutada exitosamente")
+        @ApiResponse(
+            responseCode = "200",
+            description = "Operación personalizada '{{ metodo.nombre }}' ejecutada con éxito"{% if metodo.return_json_example %},
+            content = @Content(mediaType = "application/json", examples = @ExampleObject(value = "{{ metodo.return_json_example }}")){% endif %}
+        ),
+        @ApiResponse(responseCode = "400", description = "Parámetros de entrada inválidos para '{{ metodo.nombre }}'")
     })
+    {% if metodo.json_body_example %}
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+        description = "Ejemplo del cuerpo JSON para enviar parámetros a {{ metodo.nombre }}",
+        required = false,
+        content = @Content(mediaType = "application/json", examples = @ExampleObject(value = "{{ metodo.json_body_example }}"))
+    )
+    {% endif %}
     {% if metodo.retorno == 'void' %}
     @PostMapping("/{{ metodo.nombre }}")
     public ResponseEntity<Void> {{ metodo.nombre }}({% if metodo.spring_params %}{{ metodo.spring_params }}{% endif %}) {
@@ -179,4 +192,5 @@ public class {{ clase.nombre }}Controller {
     {% endif %}
     {% endfor %}
 }
+
 
