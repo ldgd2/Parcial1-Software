@@ -311,6 +311,16 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
             
             nginx_conf_path = os.path.join(nginx_conf_dir, f"{project_id}.conf")
             nginx_conf_content = f'''location /host/{owner_prefix}/{db_name} {{
+    if ($request_method = 'OPTIONS') {{
+        add_header 'Access-Control-Allow-Origin' '*' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE, PATCH' always;
+        add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,Accept' always;
+        add_header 'Access-Control-Max-Age' 1728000 always;
+        add_header 'Content-Type' 'text/plain; charset=utf-8' always;
+        add_header 'Content-Length' 0 always;
+        return 204;
+    }}
+
     proxy_pass http://127.0.0.1:{deployment.port};
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
