@@ -6,6 +6,8 @@ from modules.gestion_despliegue.recibir_webhook.controllers import webhook_contr
 import uvicorn
 import asyncio
 
+from modules.gestion_despliegue.recibir_webhook.services.deploy_service import auto_fix_all_databases
+
 app = FastAPI(title=settings.PROJECT_NAME)
 
 app.add_middleware(
@@ -21,6 +23,10 @@ app.include_router(webhook_controller.router, prefix=settings.API_V1_STR)
 @app.on_event("startup")
 async def on_startup():
     await init_db()
+    try:
+        auto_fix_all_databases()
+    except Exception as e:
+        print(f"Startup DB permissions fix warning: {e}")
     print(f"Deployer Backend started. Workspace: {settings.WORKSPACE_DIR}")
 
 if __name__ == "__main__":

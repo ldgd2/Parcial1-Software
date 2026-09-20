@@ -108,6 +108,56 @@ def kill_process_on_port(port: int):
     except Exception as e:
         print(f"Error al intentar buscar/matar proceso en puerto {port}: {e}")
 
+def grant_all_permissions_to_db(db_name: str, db_user: str):
+    """Otorgar permisos totales sobre la BD, esquema public, tablas y secuencias al usuario."""
+    if platform.system() != "Linux":
+        return
+    try:
+        env = os.environ.copy()
+        env["PGPASSWORD"] = settings.PG_PASSWORD
+        pg_host = settings.PG_HOST
+        psql_db_cmd = ["psql", "-U", "postgres", "-h", pg_host, "-d", db_name]
+        
+        grant_sql = (
+            f'ALTER SCHEMA public OWNER TO "{db_user}"; '
+            f'GRANT ALL PRIVILEGES ON DATABASE "{db_name}" TO "{db_user}"; '
+            f'GRANT ALL ON SCHEMA public TO "{db_user}"; '
+            f'GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "{db_user}"; '
+            f'GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "{db_user}"; '
+            f'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "{db_user}"; '
+            f'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO "{db_user}"; '
+            f'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO "{db_user}"; '
+            f'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON SEQUENCES TO "{db_user}";'
+        )
+        subprocess.run(psql_db_cmd + ["-c", grant_sql], env=env, check=False)
+        print(f"[{db_name}] Permisos PostgreSQL otorgados a {db_user}.")
+    except Exception as e:
+        print(f"[{db_name}] Error al otorgar permisos: {e}")
+
+def auto_fix_all_databases():
+    """Recorre todas las bases de datos de usuarios en PostgreSQL y otorga permisos totales a sus propietarios."""
+    if platform.system() != "Linux":
+        return
+    try:
+        env = os.environ.copy()
+        env["PGPASSWORD"] = settings.PG_PASSWORD
+        pg_host = settings.PG_HOST
+        
+        psql_cmd = ["psql", "-U", "postgres", "-h", pg_host, "-t", "-c",
+                    "SELECT datname, pg_catalog.pg_get_userbyid(datdba) FROM pg_database WHERE datname NOT IN ('postgres', 'template0', 'template1');"]
+        result = subprocess.run(psql_cmd, env=env, capture_output=True, text=True)
+        if result.returncode == 0:
+            lines = result.stdout.strip().split("\n")
+            for line in lines:
+                parts = line.split("|")
+                if len(parts) == 2:
+                    dbname = parts[0].strip()
+                    dbowner = parts[1].strip()
+                    if dbname and dbowner and dbowner != "postgres":
+                        grant_all_permissions_to_db(dbname, dbowner)
+    except Exception as e:
+        print(f"Error en auto_fix_all_databases: {e}")
+
 async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_name: str = None, db_password: str = None, owner_prefix: str = None):
     """
     Background task to clone, build, and run the project.
@@ -147,18 +197,7 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
                 subprocess.run(psql_cmd + ["-c", f'CREATE DATABASE "{db_name}" OWNER "{db_user}";'], env=env, check=True)
             
             # Otorgar permisos completos sobre la BD, esquema public, tablas y secuencias
-            psql_db_cmd = ["psql", "-U", "postgres", "-h", pg_host, "-d", db_name]
-            grant_schema_sql = (
-                f'ALTER SCHEMA public OWNER TO "{db_user}"; '
-                f'GRANT ALL PRIVILEGES ON DATABASE "{db_name}" TO "{db_user}"; '
-                f'GRANT ALL ON SCHEMA public TO "{db_user}"; '
-                f'GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "{db_user}"; '
-                f'GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "{db_user}"; '
-                f'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "{db_user}"; '
-                f'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO "{db_user}";'
-            )
-            subprocess.run(psql_db_cmd + ["-c", grant_schema_sql], env=env, check=True)
-            print(f"[{project_id}] Base de datos {db_name} lista y permisos totales otorgados a {db_user}.")
+            grant_all_permissions_to_db(db_name, db_user)
         except subprocess.CalledProcessError as e:
             print(f"[{project_id}] Error aprovisionando BD PostgreSQL: {e}")
 
@@ -260,23 +299,7 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
         
         # Otorgar permisos sobre todas las tablas recién creadas por Flyway/Hibernate al usuario del proyecto
         if db_name and owner_prefix:
-            try:
-                env = os.environ.copy()
-                env["PGPASSWORD"] = settings.PG_PASSWORD
-                pg_host = settings.PG_HOST
-                psql_db_cmd = ["psql", "-U", "postgres", "-h", pg_host, "-d", db_name]
-                grant_sql = (
-                    f'ALTER SCHEMA public OWNER TO "{owner_prefix}"; '
-                    f'GRANT ALL ON SCHEMA public TO "{owner_prefix}"; '
-                    f'GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "{owner_prefix}"; '
-                    f'GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "{owner_prefix}"; '
-                    f'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "{owner_prefix}"; '
-                    f'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO "{owner_prefix}";'
-                )
-                subprocess.run(psql_db_cmd + ["-c", grant_sql], env=env, check=False)
-                print(f"[{project_id}] Permisos sobre tablas otorgados a {owner_prefix} en BD {db_name}.")
-            except Exception as e:
-                print(f"[{project_id}] Advertencia al otorgar permisos post-despliegue: {e}")
+            grant_all_permissions_to_db(db_name, owner_prefix)
         
     # 7. Configurar Nginx Dinámicamente si hay owner_prefix
     deployment_url = f"http://{settings.SERVER_HOST}:{deployment.port}"
