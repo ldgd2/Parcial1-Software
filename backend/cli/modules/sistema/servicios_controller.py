@@ -72,7 +72,7 @@ WantedBy=multi-user.target
 
     # 3. Crear NGINX configs
     if modo == "dominio":
-        dominio_base = Prompt.ask("Ingresa tu dominio base (ej: gerlextech.com o example.com)")
+        dominio_base = Prompt.ask("Ingresa tu dominio base (ej: example.com)")
         conf_frontend = f"""server {{
     listen 80;
     server_name diagramador.{dominio_base};
@@ -96,8 +96,8 @@ WantedBy=multi-user.target
         proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
-    }
-}
+    }}
+}}
 """
         with open(os.path.join(NGINX_CONF_DIR, "diagramador-dominio-front"), "w") as f: f.write(conf_frontend)
         with open(os.path.join(NGINX_CONF_DIR, "diagramador-dominio-back"), "w") as f: f.write(conf_backend)
