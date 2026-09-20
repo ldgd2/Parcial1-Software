@@ -20,80 +20,72 @@ def sanitize_identifier(name: str) -> str:
         res = "attr" + res
     return res
 
+TYPE_GENERATORS = {
+    "UUID": lambda n: str(uuid.uuid4()),
+    "Boolean": lambda n: "true",
+    "Integer": lambda n: "1",
+    "Long": lambda n: "100",
+    "Short": lambda n: "1",
+    "Double": lambda n: "0.0",
+    "java.math.BigDecimal": lambda n: "0.0",
+    "java.time.LocalDate": lambda n: str(date.today()),
+    "java.time.LocalDateTime": lambda n: f"{date.today()}T12:00:00",
+    "java.time.LocalTime": lambda n: "12:00:00",
+    "Object": lambda n: '{"detalle": "ejemplo"}',
+    "java.util.List<Object>": lambda n: '["ejemplo1", "ejemplo2"]',
+}
+
+TYPE_PATTERNS = [
+    (r'\b(uuid|guid)\b', "UUID"),
+    (r'\b(datetime|timestamp|fechahora)\b', "java.time.LocalDateTime"),
+    (r'\b(date|fecha)\b', "java.time.LocalDate"),
+    (r'\b(time|hora)\b', "java.time.LocalTime"),
+    (r'\b(bigint|long)\b', "Long"),
+    (r'\b(short|smallint)\b', "Short"),
+    (r'\b(int|integer|entero|number|numero)\b', "Integer"),
+    (r'\b(bool|boolean|logico|bit)\b', "Boolean"),
+    (r'\b(decimal|numeric|money)\b', "java.math.BigDecimal"),
+    (r'\b(float|double|real)\b', "Double"),
+    (r'\b(json|object|map|dict)\b', "Object"),
+    (r'\b(array|list)\b', "java.util.List<Object>"),
+]
+
 def map_java_type(tipo_uml: str) -> str:
-    """Mapea tipos UML genéricos y de base de datos a tipos Java estándar"""
+    """Mapea dinámicamente un tipo UML a tipo Java usando patrones declarativos."""
     t = str(tipo_uml).lower().strip()
-    if "uuid" in t or "guid" in t: return "UUID"
-    if "datetime" in t or "timestamp" in t or "fechahora" in t: return "java.time.LocalDateTime"
-    if "date" in t or "fecha" in t: return "java.time.LocalDate"
-    if "time" in t or "hora" in t: return "java.time.LocalTime"
-    if "bigint" in t or "long" in t: return "Long"
-    if "short" in t or "smallint" in t: return "Short"
-    if "int" in t or "integer" in t or "entero" in t or "number" in t or "numero" in t: return "Integer"
-    if "bool" in t or "logico" in t or "bit" in t: return "Boolean"
-    if "decimal" in t or "numeric" in t or "money" in t: return "java.math.BigDecimal"
-    if "float" in t or "double" in t or "real" in t: return "Double"
-    if "json" in t or "object" in t or "map" in t or "dict" in t: return "Object"
-    if "array" in t or "list" in t: return "java.util.List<Object>"
-    if "string" in t or "varchar" in t or "texto" in t or "char" in t or "text" in t: return "String"
+    for pattern, java_type in TYPE_PATTERNS:
+        if re.search(pattern, t):
+            return java_type
     return "String"
 
-
 def obtener_ejemplo_atributo_raw(nombre: str, tipo: str) -> str:
-    """Genera un valor de ejemplo dinámico basado exclusivamente en el tipo de dato de la variable."""
-    n = str(nombre).lower().strip()
-    t = str(tipo).lower().strip()
-    
-    if n == "id" or "uuid" in t or "guid" in t:
+    """Genera dinámicamente el valor de ejemplo despachando por tipo Java resuelto."""
+    n = str(nombre).strip()
+    if n.lower() == "id":
         return str(uuid.uuid4())
-    if "bool" in t or "logico" in t or "bit" in t:
-        return "true"
-    if "bigint" in t or "long" in t:
-        return "100"
-    if "int" in t or "integer" in t or "entero" in t or "short" in t or "smallint" in t or "number" in t:
-        return "1"
-    if "double" in t or "float" in t or "decimal" in t or "real" in t or "numeric" in t:
-        return "0.0"
-    if "datetime" in t or "timestamp" in t or "fechahora" in t:
-        return "2026-09-20T12:00:00"
-    if "date" in t or "fecha" in t:
-        return str(date.today())
-    if "time" in t or "hora" in t:
-        return "12:00:00"
-    if "json" in t or "object" in t or "map" in t or "dict" in t:
-        return '{"detalle": "ejemplo"}'
-    if "array" in t or "list" in t:
-        return '["ejemplo1", "ejemplo2"]'
-    return f"ejemplo_{n}"
-
+    java_type = map_java_type(tipo)
+    generator = TYPE_GENERATORS.get(java_type, lambda name: f"ejemplo_{name.lower()}")
+    return generator(n)
 
 def obtener_ejemplo_atributo_json(nombre: str, tipo: str) -> str:
-    """Genera un valor formateado para JSON (con comillas si es string/date, sin comillas si es número/bool/json/array)."""
+    """Formatea el valor para JSON (comillas para strings/fechas, raw para números/booleanos/objetos)."""
     val = obtener_ejemplo_atributo_raw(nombre, tipo)
-    t = str(tipo).lower().strip()
-    if val in ["true", "false"] or val.startswith("{") or val.startswith("[") or t in ["integer", "int", "double", "float", "long", "short", "bigdecimal", "bigint"]:
+    java_type = map_java_type(tipo)
+    if val in ["true", "false"] or val.startswith("{") or val.startswith("[") or java_type in ["Integer", "Long", "Short", "Double", "java.math.BigDecimal"]:
         return val
     return f'"{val}"'
 
-
 def obtener_ejemplo_retorno(tipo_retorno: str) -> str:
-    """Genera un string JSON de ejemplo formateado para Java annotation en respuestas de Swagger."""
-    t = str(tipo_retorno).lower().strip()
-    if t == "void":
+    """Genera la anotación JSON de ejemplo para el tipo de retorno en Swagger."""
+    if str(tipo_retorno).lower().strip() == "void":
         return "{\\n  \\\"status\\\": \\\"OK\\\",\\n  \\\"message\\\": \\\"Operación ejecutada con éxito\\\"\\n}"
-    if "datetime" in t or "timestamp" in t:
-        return "\\\"2026-09-20T12:00:00\\\""
-    if "date" in t:
-        return f"\\\"{date.today()}\\\""
-    if "int" in t or "integer" in t or "long" in t or "short" in t:
-        return "1"
-    if "bool" in t:
-        return "true"
-    if "double" in t or "float" in t or "decimal" in t:
-        return "0.0"
-    if "string" in t:
-        return "\\\"Resultado de la operación\\\""
-    return "{\\n  \\\"result\\\": \\\"Operación exitosa\\\"\\n}"
+    val = obtener_ejemplo_atributo_raw("resultado", tipo_retorno)
+    if val.startswith("{") or val.startswith("["):
+        return val.replace('"', '\\"')
+    java_type = map_java_type(tipo_retorno)
+    if val in ["true", "false"] or java_type in ["Integer", "Long", "Short", "Double", "java.math.BigDecimal"]:
+        return val
+    return f"\\\"{val}\\\""
 
 
 RESERVED_CRUD_METHODS = {'delete', 'deletebyid', 'remove', 'save', 'update', 'create', 'findall', 'findbyid', 'getid', 'setid'}
