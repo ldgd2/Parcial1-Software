@@ -183,7 +183,8 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
     
     java_cmd = [
         "java",
-        f"-Dserver.port={deployment.port}",
+        "-jar", target_jar,
+        f"--server.port={deployment.port}",
     ]
     
     if db_name and db_password and owner_prefix:
@@ -195,8 +196,6 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
         
     if owner_prefix and db_name:
         java_cmd.append(f"--server.servlet.context-path=/host/{owner_prefix}/{db_name}")
-        
-    java_cmd.extend(["-jar", target_jar])
     
     if platform.system() == "Windows":
         process = subprocess.Popen(java_cmd, cwd=project_dir, stdout=log_file, stderr=log_file)
