@@ -3,7 +3,7 @@ import subprocess
 from cli.console import console, print_header
 from rich.prompt import Prompt
 
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../"))
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
 SERVICE_DIR = "/etc/systemd/system"
 NGINX_CONF_DIR = "/etc/nginx/sites-available"
 
