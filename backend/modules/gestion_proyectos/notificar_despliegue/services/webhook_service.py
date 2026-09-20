@@ -1,8 +1,6 @@
 import httpx
 from fastapi import HTTPException
-import os
-
-DEPLOYER_URL = os.getenv("DEPLOYER_URL", "http://localhost:8001/api/v1/deploy/webhook")
+from backend.core.config import settings
 
 async def notificar_deployer(project_id: int, repo_url: str, db_name: str = None, db_password: str = None, owner_prefix: str = None):
     """
@@ -20,7 +18,8 @@ async def notificar_deployer(project_id: int, repo_url: str, db_name: str = None
     
     async with httpx.AsyncClient(timeout=10.0) as client:
         try:
-            response = await client.post(DEPLOYER_URL, json=payload)
+            webhook_url = f"{settings.DEPLOYER_URL.rstrip('/')}/api/v1/deploy/webhook"
+            response = await client.post(webhook_url, json=payload)
             if response.status_code not in (200, 201, 202):
                 print(f"Error del Deployer Backend: {response.text}")
                 # No lanzamos excepción estricta para no romper el flujo principal si el deployer falla
