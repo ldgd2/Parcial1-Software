@@ -82,7 +82,7 @@ async def websocket_endpoint(
     nickname: str = None,
 ):
     if user_type == "host":
-        await manager.connect_host(websocket, codigo_acceso)
+        await manager.connect_host(websocket, codigo_acceso, host_id=guest_id, nickname=nickname)
 
         # Enviar guests pendientes al host
         pending = manager.salas[codigo_acceso].get("pending_guests", {})
@@ -181,9 +181,11 @@ async def websocket_endpoint(
                 elif msg_type == "lock_element":
                     from backend.modules.gestion_concurrencia.bloquear_elemento.services.lock_service import lock_service
                     element_id = message.get("element_id")
-                    if element_id and lock_service.lock_element(codigo_acceso, element_id, "host", "Host"):
+                    host_nick = nickname or "Anfitrión"
+                    host_user_id = guest_id or "host"
+                    if element_id and lock_service.lock_element(codigo_acceso, element_id, host_user_id, host_nick):
                         await manager.broadcast_to_sala(
-                            {"type": "element_locked", "element_id": element_id, "nickname": "Host"},
+                            {"type": "element_locked", "element_id": element_id, "nickname": host_nick},
                             codigo_acceso,
                             exclude=websocket
                         )

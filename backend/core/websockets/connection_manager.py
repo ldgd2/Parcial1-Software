@@ -19,10 +19,12 @@ class ConnectionManager:
                 "locked_elements": {} # element_id -> username
             }
 
-    async def connect_host(self, websocket: WebSocket, sala_id: str):
+    async def connect_host(self, websocket: WebSocket, sala_id: str, host_id: str = None, nickname: str = None):
         await websocket.accept()
         self._init_sala(sala_id)
         self.salas[sala_id]["host"] = websocket
+        if host_id and nickname:
+            self.salas[sala_id]["guest_nicknames"][host_id] = nickname
 
     async def connect_guest(self, websocket: WebSocket, sala_id: str, guest_id: str, nickname: str = None):
         await websocket.accept()

@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { salaService } from '@/features/gestion_salas/shared/services/salaService';
-import { getGuestId, getGuestNickname } from '@/shared/utils/animalNames';
 import { WS_URL } from '@/shared/lib/api';
 import './UnirseView.css';
+
+import { getUserIdentity } from '@/features/gestion_concurrencia/sincronizacion_tiempo_real/context/RealTimeSyncContext';
 
 export const UnirseView: React.FC = () => {
   const { codigo } = useParams<{ codigo: string }>();
@@ -61,17 +62,16 @@ export const UnirseView: React.FC = () => {
         });
       } else {
         // Guest flow
-        const guestId = getGuestId();
-        const guestNick = getGuestNickname();
-        setNickname(guestNick);
+        const identity = getUserIdentity();
+        setNickname(identity.nickname);
         
-        const wsUrl = `${WS_URL}/ws/salas/${codigo}?user_type=guest&guest_id=${guestId}&nickname=${encodeURIComponent(guestNick)}`;
+        const wsUrl = `${WS_URL}/ws/salas/${codigo}?user_type=guest&guest_id=${identity.id}&nickname=${encodeURIComponent(identity.nickname)}`;
         const ws = new WebSocket(wsUrl);
         wsRef.current = ws;
 
         ws.onopen = () => {
           setStatus('pendiente');
-          setMessage(`Te has conectado como invitado: "${guestNick}". Esperando autorización...`);
+          setMessage(`Te has conectado como ${identity.isRegistered ? 'usuario' : 'invitado'}: "${identity.nickname}". Esperando autorización...`);
         };
 
         ws.onmessage = (event) => {

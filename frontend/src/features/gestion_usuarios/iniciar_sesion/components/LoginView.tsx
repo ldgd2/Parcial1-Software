@@ -27,8 +27,11 @@ export const LoginView: React.FC = () => {
         
         try {
           const user = await apiFetch('/usuarios/me');
-          if (user && user.nombre) {
-            localStorage.setItem('usuario_nombre', user.nombre);
+          if (user) {
+            localStorage.setItem('user', JSON.stringify(user));
+            if (user.nombre) {
+              localStorage.setItem('usuario_nombre', user.nombre);
+            }
           }
         } catch (e) {
           // ignore

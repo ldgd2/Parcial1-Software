@@ -3,6 +3,33 @@ import { getGuestId, getGuestNickname } from '@/shared/utils/animalNames';
 import { useSearchParams } from 'react-router-dom';
 import { WS_URL } from '@/shared/lib/api';
 
+import { TokenService } from '@/shared/lib/TokenService';
+
+export const getUserIdentity = (): { id: string; nickname: string; isRegistered: boolean } => {
+  const token = TokenService.getToken();
+  const storedName = localStorage.getItem('usuario_nombre');
+  const userStr = localStorage.getItem('user');
+
+  let registeredUser: any = null;
+  if (userStr) {
+    try {
+      registeredUser = JSON.parse(userStr);
+    } catch (e) {}
+  }
+
+  if (token) {
+    const nickname = registeredUser?.nombre || storedName || registeredUser?.email?.split('@')[0] || 'Usuario';
+    const id = registeredUser?.id ? `auth_${registeredUser.id}` : `auth_${nickname.replace(/\s+/g, '_')}`;
+    return { id, nickname, isRegistered: true };
+  }
+
+  return {
+    id: getGuestId(),
+    nickname: getGuestNickname(),
+    isRegistered: false
+  };
+};
+
 interface PendingGuest {
   guest_id: string;
   nickname: string;
@@ -46,30 +73,36 @@ export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: a
   const isGuest = searchParams.get('guest') === 'true' || (sala.rol_proyecto && sala.rol_proyecto !== 'anfitrion');
   const codigo = searchParams.get('codigo') || sala.codigo_acceso;
 
+  // Auto-fetch profile if logged in but local storage is missing user data
+  useEffect(() => {
+    const token = TokenService.getToken();
+    if (token && (!localStorage.getItem('user') || !localStorage.getItem('usuario_nombre'))) {
+      import('@/shared/lib/api').then(({ apiFetch }) => {
+        apiFetch('/usuarios/me').then(user => {
+          if (user) {
+            localStorage.setItem('user', JSON.stringify(user));
+            if (user.nombre) {
+              localStorage.setItem('usuario_nombre', user.nombre);
+            }
+          }
+        }).catch(() => {});
+      });
+    }
+  }, []);
+
   useEffect(() => {
     if (sala.isOfflineMode || !navigator.onLine) {
       console.log('Modo offline detectado: WebSocket omitido.');
       return;
     }
     
+    const identity = getUserIdentity();
     let wsUrl = `${WS_URL}/ws/salas/${codigo}`;
     
     if (isGuest) {
-      let guestId = getGuestId();
-      let nickname = getGuestNickname();
-      
-      const userStr = localStorage.getItem('user');
-      if (userStr) {
-        try {
-          const user = JSON.parse(userStr);
-          guestId = `auth_${user.id}`;
-          nickname = user.nombre || user.email.split('@')[0];
-        } catch (e) {}
-      }
-      
-      wsUrl += `?user_type=guest&guest_id=${guestId}&nickname=${encodeURIComponent(nickname)}`;
+      wsUrl += `?user_type=guest&guest_id=${identity.id}&nickname=${encodeURIComponent(identity.nickname)}`;
     } else {
-      wsUrl += `?user_type=host`;
+      wsUrl += `?user_type=host&guest_id=${identity.id}&nickname=${encodeURIComponent(identity.nickname)}`;
     }
 
     let ws: WebSocket | null = null;
@@ -258,37 +291,12 @@ export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: a
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (socketRef.current?.readyState === WebSocket.OPEN) {
-        let userId = 'host';
-        let nickname = 'Anfitrión';
-        
-        const userStr = localStorage.getItem('user');
-        if (userStr) {
-          try {
-            const user = JSON.parse(userStr);
-            nickname = user.nombre || user.email.split('@')[0];
-            if (!isGuest) {
-              userId = `host_${user.id}`;
-            }
-          } catch (e) {}
-        }
-
-        if (isGuest) {
-          userId = getGuestId();
-          nickname = getGuestNickname();
-          
-          if (userStr) {
-            try {
-              const user = JSON.parse(userStr);
-              userId = `auth_${user.id}`;
-              nickname = user.nombre || user.email.split('@')[0];
-            } catch (e) {}
-          }
-        }
+        const identity = getUserIdentity();
         
         socketRef.current.send(JSON.stringify({
           type: 'mouse_move',
-          user_id: userId,
-          nickname: nickname,
+          user_id: identity.id,
+          nickname: identity.nickname,
           x: e.clientX,
           y: e.clientY
         }));
