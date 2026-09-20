@@ -68,6 +68,9 @@ public class {{ clase.nombre }}Service {
     }
 
     private void mapToEntity({{ clase.nombre }}RequestDTO dto, {{ clase.nombre }} entity) {
+        if (dto.getId() != null) {
+            entity.setId(dto.getId());
+        }
         {% for attr in clase.atributos %}
         {% if attr.nombre | lower not in ['id', 'createdat', 'updatedat', 'isactive'] %}
         entity.set{{ attr.nombre_capitalizado }}(dto.get{{ attr.nombre_capitalizado }}());

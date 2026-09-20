@@ -39,7 +39,15 @@ def mapear_tipo_sql(tipo_java: str) -> str:
         return 'VARCHAR(255)'
 
 def generar_tablas_basicas(nodos: list) -> str:
-    sql = ""
+    sql = 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";\n\n'
+    sql += '''CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';\n\n'''
+
     for nodo in nodos:
         if nodo.get("type") in ["class", "interface"]:
             raw_nombre = nodo.get("nombre", "")
@@ -56,6 +64,11 @@ def generar_tablas_basicas(nodos: list) -> str:
             for attr in atributos:
                 raw_attr_name = attr.get("nombre", "")
                 nombre_attr = clean_sql_identifier(raw_attr_name, default="columna")
+                
+                # Ignorar columnas base de auditoría para manejarlas centralizadamente
+                if nombre_attr in ['created_at', 'createdat', 'updated_at', 'updatedat', 'is_active', 'isactive']:
+                    continue
+
                 raw_tipo = attr.get("tipo", "")
                 if not raw_tipo and ':' in str(raw_attr_name):
                     parts = str(raw_attr_name).split(':', 1)
@@ -64,16 +77,28 @@ def generar_tablas_basicas(nodos: list) -> str:
                 tipo_sql = mapear_tipo_sql(raw_tipo or "string")
                 
                 if attr.get("visibilidad") == 'PK' or nombre_attr == 'id':
-                    cols.append(f"    {nombre_attr} UUID PRIMARY KEY")
+                    cols.append(f"    {nombre_attr} UUID PRIMARY KEY DEFAULT gen_random_uuid()")
                     tiene_pk = True
                 else:
                     cols.append(f"    {nombre_attr} {tipo_sql}")
             
             if not tiene_pk:
-                cols.insert(0, "    id UUID PRIMARY KEY")
+                cols.insert(0, "    id UUID PRIMARY KEY DEFAULT gen_random_uuid()")
                 
+            cols.append("    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP")
+            cols.append("    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP")
+            cols.append("    is_active BOOLEAN DEFAULT TRUE")
+
             sql += ",\n".join(cols)
             sql += "\n);\n\n"
+
+            # Trigger para actualizar automaticamente updated_at
+            sql += f"DROP TRIGGER IF EXISTS update_{nombre_tabla}_updated_at ON {nombre_tabla};\n"
+            sql += f"CREATE TRIGGER update_{nombre_tabla}_updated_at\n"
+            sql += f"BEFORE UPDATE ON {nombre_tabla}\n"
+            sql += f"FOR EACH ROW\n"
+            sql += f"EXECUTE FUNCTION update_updated_at_column();\n\n"
+
     return sql
 
 async def solicitar_constraints_ia(nodos: list, relaciones: list) -> str:
