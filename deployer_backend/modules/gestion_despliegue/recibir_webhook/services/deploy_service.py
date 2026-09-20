@@ -205,7 +205,7 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
             
             nginx_conf_path = os.path.join(nginx_conf_dir, f"{project_id}.conf")
             nginx_conf_content = f'''location /host/{owner_prefix}/{db_name}/ {{
-    proxy_pass http://localhost:{deployment.port}/;
+    proxy_pass http://localhost:{deployment.port};
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
