@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 import os
@@ -53,6 +53,7 @@ async def github_callback(
 @router.post("/exportar", response_model=ExportarProyectoResponse)
 async def exportar_proyecto(
     payload: ExportarProyectoRequest,
+    request: Request,
     current_user: Usuario = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -121,7 +122,13 @@ async def exportar_proyecto(
         owner_prefix = anfitrion.email.split("@")[0] if anfitrion.email else "user"
         if payload.auto_deploy:
             from backend.core.config import settings
-            url_base = f"{settings.HOST_DOMAIN}/host/{owner_prefix}/{db_name}"
+            domain = settings.HOST_DOMAIN.rstrip("/")
+            if domain == "http://localhost" and request:
+                host_header = request.headers.get("x-forwarded-host") or request.headers.get("host")
+                if host_header:
+                    scheme = request.headers.get("x-forwarded-proto", "http")
+                    domain = f"{scheme}://{host_header}"
+            url_base = f"{domain}/host/{owner_prefix}/{db_name}"
         else:
             url_base = "http://localhost:8080"
             
