@@ -15,13 +15,10 @@ import lombok.NoArgsConstructor;
 public class {{ clase.nombre }} extends BaseEntity {
 
     {% for attr in clase.atributos %}
-    {% if attr.visibilidad == 'PK' %}
-    @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    private UUID {{ attr.nombre }};
-    {% else %}
+    {% if attr.nombre | lower not in ['id', 'createdat', 'updatedat', 'isactive'] %}
     @Column(name = "{{ attr.nombre | lower }}")
     private {{ attr.tipo }} {{ attr.nombre }};
     {% endif %}
     {% endfor %}
 }
+

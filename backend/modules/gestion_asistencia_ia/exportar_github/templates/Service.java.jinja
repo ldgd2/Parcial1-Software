@@ -55,11 +55,12 @@ public class {{ clase.nombre }}Service {
     // Mapeos Manuales
     private {{ clase.nombre }}ResponseDTO mapToResponseDTO({{ clase.nombre }} entity) {
         {{ clase.nombre }}ResponseDTO dto = new {{ clase.nombre }}ResponseDTO();
-        {% for attr in clase.atributos %}{% if attr.visibilidad == 'PK' %}
+        dto.setId(entity.getId());
+        {% for attr in clase.atributos %}
+        {% if attr.nombre | lower not in ['id', 'createdat', 'updatedat', 'isactive'] %}
         dto.set{{ attr.nombre_capitalizado }}(entity.get{{ attr.nombre_capitalizado }}());
-        {% else %}
-        dto.set{{ attr.nombre_capitalizado }}(entity.get{{ attr.nombre_capitalizado }}());
-        {% endif %}{% endfor %}
+        {% endif %}
+        {% endfor %}
         dto.setCreatedAt(entity.getCreatedAt());
         dto.setUpdatedAt(entity.getUpdatedAt());
         dto.setIsActive(entity.getIsActive());
@@ -67,9 +68,11 @@ public class {{ clase.nombre }}Service {
     }
 
     private void mapToEntity({{ clase.nombre }}RequestDTO dto, {{ clase.nombre }} entity) {
-        {% for attr in clase.atributos %}{% if attr.visibilidad != 'PK' %}
+        {% for attr in clase.atributos %}
+        {% if attr.nombre | lower not in ['id', 'createdat', 'updatedat', 'isactive'] %}
         entity.set{{ attr.nombre_capitalizado }}(dto.get{{ attr.nombre_capitalizado }}());
-        {% endif %}{% endfor %}
+        {% endif %}
+        {% endfor %}
     }
 
     {% for metodo in clase.metodos %}
@@ -79,3 +82,4 @@ public class {{ clase.nombre }}Service {
     }
     {% endfor %}
 }
+

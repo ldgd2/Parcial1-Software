@@ -7,11 +7,16 @@ import java.time.LocalDateTime;
 @Data
 public class {{ clase.nombre }}ResponseDTO {
 
+    private UUID id;
+
     {% for attr in clase.atributos %}
+    {% if attr.nombre | lower not in ['id', 'createdat', 'updatedat', 'isactive'] %}
     private {{ attr.tipo }} {{ attr.nombre }};
+    {% endif %}
     {% endfor %}
     
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private Boolean isActive;
 }
+
