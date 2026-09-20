@@ -87,30 +87,9 @@ RESERVED_CRUD_METHODS = {'delete', 'deletebyid', 'remove', 'save', 'update', 'cr
 
 def parse_java_parameters(params_str: str, method_name: str = "") -> tuple[str, str, str, str]:
     """
-    Parsea parámetros UML o Java a (java_decl, call_args, spring_params, json_body_example).
-    Si los parámetros están vacíos pero el nombre del método sugiere una búsqueda o criterio,
-    deduce parámetros por defecto para que la API sea funcional y auto-documentada.
+    Parsea los parámetros UML explícitamente declarados en el diagrama a (java_decl, call_args, spring_params, json_body_example).
+    Sin inferencias ni valores hardcodeados.
     """
-    m_lower = method_name.lower().strip()
-    
-    if not params_str or not str(params_str).strip():
-        if "email" in m_lower or "correo" in m_lower or "user" in m_lower or "usuario" in m_lower:
-            params_str = "email: string"
-        elif "codigo" in m_lower or "code" in m_lower:
-            params_str = "codigo: string"
-        elif "nombre" in m_lower or "name" in m_lower:
-            params_str = "nombre: string"
-        elif "estado" in m_lower or "status" in m_lower:
-            params_str = "estado: string"
-        elif "criterion" in m_lower or "criterio" in m_lower:
-            params_str = "criteriondescription: string"
-        elif "student" in m_lower or "estudiante" in m_lower or "enroll" in m_lower:
-            params_str = "student: string"
-        elif "assignment" in m_lower or "tarea" in m_lower:
-            params_str = "assignment: string"
-        elif m_lower.startswith(("get", "find", "buscar", "filter", "search")):
-            params_str = "query: string"
-
     if not params_str or not str(params_str).strip():
         return "", "", "", ""
         
