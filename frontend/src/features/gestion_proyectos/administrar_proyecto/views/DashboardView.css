@@ -189,3 +189,166 @@
   .dashboard-search__input { width: 140px; }
   .dashboard-grid { grid-template-columns: 1fr; }
 }
+
+/* Offline Mode Styles */
+.dashboard-offline-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  padding: 1rem 1.5rem;
+  margin-bottom: 2rem;
+  background: var(--surface-color, #393E46);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+  border-left: 4px solid var(--primary, #DFD0B8);
+  border-radius: var(--radius-lg, 8px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.dashboard-offline-banner__left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.dashboard-offline-banner__icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  background: rgba(223, 208, 184, 0.1);
+  border: 1px solid rgba(223, 208, 184, 0.25);
+  color: var(--primary, #DFD0B8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dashboard-offline-banner__text strong {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--text-primary, #ffffff);
+  margin-bottom: 2px;
+}
+
+.dashboard-offline-banner__text p {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-secondary, #DFD0B8);
+  line-height: 1.4;
+  opacity: 0.85;
+}
+
+.dashboard-btn-offline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.65rem 1.25rem;
+  border-radius: var(--radius-md, 4px);
+  background: var(--primary, #DFD0B8);
+  border: 1px solid var(--primary, #DFD0B8);
+  color: var(--bg-color, #222831);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.dashboard-btn-offline:hover {
+  background: var(--primary-hover, #eaddcb);
+  box-shadow: 0 4px 12px rgba(223, 208, 184, 0.25);
+}
+
+.dashboard-btn-offline-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.625rem 1.25rem;
+  border-radius: var(--radius-md, 4px);
+  background: var(--surface-color, #393E46);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+  color: var(--primary, #DFD0B8);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dashboard-btn-offline-secondary:hover {
+  border-color: var(--primary, #DFD0B8);
+  background: rgba(223, 208, 184, 0.08);
+}
+
+.dashboard-empty--offline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  background: var(--surface-color, #393E46);
+  border: 1px dashed var(--border-color, rgba(255, 255, 255, 0.18));
+  border-radius: var(--radius-lg, 8px);
+}
+
+.dashboard-empty__badge {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  background: rgba(223, 208, 184, 0.08);
+  border: 1px solid rgba(223, 208, 184, 0.2);
+  color: var(--primary, #DFD0B8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+}
+
+.dashboard-empty--offline h2 {
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--text-primary, #ffffff);
+  margin: 0 0 0.5rem;
+}
+
+.dashboard-empty--offline p {
+  font-size: 0.85rem;
+  color: var(--text-secondary, #DFD0B8);
+  max-width: 480px;
+  margin: 0 0 1.5rem;
+  line-height: 1.5;
+  opacity: 0.85;
+}
+
+.dashboard-btn-offline-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.75rem 1.75rem;
+  border-radius: var(--radius-md, 4px);
+  background: var(--primary, #DFD0B8);
+  border: 1px solid var(--primary, #DFD0B8);
+  color: var(--bg-color, #222831);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dashboard-btn-offline-action:hover {
+  background: var(--primary-hover, #eaddcb);
+  box-shadow: 0 4px 16px rgba(223, 208, 184, 0.3);
+}
+

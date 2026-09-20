@@ -148,33 +148,61 @@ const DashboardContent: React.FC = () => {
       <DashboardNavbar userName={userName} />
 
       <main className="dashboard-main">
+        {/* Offline Banner */}
+        {isOffline && (
+          <div className="dashboard-offline-banner">
+            <div className="dashboard-offline-banner__left">
+              <div className="dashboard-offline-banner__icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="1" y1="1" x2="23" y2="23" />
+                  <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55" />
+                  <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39" />
+                  <path d="M10.71 5.05A16 16 0 0 1 22.58 9" />
+                  <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88" />
+                  <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+                  <line x1="12" y1="20" x2="12.01" y2="20" />
+                </svg>
+              </div>
+              <div className="dashboard-offline-banner__text">
+                <strong>MODO SIN CONEXIÓN ACTIVO</strong>
+                <p>El servidor no está accesible. Puedes continuar trabajando localmente; los diagramas se guardarán en IndexedDB.</p>
+              </div>
+            </div>
+            <button className="dashboard-btn-offline" onClick={() => navigate('/diagrama/local')}>
+              <span>Abrir Entorno Local</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </button>
+          </div>
+        )}
+
         {/* Header */}
         <div className="dashboard-header">
           <div className="dashboard-header__left">
             <h1 className="dashboard-header__title">
-              {isOffline ? 'MODO SIN CONEXIÓN' : 'MIS PROYECTOS'}
+              {isOffline ? 'PROYECTOS LOCALES' : 'MIS PROYECTOS'}
             </h1>
             <p className="dashboard-header__sub">
-              {isOffline ? 'Estás trabajando localmente.' : `${proyectos.length} ${proyectos.length === 1 ? 'proyecto' : 'proyectos'}`}
+              {isOffline ? 'Almacenamiento persistente en IndexedDB.' : `${proyectos.length} ${proyectos.length === 1 ? 'proyecto' : 'proyectos'}`}
             </p>
           </div>
           <div className="dashboard-header__right">
             {isOffline ? (
-              <button className="dashboard-search__input" style={{cursor: 'pointer', background: '#ed8936', color: '#1a1d21', fontWeight: 'bold'}} onClick={() => navigate('/diagrama/local')}>
-                IR A ENTORNO LOCAL
+              <button className="dashboard-btn-offline-secondary" onClick={() => navigate('/diagrama/local')}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>
+                <span>Nuevo Diagrama Local</span>
               </button>
             ) : (
               <div className="dashboard-search">
-              <span className="dashboard-search__icon"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2l10 10-10 10L2 12 12 2z"/></svg></span>
-              <input
-                id="input-buscar-proyecto"
-                className="dashboard-search__input"
-                type="text"
-                placeholder="BUSCAR..."
-                value={busqueda}
-                onChange={e => setBusqueda(e.target.value)}
-              />
-            </div>
+                <span className="dashboard-search__icon"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2l10 10-10 10L2 12 12 2z"/></svg></span>
+                <input
+                  id="input-buscar-proyecto"
+                  className="dashboard-search__input"
+                  type="text"
+                  placeholder="BUSCAR..."
+                  value={busqueda}
+                  onChange={e => setBusqueda(e.target.value)}
+                />
+              </div>
             )}
           </div>
         </div>
@@ -186,11 +214,23 @@ const DashboardContent: React.FC = () => {
             <p>Cargando proyectos...</p>
           </div>
         ) : isOffline ? (
-          <div className="dashboard-empty">
-            <h2>Estás sin conexión a internet</h2>
-            <p>Puedes crear un diagrama localmente y exportarlo a XML/JSON.</p>
-            <button style={{marginTop: '20px', padding: '10px 20px', background: '#ed8936', color: 'black', fontWeight: 'bold'}} onClick={() => navigate('/diagrama/local')}>
-              CREAR DIAGRAMA LOCAL
+          <div className="dashboard-empty dashboard-empty--offline">
+            <div className="dashboard-empty__badge">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="1" y1="1" x2="23" y2="23" />
+                <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55" />
+                <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39" />
+                <path d="M10.71 5.05A16 16 0 0 1 22.58 9" />
+                <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88" />
+                <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+                <line x1="12" y1="20" x2="12.01" y2="20" />
+              </svg>
+            </div>
+            <h2>Estás Trabajando sin Conexión</h2>
+            <p>Puedes crear diagramas de clase UML localmente y exportarlos a formatos XML o JSON en cualquier momento.</p>
+            <button className="dashboard-btn-offline-action" onClick={() => navigate('/diagrama/local')}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>
+              <span>Crear Diagrama Local</span>
             </button>
           </div>
         ) : (
