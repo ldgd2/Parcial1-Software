@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useImageDigitization } from '../hooks/useImageDigitization';
 import { useDiagram } from '../../../gestion_modelado/shared/context/DiagramContext';
 import { generateDeterministicHash } from '../../../gestion_modelado/shared/utils/hashGenerator';
+import { parseUmlAttribute, parseUmlMethod } from '../../../gestion_modelado/shared/utils/umlParser';
 
 interface ImageUploadModalProps {
     isOpen: boolean;
@@ -55,8 +56,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({ isOpen, onCl
                     id: newId,
                     type: node.type,
                     nombre: node.name,
-                    atributos: node.attributes.map((attr: string) => ({ id: crypto.randomUUID(), visibilidad: '-', nombre: attr, tipo: 'String', version: 0 })),
-                    metodos: node.methods.map((met: string) => ({ id: crypto.randomUUID(), visibilidad: '+', nombre: met, parametros: '', retorno: 'void', version: 0 })),
+                    atributos: node.attributes.map((attr: string) => parseUmlAttribute(attr)),
+                    metodos: node.methods.map((met: string) => parseUmlMethod(met)),
                     color: '#ed8936',
                     x: Math.random() * 400 + 100, 
                     y: Math.random() * 400 + 100,

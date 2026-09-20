@@ -15,11 +15,14 @@ async def _llamar_gemini_vision(image_base64: str, context: str | None = None) -
     
     system_instruction = (
         "Eres un experto arquitecto de software UML. El usuario te dará una imagen de un diagrama UML. "
-        "Debes extraer las clases, sus atributos, métodos y sus relaciones. Devuelve SOLO un JSON válido con esta estructura "
-        "(sin markdown ni explicaciones):\n"
+        "Debes extraer las clases, sus atributos, métodos y sus relaciones. "
+        "IMPORTANTE: En los elementos de 'attributes' y 'methods', NO incluyas los símbolos de visibilidad (-, +, #) dentro del string.\n"
+        "Formato exacto de atributo: 'nombre: tipo' (ejemplo: 'id: int', 'username: string').\n"
+        "Formato exacto de método: 'nombre(parametros): retorno' (ejemplo: 'save(): void', 'findById(id: int): User').\n"
+        "Devuelve SOLO un JSON válido con esta estructura (sin markdown ni explicaciones):\n"
         "{\n"
         "  \"nodes\": [\n"
-        "    { \"id\": \"ClaseA\", \"type\": \"class\", \"name\": \"ClaseA\", \"attributes\": [\"- id: int\"], \"methods\": [\"+ save()\"] }\n"
+        "    { \"id\": \"ClaseA\", \"type\": \"class\", \"name\": \"ClaseA\", \"attributes\": [\"id: int\", \"name: string\"], \"methods\": [\"save(): void\"] }\n"
         "  ],\n"
         "  \"relations\": [\n"
         "    { \"id\": \"rel1\", \"sourceId\": \"ClaseA\", \"targetId\": \"ClaseB\", \"type\": \"association\", \"label\": \"1..*\" }\n"
@@ -95,10 +98,13 @@ async def _llamar_openrouter_vision(image_base64: str, context: str | None = Non
     
     system_instruction = (
         "Eres un experto arquitecto de software UML. Extrae las clases y relaciones de la imagen. "
+        "IMPORTANTE: En los elementos de 'attributes' y 'methods', NO incluyas los símbolos de visibilidad (-, +, #) dentro del string.\n"
+        "Formato exacto de atributo: 'nombre: tipo' (ejemplo: 'id: int', 'username: string').\n"
+        "Formato exacto de método: 'nombre(parametros): retorno' (ejemplo: 'save(): void', 'findById(id: int): User').\n"
         "Devuelve SOLO JSON:\n"
         "{\n"
         "  \"nodes\": [\n"
-        "    { \"id\": \"uuid1\", \"type\": \"class\", \"name\": \"ClaseA\", \"attributes\": [\"- id: int\"], \"methods\": [\"+ save()\"] }\n"
+        "    { \"id\": \"uuid1\", \"type\": \"class\", \"name\": \"ClaseA\", \"attributes\": [\"id: int\", \"name: string\"], \"methods\": [\"save(): void\"] }\n"
         "  ],\n"
         "  \"relations\": [\n"
         "    { \"id\": \"rel1\", \"sourceId\": \"uuid1\", \"targetId\": \"uuid2\", \"type\": \"association\", \"label\": \"1..*\" }\n"

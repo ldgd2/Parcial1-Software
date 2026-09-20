@@ -2,6 +2,7 @@ import React from 'react';
 import { usePromptGeneration } from '../hooks/usePromptGeneration';
 import { useDiagram } from '../../../gestion_modelado/shared/context/DiagramContext';
 import { generateDeterministicHash } from '../../../gestion_modelado/shared/utils/hashGenerator';
+import { parseUmlAttribute, parseUmlMethod } from '../../../gestion_modelado/shared/utils/umlParser';
 
 interface PromptModalProps {
     isOpen: boolean;
@@ -13,20 +14,18 @@ export const PromptModal: React.FC<PromptModalProps> = ({ isOpen, onClose }) => 
         isLoading, 
         error, 
         generateDiagram, 
-        isListening, 
-        transcript, 
-        setTranscript, 
-        startListening, 
-        stopListening 
+        clearError 
     } = usePromptGeneration();
     
     const { addNode, addRelation } = useDiagram();
+    const [prompt, setPrompt] = React.useState('');
 
     if (!isOpen) return null;
 
     const handleSubmit = async () => {
-        if (!transcript.trim()) return;
-        const result = await generateDiagram(transcript);
+        if (!prompt.trim()) return;
+        
+        const result = await generateDiagram(prompt);
         
         if (result) {
             // Add nodes to diagram
@@ -40,8 +39,8 @@ export const PromptModal: React.FC<PromptModalProps> = ({ isOpen, onClose }) => 
                     id: newId,
                     type: node.type,
                     nombre: node.name,
-                    atributos: node.attributes.map((attr: string) => ({ id: crypto.randomUUID(), visibilidad: '-', nombre: attr, tipo: 'String', version: 0 })),
-                    metodos: node.methods.map((met: string) => ({ id: crypto.randomUUID(), visibilidad: '+', nombre: met, parametros: '', retorno: 'void', version: 0 })),
+                    atributos: node.attributes.map((attr: string) => parseUmlAttribute(attr)),
+                    metodos: node.methods.map((met: string) => parseUmlMethod(met)),
                     color: '#ed8936',
                     x: Math.random() * 400 + 100, 
                     y: Math.random() * 400 + 100,
