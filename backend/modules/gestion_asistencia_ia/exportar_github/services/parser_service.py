@@ -33,6 +33,8 @@ def map_java_type(tipo_uml: str) -> str:
     if "bool" in t or "logico" in t or "bit" in t: return "Boolean"
     if "decimal" in t or "numeric" in t or "money" in t: return "java.math.BigDecimal"
     if "float" in t or "double" in t or "real" in t: return "Double"
+    if "json" in t or "object" in t or "map" in t or "dict" in t: return "Object"
+    if "array" in t or "list" in t: return "java.util.List<Object>"
     if "string" in t or "varchar" in t or "texto" in t or "char" in t or "text" in t: return "String"
     return "String"
 
@@ -58,14 +60,18 @@ def obtener_ejemplo_atributo_raw(nombre: str, tipo: str) -> str:
         return str(date.today())
     if "time" in t or "hora" in t:
         return "12:00:00"
+    if "json" in t or "object" in t or "map" in t or "dict" in t:
+        return '{"detalle": "ejemplo"}'
+    if "array" in t or "list" in t:
+        return '["ejemplo1", "ejemplo2"]'
     return f"ejemplo_{n}"
 
 
 def obtener_ejemplo_atributo_json(nombre: str, tipo: str) -> str:
-    """Genera un valor formateado para JSON (con comillas si es string/date, sin comillas si es número/bool)."""
+    """Genera un valor formateado para JSON (con comillas si es string/date, sin comillas si es número/bool/json/array)."""
     val = obtener_ejemplo_atributo_raw(nombre, tipo)
     t = str(tipo).lower().strip()
-    if val in ["true", "false"] or t in ["integer", "int", "double", "float", "long", "short", "bigdecimal", "bigint"]:
+    if val in ["true", "false"] or val.startswith("{") or val.startswith("[") or t in ["integer", "int", "double", "float", "long", "short", "bigdecimal", "bigint"]:
         return val
     return f'"{val}"'
 
