@@ -101,12 +101,22 @@ async def exportar_proyecto(
         db_password = desencriptar_dato(anfitrion.db_password_encrypted) if anfitrion.db_password_encrypted else "password"
         
         # 4. Generar código en carpeta temporal
-        if proyecto.github_repo_url:
-            # Ignorar "update" del frontend y extraer el nombre real del repo desde la URL
-            real_repo_name = proyecto.github_repo_url.split('/')[-1].replace('.git', '')
-            payload.nombre_repo = real_repo_name
+        import re
+        nombre_proyecto_limpio = re.sub(r'[^a-zA-Z0-9_]', '_', (proyecto.nombre or "app")).strip('_').lower()
+        if not nombre_proyecto_limpio or nombre_proyecto_limpio[0].isdigit():
+            nombre_proyecto_limpio = f"db_{nombre_proyecto_limpio}"
 
-        db_name = payload.nombre_repo.lower().replace("-", "_")
+        # Si payload.nombre_repo viene como "update" o vacío, forzamos al nombre real del proyecto
+        if not payload.nombre_repo or payload.nombre_repo.lower() == "update":
+            payload.nombre_repo = nombre_proyecto_limpio
+
+        if proyecto.github_repo_url:
+            real_repo_name = proyecto.github_repo_url.split('/')[-1].replace('.git', '')
+            if real_repo_name.lower() != "update":
+                payload.nombre_repo = real_repo_name
+
+        # El db_name siempre debe basarse en el nombre del proyecto en el sistema (ej: "test")
+        db_name = nombre_proyecto_limpio
         
         owner_prefix = anfitrion.email.split("@")[0] if anfitrion.email else "user"
         if payload.auto_deploy:
