@@ -77,7 +77,7 @@ WantedBy=multi-user.target
     listen 80;
     server_name diagramador.{dominio_base};
     
-    root {os.path.join(BASE_DIR, "frontend", "dist")};
+    root /var/www/diagramador-frontend;
     index index.html;
 
     location / {{
@@ -109,7 +109,7 @@ server {{
     listen 80;
     server_name {ip_address};
 
-    root {os.path.join(BASE_DIR, "frontend", "dist")};
+    root /var/www/diagramador-frontend;
     index index.html;
 
     location / {{
@@ -138,6 +138,8 @@ server {{
     if os.name != 'nt':
         console.print("[cyan]Haciendo build del Frontend...[/cyan]")
         subprocess.run("npm run build", cwd=os.path.join(BASE_DIR, "frontend"), shell=True)
+        os.system(f"sudo rm -rf /var/www/diagramador-frontend")
+        os.system(f"sudo cp -r {os.path.join(BASE_DIR, 'frontend', 'dist')} /var/www/diagramador-frontend")
         
         console.print("[cyan]Aplicando configuraciones NGINX y Systemd...[/cyan]")
         os.system(f"sudo cp {SERVICE_DIR}/*.service /etc/systemd/system/")
@@ -163,6 +165,9 @@ def reiniciar_todo():
     if os.name != 'nt':
         console.print("[cyan]Haciendo rebuild del Frontend...[/cyan]")
         subprocess.run("npm run build", cwd=os.path.join(BASE_DIR, "frontend"), shell=True)
+        os.system(f"sudo rm -rf /var/www/diagramador-frontend")
+        os.system(f"sudo cp -r {os.path.join(BASE_DIR, 'frontend', 'dist')} /var/www/diagramador-frontend")
+        
         console.print("[cyan]Reiniciando servicios...[/cyan]")
         os.system("sudo systemctl restart backend-app nginx")
         console.print("[bold green]✔ Servicios reiniciados.[/bold green]")
