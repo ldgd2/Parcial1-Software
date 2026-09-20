@@ -1,20 +1,40 @@
 import os
+import re
 import httpx
 from backend.core.config import settings
 
+def clean_sql_identifier(raw_name: str, default: str = "attr") -> str:
+    """Limpia un nombre UML (ej: '- email: string') para ser un identificador SQL válido."""
+    if not raw_name:
+        return default
+    # Quitar símbolos UML iniciales: -, +, #, ~ y espacios
+    name = re.sub(r'^[\-\+\#\~\s]+', '', str(raw_name))
+    # Si contiene ':', tomar solo la parte anterior al tipo
+    if ':' in name:
+        name = name.split(':')[0]
+    # Quitar cualquier carácter que no sea alfanumérico o guion bajo
+    name = re.sub(r'[^a-zA-Z0-9_]', '_', name).strip('_').lower()
+    if not name:
+        return default
+    if name[0].isdigit():
+        name = f"{default}_{name}"
+    return name
+
 def mapear_tipo_sql(tipo_java: str) -> str:
     """Mapea tipos genéricos a tipos de PostgreSQL"""
-    tipo_java = tipo_java.lower()
-    if 'int' in tipo_java:
+    tipo_java = str(tipo_java).lower().strip()
+    if 'int' in tipo_java or 'entero' in tipo_java:
         return 'INTEGER'
     elif 'long' in tipo_java:
         return 'BIGINT'
-    elif 'bool' in tipo_java:
+    elif 'bool' in tipo_java or 'logico' in tipo_java:
         return 'BOOLEAN'
-    elif 'float' in tipo_java or 'double' in tipo_java:
+    elif 'float' in tipo_java or 'double' in tipo_java or 'decimal' in tipo_java:
         return 'DOUBLE PRECISION'
-    elif 'date' in tipo_java or 'time' in tipo_java:
+    elif 'date' in tipo_java or 'time' in tipo_java or 'fecha' in tipo_java:
         return 'TIMESTAMP'
+    elif 'uuid' in tipo_java:
+        return 'UUID'
     else:
         return 'VARCHAR(255)'
 
@@ -22,18 +42,28 @@ def generar_tablas_basicas(nodos: list) -> str:
     sql = ""
     for nodo in nodos:
         if nodo.get("type") in ["class", "interface"]:
-            nombre = nodo.get("nombre", "").lower() + "s"
-            sql += f"CREATE TABLE {nombre} (\n"
+            raw_nombre = nodo.get("nombre", "")
+            nombre_tabla = clean_sql_identifier(raw_nombre, default="entidad")
+            if not nombre_tabla.endswith("s"):
+                nombre_tabla += "s"
+                
+            sql += f"CREATE TABLE IF NOT EXISTS {nombre_tabla} (\n"
             atributos = nodo.get("atributos", [])
             cols = []
             
             # Siempre aseguramos que haya una PK
             tiene_pk = False
             for attr in atributos:
-                nombre_attr = attr.get("nombre", "").lower()
-                tipo_sql = mapear_tipo_sql(attr.get("tipo", "string"))
+                raw_attr_name = attr.get("nombre", "")
+                nombre_attr = clean_sql_identifier(raw_attr_name, default="columna")
+                raw_tipo = attr.get("tipo", "")
+                if not raw_tipo and ':' in str(raw_attr_name):
+                    parts = str(raw_attr_name).split(':', 1)
+                    raw_tipo = parts[1].strip()
+                    
+                tipo_sql = mapear_tipo_sql(raw_tipo or "string")
                 
-                if attr.get("visibilidad") == 'PK':
+                if attr.get("visibilidad") == 'PK' or nombre_attr == 'id':
                     cols.append(f"    {nombre_attr} UUID PRIMARY KEY")
                     tiene_pk = True
                 else:
@@ -71,7 +101,6 @@ async def solicitar_constraints_ia(nodos: list, relaciones: list) -> str:
         "Content-Type": "application/json"
     }
     
-    # URL base para OpenRouter (se puede cambiar a Gemini u otro proveedor configurado en IA_SERVICE)
     url = "https://openrouter.ai/api/v1/chat/completions"
     
     try:
@@ -83,7 +112,15 @@ async def solicitar_constraints_ia(nodos: list, relaciones: list) -> str:
             
             if response.status_code == 200:
                 data = response.json()
-                return data['choices'][0]['message']['content'].strip()
+                raw_sql = data['choices'][0]['message']['content'].strip()
+                # Filtrar cualquier línea explicativa no-SQL
+                sql_lines = []
+                for line in raw_sql.splitlines():
+                    ls = line.strip()
+                    if not ls or ls.startswith("```") or ls.lower().startswith("here") or ls.lower().startswith("aquí"):
+                        continue
+                    sql_lines.append(line)
+                return "\n".join(sql_lines)
             else:
                 print(f"Error IA SQL: {response.text}")
                 return "-- Error al generar relaciones complejas\n"
@@ -103,12 +140,13 @@ async def generar_migracion_sql(diagram_json: dict, temp_dir: str):
     sql_script += generar_tablas_basicas(nodos)
     
     sql_relaciones = await solicitar_constraints_ia(nodos, relaciones)
-    sql_script += "\n-- Constraints inferidos por IA\n"
-    sql_script += sql_relaciones
-    
-    # Limpiamos posibles formatos markdown que la IA haya filtrado por error
+    if sql_relaciones and not sql_relaciones.startswith("--"):
+        sql_script += "\n-- Constraints inferidos por IA\n"
+        sql_script += sql_relaciones + "\n"
+        
     sql_script = sql_script.replace("```sql", "").replace("```", "")
     
     file_path = os.path.join(temp_dir, "src", "main", "resources", "db", "migration", "V1__Esquema_Inicial.sql")
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(sql_script)
+

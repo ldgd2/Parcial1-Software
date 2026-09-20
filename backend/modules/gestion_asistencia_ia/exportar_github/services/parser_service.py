@@ -3,9 +3,12 @@ import re
 from jinja2 import Environment, FileSystemLoader
 
 def sanitize_identifier(name: str) -> str:
-    """Convierte un string a camelCase válido para Java"""
+    """Convierte un string a camelCase válido para Java, limpiando símbolos UML (- email: string -> email)"""
     if not name:
         return "unnamed"
+    name = re.sub(r'^[\-\+\#\~\s]+', '', str(name))
+    if ':' in name:
+        name = name.split(':')[0]
     name = re.sub(r'[^a-zA-Z0-9]', ' ', name)
     parts = name.split()
     if not parts:
