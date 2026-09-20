@@ -63,6 +63,37 @@ def get_free_port(start_port: int = 8080, exclude_ports: set = None) -> int:
         port += 1
     raise Exception("No hay puertos libres disponibles en el servidor.")
 
+def ensure_nginx_include():
+    """Asegura que 'include /etc/nginx/deploy_apps/*.conf;' esté dentro de un bloque server activo de Nginx."""
+    if platform.system() != "Linux":
+        return
+    try:
+        sites_dir = Path("/etc/nginx/sites-enabled")
+        if not sites_dir.exists():
+            return
+            
+        already_included = False
+        target_file = None
+        
+        for conf_file in sites_dir.glob("*"):
+            try:
+                content = conf_file.read_text(encoding="utf-8", errors="ignore")
+                if "deploy_apps/*.conf" in content:
+                    already_included = True
+                    break
+                if not target_file and "server {" in content:
+                    target_file = conf_file
+            except Exception:
+                pass
+                
+        if not already_included and target_file:
+            content = target_file.read_text(encoding="utf-8", errors="ignore")
+            new_content = content.replace("server {", "server {\n    include /etc/nginx/deploy_apps/*.conf;\n")
+            target_file.write_text(new_content, encoding="utf-8")
+            print(f"Incluido /etc/nginx/deploy_apps/*.conf en {target_file}")
+    except Exception as e:
+        print(f"Advertencia al incluir deploy_apps en Nginx: {e}")
+
 def kill_process_on_port(port: int):
     """Encuentra y mata de forma segura el proceso (Spring Boot) que esté usando el puerto."""
     try:
@@ -234,37 +265,6 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
     else:
         print(f"[{project_id}] El proceso de Spring Boot (PID {process.pid}) está activo en el puerto {deployment.port}.")
         
-def ensure_nginx_include():
-    """Asegura que 'include /etc/nginx/deploy_apps/*.conf;' esté dentro de un bloque server activo de Nginx."""
-    if platform.system() != "Linux":
-        return
-    try:
-        sites_dir = Path("/etc/nginx/sites-enabled")
-        if not sites_dir.exists():
-            return
-            
-        already_included = False
-        target_file = None
-        
-        for conf_file in sites_dir.glob("*"):
-            try:
-                content = conf_file.read_text(encoding="utf-8", errors="ignore")
-                if "deploy_apps/*.conf" in content:
-                    already_included = True
-                    break
-                if not target_file and "server {" in content:
-                    target_file = conf_file
-            except Exception:
-                pass
-                
-        if not already_included and target_file:
-            content = target_file.read_text(encoding="utf-8", errors="ignore")
-            new_content = content.replace("server {", "server {\n    include /etc/nginx/deploy_apps/*.conf;\n")
-            target_file.write_text(new_content, encoding="utf-8")
-            print(f"Incluido /etc/nginx/deploy_apps/*.conf en {target_file}")
-    except Exception as e:
-        print(f"Advertencia al incluir deploy_apps en Nginx: {e}")
-
     # 6. Configurar Nginx Dinámicamente si hay owner_prefix
     deployment_url = f"http://{settings.SERVER_HOST}:{deployment.port}"
     if owner_prefix and db_name:
