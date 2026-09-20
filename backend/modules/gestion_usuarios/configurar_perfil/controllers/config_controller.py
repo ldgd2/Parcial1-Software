@@ -78,3 +78,17 @@ async def configurar_db_password(
     
     return {"status": "success", "message": "Contraseña de base de datos actualizada en el host correctamente"}
 
+@router.delete("/github")
+async def desvincular_github(
+    current_user: Usuario = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(select(UsuarioGitHub).where(UsuarioGitHub.usuario_id == current_user.id))
+    github = result.scalars().first()
+    if github:
+        await db.delete(github)
+        await db.commit()
+        return {"status": "success", "message": "Cuenta de GitHub desvinculada exitosamente"}
+    raise HTTPException(status_code=404, detail="No posees una cuenta de GitHub vinculada.")
+
+

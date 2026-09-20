@@ -41,5 +41,17 @@ export const configApi = {
             throw new Error(errData.detail || 'Error al configurar la contraseña');
         }
         return response.json();
+    },
+
+    desvincularGithub: async () => {
+        const response = await fetch(`${API_URL}/configuracion/github`, {
+            method: 'DELETE',
+            headers: getAuthHeaders()
+        });
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.detail || 'Error al desvincular la cuenta de GitHub');
+        }
+        return response.json();
     }
 };
