@@ -29,14 +29,29 @@ def map_java_type(tipo_uml: str) -> str:
     return "String"
 
 
-def parse_java_parameters(params_str: str) -> tuple[str, str, str]:
+RESERVED_CRUD_METHODS = {'delete', 'deletebyid', 'remove', 'save', 'update', 'create', 'findall', 'findbyid', 'getid', 'setid'}
+
+def parse_java_parameters(params_str: str, method_name: str = "") -> tuple[str, str, str]:
     """
     Parsea parámetros UML o Java a (java_decl, call_args, spring_params).
-    Ejemplo input: "email: string, edad: int"
-    - java_decl: "String email, Integer edad"
-    - call_args: "email, edad"
-    - spring_params: "@RequestParam(required = false) String email, @RequestParam(required = false) Integer edad"
+    Si los parámetros están vacíos pero el nombre del método sugiere una búsqueda (ej: getUser, buscar),
+    deduce parámetros por defecto para que la API sea funcional y auto-documentada.
     """
+    m_lower = method_name.lower().strip()
+    
+    if not params_str or not str(params_str).strip():
+        # Deducir parámetros inteligentes si el usuario no especificó parámetros en el diagrama
+        if "email" in m_lower or "correo" in m_lower or "user" in m_lower or "usuario" in m_lower:
+            params_str = "email: string"
+        elif "codigo" in m_lower or "code" in m_lower:
+            params_str = "codigo: string"
+        elif "nombre" in m_lower or "name" in m_lower:
+            params_str = "nombre: string"
+        elif "estado" in m_lower or "status" in m_lower:
+            params_str = "estado: string"
+        elif m_lower.startswith(("get", "find", "buscar", "filter", "search")):
+            params_str = "query: string"
+
     if not params_str or not str(params_str).strip():
         return "", "", ""
         
@@ -64,7 +79,7 @@ def parse_java_parameters(params_str: str) -> tuple[str, str, str]:
             
         java_decls.append(f"{p_type} {p_name}")
         call_args.append(p_name)
-        spring_params.append(f"@RequestParam(required = false) {p_type} {p_name}")
+        spring_params.append(f'@Parameter(description = "Parámetro {p_name} ({p_type})") @RequestParam(required = false) {p_type} {p_name}')
         
     return ", ".join(java_decls), ", ".join(call_args), ", ".join(spring_params)
 
@@ -536,15 +551,19 @@ def generar_archivos_java(diagram_json: dict, temp_dir: str):
 
             metodos_sanitizados = []
             for m in nodo.get("metodos", []):
+                m_name = sanitize_identifier(m.get("nombre", ""))
+                if m_name.lower() in RESERVED_CRUD_METHODS:
+                    continue
+                    
                 nuevo_m = dict(m)
-                nuevo_m["nombre"] = sanitize_identifier(m.get("nombre", ""))
+                nuevo_m["nombre"] = m_name
                 tipo_ret = str(m.get("retorno", "void")).strip()
                 if tipo_ret.lower() != "void":
                     nuevo_m["retorno"] = map_java_type(tipo_ret)
                 else:
                     nuevo_m["retorno"] = "void"
                 
-                java_decl, call_args, spring_params = parse_java_parameters(str(m.get("parametros", "")))
+                java_decl, call_args, spring_params = parse_java_parameters(str(m.get("parametros", "")), m_name)
                 nuevo_m["java_decl"] = java_decl
                 nuevo_m["call_args"] = call_args
                 nuevo_m["spring_params"] = spring_params
@@ -691,10 +710,12 @@ def generar_documentacion_md(diagram_json: dict, url_base: str, nombre_repo: str
 
             metodos = nodo.get("metodos", [])
             if metodos:
-                md += "#### ⚡ APIs de Lógica de Negocio Personalizadas (Generadas por IA):\n\n"
+                md += "#### APIs de Lógica de Negocio Personalizadas (Generadas por IA):\n\n"
                 for m in metodos:
                     m_name = sanitize_identifier(m.get("nombre", ""))
-                    java_decl, call_args, _ = parse_java_parameters(str(m.get("parametros", "")))
+                    if m_name.lower() in RESERVED_CRUD_METHODS:
+                        continue
+                    java_decl, call_args, _ = parse_java_parameters(str(m.get("parametros", "")), m_name)
                     ret_type = map_java_type(m.get("retorno", "void")) if str(m.get("retorno", "")).lower() != "void" else "void"
                     
                     # Construir query string de ejemplo si recibe parametros

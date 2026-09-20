@@ -4,6 +4,7 @@ import com.proyecto.dtos.{{ clase.nombre }}RequestDTO;
 import com.proyecto.dtos.{{ clase.nombre }}ResponseDTO;
 import com.proyecto.services.{{ clase.nombre }}Service;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,37 +32,40 @@ public class {{ clase.nombre }}Controller {
 
     @Operation(summary = "Obtener por ID", description = "Busca un {{ clase.nombre }} por su UUID")
     @GetMapping("/{id}")
-    public ResponseEntity<{{ clase.nombre }}ResponseDTO> getById(@PathVariable UUID id) {
+    public ResponseEntity<{{ clase.nombre }}ResponseDTO> getById(@Parameter(description = "UUID de {{ clase.nombre }}") @PathVariable UUID id) {
         return ResponseEntity.ok(service.findById(id));
     }
 
-    @Operation(summary = "Crear nuevo", description = "Crea un nuevo {{ clase.nombre }}")
+    @Operation(summary = "Crear nuevo", description = "Crea un nuevo {{ clase.nombre }} en el sistema")
     @PostMapping
     public ResponseEntity<{{ clase.nombre }}ResponseDTO> create(@Valid @RequestBody {{ clase.nombre }}RequestDTO dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.create(dto));
     }
 
-    @Operation(summary = "Actualizar existente", description = "Actualiza un {{ clase.nombre }} por su UUID")
+    @Operation(summary = "Actualizar existente", description = "Actualiza un {{ clase.nombre }} de forma completa por su UUID")
     @PutMapping("/{id}")
-    public ResponseEntity<{{ clase.nombre }}ResponseDTO> update(@PathVariable UUID id, @Valid @RequestBody {{ clase.nombre }}RequestDTO dto) {
+    public ResponseEntity<{{ clase.nombre }}ResponseDTO> update(@Parameter(description = "UUID de {{ clase.nombre }}") @PathVariable UUID id, @Valid @RequestBody {{ clase.nombre }}RequestDTO dto) {
         return ResponseEntity.ok(service.update(id, dto));
     }
 
-    @Operation(summary = "Actualización parcial", description = "Actualiza campos específicos de un {{ clase.nombre }} por su UUID")
+    @Operation(summary = "Actualización parcial", description = "Actualiza únicamente los campos provistos en el body de {{ clase.nombre }}")
     @PatchMapping("/{id}")
-    public ResponseEntity<{{ clase.nombre }}ResponseDTO> patch(@PathVariable UUID id, @RequestBody {{ clase.nombre }}RequestDTO dto) {
+    public ResponseEntity<{{ clase.nombre }}ResponseDTO> patch(@Parameter(description = "UUID de {{ clase.nombre }}") @PathVariable UUID id, @RequestBody {{ clase.nombre }}RequestDTO dto) {
         return ResponseEntity.ok(service.patch(id, dto));
     }
 
-    @Operation(summary = "Eliminar", description = "Elimina un {{ clase.nombre }} por su UUID")
+    @Operation(summary = "Eliminar por ID", description = "Elimina un {{ clase.nombre }} por su UUID")
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable UUID id) {
+    public ResponseEntity<Void> delete(@Parameter(description = "UUID de {{ clase.nombre }} a eliminar") @PathVariable UUID id) {
         service.deleteById(id);
         return ResponseEntity.noContent().build();
     }
 
     {% for metodo in clase.metodos %}
-    @Operation(summary = "Ejecutar {{ metodo.nombre }}", description = "Ejecuta la lógica de negocio personalizada {{ metodo.nombre }}")
+    @Operation(
+        summary = "Lógica: {{ metodo.nombre }}",
+        description = "Operación de negocio personalizada '{{ metodo.nombre }}'. Parámetros esperados: {% if metodo.java_decl %}{{ metodo.java_decl }}{% else %}Ninguno{% endif %}. Retorno: {{ metodo.retorno }}."
+    )
     {% if metodo.retorno == 'void' %}
     @PostMapping("/{{ metodo.nombre }}")
     public ResponseEntity<Void> {{ metodo.nombre }}({% if metodo.spring_params %}{{ metodo.spring_params }}{% endif %}) {
