@@ -25,6 +25,6 @@ async def generar_spring_boot(diagram_json: dict, nombre_repo: str = "proyecto_d
     await generar_migracion_sql(diagram_json, temp_dir)
     
     # Fase 3: Inyección de Lógica IA (Controllers/Services)
-    await inyectar_logica_ia(diagram_json, temp_dir)
+    await inyectar_logica_ia(temp_dir)
     
     return temp_dir, api_docs_md
