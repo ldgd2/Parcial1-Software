@@ -21,10 +21,10 @@ class Settings(BaseSettings):
     GMAIL_APP_PASSWORD: str = ""
     
     # Configuración de IA
-    IA_SERVICE: str = "openrouter" # o googlecloud
-    IA_API: str = ""
-    IA_MODEL: str = "google/gemini-flash-1.5"
-    IA_IMAGE_API: str = ""
+    GEMINI_API: str = ""
+    OPENROUTE_API: str = ""
+    IA_MODEL: str = "cohere/north-mini-code:free"
+    IMAGE_OPEROUTE_API: str = ""
 
     # GitHub OAuth y Seguridad
     GITHUB_CLIENT_ID: str = ""

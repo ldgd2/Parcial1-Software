@@ -81,7 +81,7 @@ async def pedir_codigo_ia(prompt: str, client: httpx.AsyncClient) -> str:
     )
     
     headers = {
-        "Authorization": f"Bearer {settings.IA_API}",
+        "Authorization": f"Bearer {settings.OPENROUTE_API}",
         "Content-Type": "application/json"
     }
     

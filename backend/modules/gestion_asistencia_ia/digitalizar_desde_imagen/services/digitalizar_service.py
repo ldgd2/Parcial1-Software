@@ -4,15 +4,10 @@ from fastapi import HTTPException
 from backend.core.config import settings
 
 async def digitalizar_diagrama_desde_imagen(image_base64: str) -> dict:
-    if settings.IA_SERVICE == "googlecloud":
-        return await _llamar_gemini_vision(image_base64)
-    elif settings.IA_SERVICE == "openrouter":
-        return await _llamar_openrouter_vision(image_base64)
-    else:
-        raise HTTPException(status_code=500, detail="Servicio de IA no configurado correctamente")
+    return await _llamar_gemini_vision(image_base64)
 
-async def _llamar_gemini_vision(image_base64: str) -> dict:
-    api_key = settings.IA_IMAGE_API or settings.IA_API
+async def _llamar_gemini_vision(image_base64: str, context: str | None = None) -> dict:
+    api_key = settings.IMAGE_OPEROUTE_API or settings.GEMINI_API
     if not api_key:
         raise HTTPException(status_code=500, detail="API Key de Gemini no configurada")
 
@@ -91,8 +86,8 @@ async def _llamar_gemini_vision(image_base64: str) -> dict:
             raise HTTPException(status_code=500, detail=f"Formato de respuesta inválido de IA: {e}")
 
 
-async def _llamar_openrouter_vision(image_base64: str) -> dict:
-    api_key = settings.IA_IMAGE_API or settings.IA_API
+async def _llamar_openrouter_vision(image_base64: str, context: str | None = None) -> dict:
+    api_key = settings.IMAGE_OPEROUTE_API or settings.OPENROUTE_API
     if not api_key:
         raise HTTPException(status_code=500, detail="API Key de OpenRouter no configurada")
 

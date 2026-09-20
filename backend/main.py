@@ -62,7 +62,11 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Permitir todos los orígenes durante desarrollo
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "https://diagramador.gerlextech.com"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

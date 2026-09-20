@@ -18,7 +18,7 @@ async def generar_mensaje_commit_ia(diff_content: str) -> str:
     )
     
     headers = {
-        "Authorization": f"Bearer {settings.IA_API}",
+        "Authorization": f"Bearer {settings.OPENROUTE_API}",
         "Content-Type": "application/json"
     }
     

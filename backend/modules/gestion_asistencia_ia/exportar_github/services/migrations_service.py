@@ -67,7 +67,7 @@ async def solicitar_constraints_ia(nodos: list, relaciones: list) -> str:
     """
     
     headers = {
-        "Authorization": f"Bearer {settings.IA_API}",
+        "Authorization": f"Bearer {settings.OPENROUTE_API}",
         "Content-Type": "application/json"
     }
     

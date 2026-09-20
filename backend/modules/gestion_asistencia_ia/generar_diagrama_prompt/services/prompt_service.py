@@ -4,15 +4,10 @@ from fastapi import HTTPException
 from backend.core.config import settings
 
 async def generar_diagrama_desde_prompt(prompt: str, context: str | None = None) -> dict:
-    if settings.IA_SERVICE == "googlecloud":
-        return await _llamar_gemini(prompt, context)
-    elif settings.IA_SERVICE == "openrouter":
-        return await _llamar_openrouter(prompt, context)
-    else:
-        raise HTTPException(status_code=500, detail="Servicio de IA no configurado correctamente")
+    return await _llamar_gemini(prompt, context)
 
 async def _llamar_gemini(prompt: str, context: str | None = None) -> dict:
-    api_key = settings.IA_API
+    api_key = settings.GEMINI_API
     if not api_key:
         raise HTTPException(status_code=500, detail="API Key de Gemini no configurada")
 
@@ -87,7 +82,7 @@ async def _llamar_gemini(prompt: str, context: str | None = None) -> dict:
             raise HTTPException(status_code=500, detail=f"Formato de respuesta inválido de IA: {e}")
 
 async def _llamar_openrouter(prompt: str, context: str | None = None) -> dict:
-    api_key = settings.IA_API
+    api_key = settings.OPENROUTE_API
     if not api_key:
         raise HTTPException(status_code=500, detail="API Key de OpenRouter no configurada")
 
