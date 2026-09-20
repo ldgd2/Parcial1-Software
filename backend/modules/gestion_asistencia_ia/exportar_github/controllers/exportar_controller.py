@@ -36,8 +36,8 @@ async def get_auth_url(current_user: Usuario = Depends(get_current_user)):
     if not client_id:
         raise HTTPException(status_code=500, detail="Falta GITHUB_CLIENT_ID en el servidor.")
     
-    redirect_uri = "http://localhost:5173/github/callback"
-    url = f"https://github.com/login/oauth/authorize?client_id={client_id}&scope=repo&redirect_uri={redirect_uri}"
+    redirect_uri = f"{settings.FRONTEND_URL}/github/callback"
+    url = f"https://github.com/login/oauth/authorize?client_id={client_id}&scope=repo,user&redirect_uri={redirect_uri}"
     return {"url": url}
 
 @router.post("/callback")

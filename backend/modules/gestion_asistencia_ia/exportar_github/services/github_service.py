@@ -23,7 +23,7 @@ async def vincular_cuenta_github(usuario_id: int, codigo: str, db: AsyncSession)
                 "client_id": client_id,
                 "client_secret": client_secret,
                 "code": codigo,
-                "redirect_uri": "http://localhost:5173/github/callback"
+                "redirect_uri": f"{settings.FRONTEND_URL}/github/callback"
             },
             headers={"Accept": "application/json"}
         )

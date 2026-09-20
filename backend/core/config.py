@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "supersecretkey_change_in_production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    FRONTEND_URL: str = "http://localhost:5173"
     
     # Base de datos
     DB_IP: str = "localhost"
