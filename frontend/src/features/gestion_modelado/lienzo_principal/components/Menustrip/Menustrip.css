@@ -227,42 +227,24 @@
   gap: 6px;
   height: 28px;
   padding: 0 0.85rem;
-  border-radius: 20px;
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(217, 119, 6, 0.35));
-  border: 1px solid rgba(245, 158, 11, 0.6);
-  color: #fef08a;
+  border-radius: var(--radius-md, 4px);
+  background: #b91c1c;
+  border: 1px solid #b91c1c;
+  color: #ffffff;
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.05em;
   cursor: pointer;
   font-family: var(--font-sans);
-  animation: notificationBadgePulse 2s infinite ease-in-out;
-  box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
-  transition: all 0.2s ease;
+  transition: background 0.15s ease;
 }
 
 .menustrip__notification-badge:hover {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.4), rgba(217, 119, 6, 0.5));
-  box-shadow: 0 0 16px rgba(245, 158, 11, 0.7);
-  transform: translateY(-1px);
+  background: #991b1b;
 }
 
 .menustrip__bell-icon {
-  color: #fef08a;
-  animation: bellShake 1.5s infinite ease-in-out;
-}
-
-@keyframes bellShake {
-  0%, 100% { transform: rotate(0deg); }
-  15% { transform: rotate(12deg); }
-  30% { transform: rotate(-12deg); }
-  45% { transform: rotate(6deg); }
-  60% { transform: rotate(-6deg); }
-}
-
-@keyframes notificationBadgePulse {
-  0%, 100% { box-shadow: 0 0 8px rgba(245, 158, 11, 0.3); }
-  50% { box-shadow: 0 0 18px rgba(245, 158, 11, 0.75); }
+  color: #ffffff;
 }
 
 /* Share Button */
@@ -286,7 +268,7 @@
   text-transform: uppercase;
   cursor: pointer;
   font-family: var(--font-sans);
-  transition: all 0.2s ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .menustrip__share-btn svg {
@@ -296,14 +278,12 @@
 
 .menustrip__share-btn:hover {
   background: var(--primary-hover, #eaddcb);
-  box-shadow: 0 0 12px rgba(223, 208, 184, 0.35);
 }
 
 .menustrip__share-btn--copiado {
-  background: #10b981 !important;
-  border-color: #10b981 !important;
+  background: #15803d !important;
+  border-color: #15803d !important;
   color: #ffffff !important;
-  box-shadow: 0 0 14px rgba(16, 185, 129, 0.5) !important;
 }
 
 .menustrip__share-btn--copiado svg {
@@ -315,16 +295,14 @@
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  background: rgba(22, 25, 31, 0.96);
-  border: 1px solid rgba(223, 208, 184, 0.25);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-radius: 12px;
+  background: var(--bg-color, #222831);
+  border: 1px solid var(--border-color, #393E46);
+  border-radius: var(--radius-md, 4px);
   width: 340px;
-  padding: 1.1rem;
+  padding: 1rem;
   z-index: 500;
-  animation: dropMenuIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6);
+  animation: dropMenuIn 0.15s ease forwards;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
 .menustrip__share-label,
@@ -342,16 +320,16 @@
   display: flex;
   gap: 0;
   margin-bottom: 0.625rem;
-  border-radius: 6px;
+  border-radius: var(--radius-md, 4px);
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--border-color, #393E46);
 }
 
 .menustrip__share-input {
   flex: 1;
-  background: rgba(15, 23, 42, 0.9);
+  background: var(--surface-color, #393E46);
   border: none;
-  color: #f1f5f9;
+  color: var(--text-primary, #ffffff);
   font-size: 0.72rem;
   font-family: monospace;
   padding: 0.55rem 0.75rem;
@@ -367,10 +345,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(223, 208, 184, 0.15);
+  background: var(--primary, #DFD0B8);
   border: none;
-  border-left: 1px solid rgba(255, 255, 255, 0.15);
-  color: var(--primary, #DFD0B8);
+  color: var(--bg-color, #222831);
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -378,21 +355,20 @@
   cursor: pointer;
   font-family: var(--font-sans);
   white-space: nowrap;
-  transition: all 0.2s ease;
+  transition: background 0.15s ease;
 }
 .menustrip__share-copy:hover,
 .menustrip__share-copy-btn:hover { 
-  background: rgba(223, 208, 184, 0.28); 
-  color: #ffffff; 
+  background: var(--primary-hover, #eaddcb); 
 }
 .menustrip__share-copy--done {
-  background: #10b981 !important;
+  background: #15803d !important;
   color: #ffffff !important;
 }
 
 .menustrip__share-hint {
   font-size: 0.68rem;
-  color: #94a3b8;
+  color: var(--secondary, #948979);
   line-height: 1.4;
   margin: 0;
 }
