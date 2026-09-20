@@ -194,10 +194,12 @@ springdoc.api-docs.path=/v3/api-docs
     with open(os.path.join(src_main_java, "controllers", "HomeController.java"), "w", encoding="utf-8") as f:
         f.write('''package com.proyecto.controllers;
 
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 
+@CrossOrigin(origins = "*", allowedHeaders = "*")
 @RestController
 public class HomeController {
 
@@ -326,14 +328,44 @@ public class GlobalExceptionHandler {
 }
 ''')
 
+    # CorsConfig.java
+    with open(os.path.join(src_main_java, "config", "CorsConfig.java"), "w", encoding="utf-8") as f:
+        f.write('''package com.proyecto.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+@Configuration
+public class CorsConfig {
+
+    @Bean
+    public WebMvcConfigurer corsConfigurer() {
+        return new WebMvcConfigurer() {
+            @Override
+            public void addCorsMappings(CorsRegistry registry) {
+                registry.addMapping("/**")
+                        .allowedOriginPatterns("*")
+                        .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH")
+                        .allowedHeaders("*")
+                        .allowCredentials(true);
+            }
+        };
+    }
+}
+''')
+
     # OpenApiConfig.java
     with open(os.path.join(src_main_java, "config", "OpenApiConfig.java"), "w", encoding="utf-8") as f:
         f.write('''package com.proyecto.config;
 
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.servers.Server;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import java.util.List;
 
 @Configuration
 public class OpenApiConfig {
@@ -341,6 +373,7 @@ public class OpenApiConfig {
     @Bean
     public OpenAPI customOpenAPI() {
         return new OpenAPI()
+                .servers(List.of(new Server().url("").description("Relative Server")))
                 .info(new Info()
                         .title("API Backend Generado")
                         .version("1.0")
