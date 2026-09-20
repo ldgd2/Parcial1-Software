@@ -329,9 +329,13 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
           <button 
             className="menustrip__notification-badge"
             onClick={() => setShowPermisos(true)}
-            title="Solicitudes de acceso"
+            title="Solicitudes de acceso en sala de espera"
           >
-            {pendingGuests.length} en espera
+            <svg className="menustrip__bell-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+            <span>{pendingGuests.length} en espera</span>
           </button>
         )}
         <span className="menustrip__node-count">{nodes.length} clases</span>
@@ -368,19 +372,52 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
 
         {/* Share button */}
         <div className="menustrip__share-wrap">
-          <button className="menustrip__share-btn" onClick={() => setShowShare(!showShare)} title="Compartir Sala de Diagramación">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-            <span>Compartir</span>
+          <button 
+            className={`menustrip__share-btn ${copiado ? 'menustrip__share-btn--copiado' : ''}`} 
+            onClick={() => {
+              copiarLink();
+              setShowShare(!showShare);
+            }} 
+            title="Copiar enlace al portapapeles y compartir sala"
+          >
+            {copiado ? (
+              <>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>¡COPIADO!</span>
+              </>
+            ) : (
+              <>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                <span>Compartir</span>
+              </>
+            )}
           </button>
           {showShare && (
-            <div className="menustrip__share-popover">
-              <p className="menustrip__share-title">Enlace de acceso rápido</p>
-              <div className="menustrip__share-input-wrap">
-                <input type="text" readOnly value={shareLink} className="menustrip__share-input" />
-                <button className="menustrip__share-copy-btn" onClick={copiarLink}>
-                  {copiado ? <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg> : <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>}
+            <div className="menustrip__share-popover menustrip__share-panel">
+              <p className="menustrip__share-title menustrip__share-label">ENLACE DE ACCESO RÁPIDO</p>
+              <div className="menustrip__share-input-wrap menustrip__share-row">
+                <input 
+                  type="text" 
+                  readOnly 
+                  value={shareLink} 
+                  className="menustrip__share-input" 
+                  onClick={(e) => (e.target as HTMLInputElement).select()}
+                />
+                <button className={`menustrip__share-copy-btn menustrip__share-copy ${copiado ? 'menustrip__share-copy--done' : ''}`} onClick={copiarLink}>
+                  {copiado ? (
+                    <>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{marginRight: 4}}><polyline points="20 6 9 17 4 12"/></svg>
+                      <span>¡Copiado!</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight: 4}}><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                      <span>Copiar</span>
+                    </>
+                  )}
                 </button>
               </div>
+              <p className="menustrip__share-hint">Cualquier usuario con este enlace podrá unirse o solicitar acceso a la sala.</p>
             </div>
           )}
         </div>

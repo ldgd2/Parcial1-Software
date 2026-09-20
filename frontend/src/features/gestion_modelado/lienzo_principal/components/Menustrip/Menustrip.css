@@ -220,6 +220,51 @@
   box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
 }
 
+/* Notification Badge for Room Waiting Requests */
+.menustrip__notification-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 0.85rem;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(217, 119, 6, 0.35));
+  border: 1px solid rgba(245, 158, 11, 0.6);
+  color: #fef08a;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  animation: notificationBadgePulse 2s infinite ease-in-out;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+  transition: all 0.2s ease;
+}
+
+.menustrip__notification-badge:hover {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.4), rgba(217, 119, 6, 0.5));
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.7);
+  transform: translateY(-1px);
+}
+
+.menustrip__bell-icon {
+  color: #fef08a;
+  animation: bellShake 1.5s infinite ease-in-out;
+}
+
+@keyframes bellShake {
+  0%, 100% { transform: rotate(0deg); }
+  15% { transform: rotate(12deg); }
+  30% { transform: rotate(-12deg); }
+  45% { transform: rotate(6deg); }
+  60% { transform: rotate(-6deg); }
+}
+
+@keyframes notificationBadgePulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(245, 158, 11, 0.3); }
+  50% { box-shadow: 0 0 18px rgba(245, 158, 11, 0.75); }
+}
+
 /* Share Button */
 .menustrip__share-wrap {
   position: relative;
@@ -254,42 +299,62 @@
   box-shadow: 0 0 12px rgba(223, 208, 184, 0.35);
 }
 
-.menustrip__share-panel {
+.menustrip__share-btn--copiado {
+  background: #10b981 !important;
+  border-color: #10b981 !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.5) !important;
+}
+
+.menustrip__share-btn--copiado svg {
+  color: #ffffff !important;
+}
+
+.menustrip__share-panel,
+.menustrip__share-popover {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  background: #16191f;
-  border: 1px solid var(--border-color);
+  background: rgba(22, 25, 31, 0.96);
+  border: 1px solid rgba(223, 208, 184, 0.25);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 12px;
   width: 340px;
-  padding: 1rem;
+  padding: 1.1rem;
   z-index: 500;
-  animation: dropMenuIn 0.15s ease forwards;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  animation: dropMenuIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6);
 }
 
-.menustrip__share-label {
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  color: var(--text-secondary);
+.menustrip__share-label,
+.menustrip__share-title {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--primary, #DFD0B8);
   margin-bottom: 0.625rem;
+  text-transform: uppercase;
 }
 
-.menustrip__share-row {
+.menustrip__share-row,
+.menustrip__share-input-wrap {
   display: flex;
   gap: 0;
   margin-bottom: 0.625rem;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .menustrip__share-input {
   flex: 1;
-  background: var(--bg-color);
-  border: 1px solid var(--border-color);
-  border-right: none;
-  color: var(--text-secondary);
-  font-size: 0.68rem;
+  background: rgba(15, 23, 42, 0.9);
+  border: none;
+  color: #f1f5f9;
+  font-size: 0.72rem;
   font-family: monospace;
-  padding: 0.5rem 0.75rem;
+  padding: 0.55rem 0.75rem;
   outline: none;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -297,29 +362,39 @@
   min-width: 0;
 }
 
-.menustrip__share-copy {
-  background: var(--surface-color);
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
-  font-size: 0.65rem;
+.menustrip__share-copy,
+.menustrip__share-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(223, 208, 184, 0.15);
+  border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--primary, #DFD0B8);
+  font-size: 0.7rem;
   font-weight: 700;
-  letter-spacing: 0.1em;
-  padding: 0 0.875rem;
+  letter-spacing: 0.05em;
+  padding: 0 0.85rem;
   cursor: pointer;
   font-family: var(--font-sans);
   white-space: nowrap;
-  transition: color 0.2s, border-color 0.2s;
+  transition: all 0.2s ease;
 }
-.menustrip__share-copy:hover { color: var(--primary); border-color: var(--primary); }
+.menustrip__share-copy:hover,
+.menustrip__share-copy-btn:hover { 
+  background: rgba(223, 208, 184, 0.28); 
+  color: #ffffff; 
+}
 .menustrip__share-copy--done {
-  color: #a3e6a3;
-  border-color: rgba(163, 230, 163, 0.4);
+  background: #10b981 !important;
+  color: #ffffff !important;
 }
 
 .menustrip__share-hint {
   font-size: 0.68rem;
-  color: var(--secondary);
+  color: #94a3b8;
   line-height: 1.4;
+  margin: 0;
 }
 
 /* Notificaciones Toast */
