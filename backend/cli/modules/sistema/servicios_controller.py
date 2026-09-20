@@ -136,6 +136,19 @@ server {{
 
     # 4. Habilitar todo (Ejecución real en Ubuntu)
     if os.name != 'nt':
+        console.print("[cyan]Configurando entorno de producción para el Frontend...[/cyan]")
+        env_prod_path = os.path.join(BASE_DIR, "frontend", ".env.production")
+        if modo == "dominio":
+            api_url = f"https://api-diagramador.{dominio_base}"
+            ws_url = f"wss://api-diagramador.{dominio_base}"
+        else:
+            api_url = f"http://{ip_address}:8080"
+            ws_url = f"ws://{ip_address}:8080"
+            
+        with open(env_prod_path, "w") as f:
+            f.write(f"VITE_API_URL={api_url}\n")
+            f.write(f"VITE_HOST_API_URL={ws_url}\n")
+
         console.print("[cyan]Haciendo build del Frontend...[/cyan]")
         subprocess.run("npm run build", cwd=os.path.join(BASE_DIR, "frontend"), shell=True)
         os.system(f"sudo rm -rf /var/www/diagramador-frontend")
@@ -164,6 +177,12 @@ def reiniciar_todo():
     
     if os.name != 'nt':
         console.print("[cyan]Haciendo rebuild del Frontend...[/cyan]")
+        
+        # Intentar inferir el dominio/IP de los archivos de NGINX si existen para reconstruir el .env.production
+        env_prod_path = os.path.join(BASE_DIR, "frontend", ".env.production")
+        if not os.path.exists(env_prod_path):
+            console.print("[yellow]No se encontró .env.production, se compilará con las variables por defecto.[/yellow]")
+            
         subprocess.run("npm run build", cwd=os.path.join(BASE_DIR, "frontend"), shell=True)
         os.system(f"sudo rm -rf /var/www/diagramador-frontend")
         os.system(f"sudo cp -r {os.path.join(BASE_DIR, 'frontend', 'dist')} /var/www/diagramador-frontend")
