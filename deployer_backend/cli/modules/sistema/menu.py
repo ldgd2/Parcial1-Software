@@ -83,7 +83,7 @@ WantedBy=multi-user.target
     
     # 2. Nginx
     if modo == "dominio":
-        dominio = Prompt.ask("Ingresa el subdominio para el Deployer (Ej: deploy.gerlextech.com)")
+        dominio = Prompt.ask("Ingresa el subdominio para el Deployer (Ej: deploy.example.com)")
         conf_nginx = f"""server {{
     listen 80;
     server_name {dominio};

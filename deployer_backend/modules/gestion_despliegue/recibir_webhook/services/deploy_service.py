@@ -217,7 +217,7 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
                 
             subprocess.run(["sudo", "systemctl", "reload", "nginx"], check=True)
             print(f"[{project_id}] Nginx reload OK. App en /host/{owner_prefix}/{db_name}/")
-            deployment_url = f"https://host.gerlextech.com/host/{owner_prefix}/{db_name}/"
+            deployment_url = f"https://host.example.com/host/{owner_prefix}/{db_name}/"
         except Exception as e:
             print(f"[{project_id}] Error configurando Nginx: {e}")
 
@@ -231,11 +231,11 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
     print(f"Deployment successful. PID: {deployment.pid}, Port: {deployment.port}")
     
     import httpx
-    main_api_url = os.getenv("MAIN_API_URL", "https://api-diagramador.gerlextech.com")
+    main_api_url = os.getenv("MAIN_API_URL", "https://api-diagramador.example.com")
     callback_url = f"{main_api_url}/deploy-callback"
     
-    # We will assume a pattern like http://deploy.gerlextech.com:{port} or use the SERVER_DOMAIN env variable
-    server_domain = os.getenv("SERVER_DOMAIN", "http://host.gerlextech.com")
+    # We will assume a pattern like http://deploy.example.com:{port} or use the SERVER_DOMAIN env variable
+    server_domain = os.getenv("SERVER_DOMAIN", "http://host.example.com")
     
     # Send the friendly deployment URL to the main API
     payload = {

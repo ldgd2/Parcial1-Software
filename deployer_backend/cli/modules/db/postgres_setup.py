@@ -61,13 +61,13 @@ def menu_postgres():
             if os.name != 'nt':
                 console.print("\n[cyan]--- EXPOSICIÓN DE RED ---[/cyan]")
                 console.print("[1] Solo Localhost (Seguro, por defecto)")
-                console.print("[2] Por Dominio (Ej. db.gerlextech.com - Requiere DNS apuntando a esta IP)")
+                console.print("[2] Por Dominio (Ej. db.example.com - Requiere DNS apuntando a esta IP)")
                 console.print("[3] Por IP Pública")
                 net_op = Prompt.ask("Selecciona cómo exponer PostgreSQL", choices=["1", "2", "3"])
                 
                 host_val = "localhost"
                 if net_op == "2":
-                    host_val = Prompt.ask("Introduce tu dominio (ej. db.gerlextech.com)")
+                    host_val = Prompt.ask("Introduce tu dominio (ej. example.com)")
                 elif net_op == "3":
                     host_val = Prompt.ask("Introduce tu IP Pública (o deja vacío para auto-detectar)")
                     if not host_val:

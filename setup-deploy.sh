@@ -55,8 +55,8 @@ echo -e "\n[3/4] Configurando Nginx y SystemD..."
 PROJECT_ROOT=$(pwd)
 
 # Prompt for the deployer domain
-read -p "Ingresa el subdominio de este VPS (ej. host.gerlextech.com) [host.gerlextech.com]: " DEPLOYER_DOMAIN
-DEPLOYER_DOMAIN=${DEPLOYER_DOMAIN:-host.gerlextech.com}
+read -p "Ingresa el subdominio de este VPS (ej. host.example.com) [host.example.com]: " DEPLOYER_DOMAIN
+DEPLOYER_DOMAIN=${DEPLOYER_DOMAIN:-host.example.com}
 
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     # -- NGINX --

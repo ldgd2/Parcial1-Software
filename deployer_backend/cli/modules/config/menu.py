@@ -12,7 +12,7 @@ def menu_config():
         load_dotenv(ENV_FILE)
         
         # Current values
-        main_api = os.getenv("MAIN_API_URL", "https://api-diagramador.gerlextech.com")
+        main_api = os.getenv("MAIN_API_URL", "https://api-diagramador.example.com")
         server_host = os.getenv("SERVER_HOST", "localhost")
         pg_password = os.getenv("PG_PASSWORD", "postgres")
         

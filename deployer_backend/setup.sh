@@ -112,7 +112,7 @@ function setup_nginx_and_services() {
         sudo bash -c "cat <<EOF > /etc/nginx/sites-available/diagramador
 server {
     listen 80;
-    server_name diagramador.gerlextech.com;
+    server_name diagramador.example.com;
 
     root $FRONTEND_DIST_PATH;
     index index.html;
@@ -132,7 +132,7 @@ EOF"
         sudo bash -c 'cat <<EOF > /etc/nginx/sites-available/api-diagramador
 server {
     listen 80;
-    server_name api.diagramador.gerlextech.com;
+    server_name api.diagramador.example.com;
 
     location / {
         proxy_pass http://localhost:8000;

@@ -105,7 +105,7 @@ async def exportar_proyecto(
         
         owner_prefix = anfitrion.email.split("@")[0] if anfitrion.email else "user"
         if payload.auto_deploy:
-            url_base = f"https://host.gerlextech.com/host/{owner_prefix}/{db_name}"
+            url_base = f"https://host.example.com/host/{owner_prefix}/{db_name}"
         else:
             url_base = "http://localhost:8080"
             

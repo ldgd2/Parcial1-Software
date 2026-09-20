@@ -89,7 +89,7 @@ WantedBy=multi-user.target
     if modo == "dominio":
         conf_frontend = """server {
     listen 80;
-    server_name diagramador.gerlextech.com;
+    server_name diagramador.example.com;
 
     location / {
         proxy_pass http://localhost:4173;
@@ -103,7 +103,7 @@ WantedBy=multi-user.target
 """
         conf_backend = """server {
     listen 80;
-    server_name api-diagramador.gerlextech.com;
+    server_name api-diagramador.example.com;
 
     location / {
         proxy_pass http://localhost:8000;
