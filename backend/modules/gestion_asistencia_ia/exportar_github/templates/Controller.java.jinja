@@ -53,4 +53,20 @@ public class {{ clase.nombre }}Controller {
         service.deleteById(id);
         return ResponseEntity.noContent().build();
     }
+
+    {% for metodo in clase.metodos %}
+    @Operation(summary = "Ejecutar {{ metodo.nombre }}", description = "Ejecuta la lógica de negocio personalizada {{ metodo.nombre }}")
+    {% if metodo.retorno == 'void' %}
+    @PostMapping("/{{ metodo.nombre }}")
+    public ResponseEntity<Void> {{ metodo.nombre }}({% if metodo.spring_params %}{{ metodo.spring_params }}{% endif %}) {
+        service.{{ metodo.nombre }}({% if metodo.call_args %}{{ metodo.call_args }}{% endif %});
+        return ResponseEntity.ok().build();
+    }
+    {% else %}
+    @PostMapping("/{{ metodo.nombre }}")
+    public ResponseEntity<{{ metodo.retorno }}> {{ metodo.nombre }}({% if metodo.spring_params %}{{ metodo.spring_params }}{% endif %}) {
+        return ResponseEntity.ok(service.{{ metodo.nombre }}({% if metodo.call_args %}{{ metodo.call_args }}{% endif %}));
+    }
+    {% endif %}
+    {% endfor %}
 }

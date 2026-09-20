@@ -29,7 +29,45 @@ def map_java_type(tipo_uml: str) -> str:
     return "String"
 
 
-def inicializar_estructura_spring(temp_dir: str, nombre_repo: str = "proyecto_db", db_password: str = "password"):
+def parse_java_parameters(params_str: str) -> tuple[str, str, str]:
+    """
+    Parsea parámetros UML o Java a (java_decl, call_args, spring_params).
+    Ejemplo input: "email: string, edad: int"
+    - java_decl: "String email, Integer edad"
+    - call_args: "email, edad"
+    - spring_params: "@RequestParam(required = false) String email, @RequestParam(required = false) Integer edad"
+    """
+    if not params_str or not str(params_str).strip():
+        return "", "", ""
+        
+    raw_parts = [p.strip() for p in str(params_str).split(",") if p.strip()]
+    java_decls = []
+    call_args = []
+    spring_params = []
+    
+    for idx, part in enumerate(raw_parts):
+        if ":" in part:
+            p_name_raw, p_type_raw = part.split(":", 1)
+            p_name = sanitize_identifier(p_name_raw)
+            p_type = map_java_type(p_type_raw)
+        else:
+            sub = part.split()
+            if len(sub) >= 2:
+                p_type = map_java_type(sub[0])
+                p_name = sanitize_identifier(sub[1])
+            else:
+                p_name = sanitize_identifier(part)
+                p_type = "String"
+                
+        if not p_name or p_name == "unnamed":
+            p_name = f"arg{idx}"
+            
+        java_decls.append(f"{p_type} {p_name}")
+        call_args.append(p_name)
+        spring_params.append(f"@RequestParam(required = false) {p_type} {p_name}")
+        
+    return ", ".join(java_decls), ", ".join(call_args), ", ".join(spring_params)
+
     """
     Crea la estructura de carpetas y archivos base (pom.xml, Application.java, properties)
     para un proyecto Spring Boot estándar sin depender de un .zip
@@ -502,9 +540,10 @@ def generar_archivos_java(diagram_json: dict, temp_dir: str):
                 else:
                     nuevo_m["retorno"] = "void"
                 
-                # Sanitización muy básica de parámetros (remover caracteres que rompan)
-                params = str(m.get("parametros", "")).strip()
-                nuevo_m["parametros"] = re.sub(r'[^a-zA-Z0-9\s,]', '', params)
+                java_decl, call_args, spring_params = parse_java_parameters(str(m.get("parametros", "")))
+                nuevo_m["java_decl"] = java_decl
+                nuevo_m["call_args"] = call_args
+                nuevo_m["spring_params"] = spring_params
                 
                 metodos_sanitizados.append(nuevo_m)
 
@@ -543,11 +582,13 @@ def generar_archivos_java(diagram_json: dict, temp_dir: str):
             with open(os.path.join(src_main_java, "dtos", f"{clase_data['nombre']}ResponseDTO.java"), "w", encoding="utf-8") as f:
                 f.write(codigo_res_dto)
 
-def generar_documentacion_md(diagram_json: dict, url_base: str, nombre_repo: str) -> str:
+def generar_documentacion_md(diagram_json: dict, url_base: str, nombre_repo: str, descripcion_proyecto: str = "") -> str:
     """Genera la documentación en formato Markdown de las APIs expuestas."""
     nodos = diagram_json.get("nodes", [])
     
     md = f"# Documentación de la API: {nombre_repo.capitalize()}\n\n"
+    if descripcion_proyecto:
+        md += f"**Descripción del Proyecto:** {descripcion_proyecto}\n\n"
     md += f"Tu proyecto está alojado y disponible en: **{url_base}**\n\n"
     md += f"## 📚 Swagger UI (Interfaz Gráfica Interactiva)\n"
     md += f"Puedes probar todas las peticiones desde tu navegador ingresando a:\n"
@@ -573,21 +614,32 @@ def generar_documentacion_md(diagram_json: dict, url_base: str, nombre_repo: str
                     md += f'  "{n}": {val}{coma} // Tipo: {t}\n'
                 md += "}\n```\n\n"
             
-            md += "**Operaciones:**\n"
+            md += "**Operaciones Standard (CRUD):**\n"
             md += f"- `GET /api/v1/{ruta}` : Listar todos los registros.\n"
             md += f"- `GET /api/v1/{ruta}/{{id}}` : Obtener un registro por su ID (UUID).\n"
             md += f"- `POST /api/v1/{ruta}` : Crear un nuevo registro (enviar JSON en el body).\n"
             md += f"- `PUT /api/v1/{ruta}/{{id}}` : Actualizar un registro (enviar JSON en el body).\n"
             md += f"- `DELETE /api/v1/{ruta}/{{id}}` : Eliminar un registro.\n\n"
+
+            metodos = nodo.get("metodos", [])
+            if metodos:
+                md += "**Operaciones de Lógica de Negocio Personalizadas:**\n"
+                for m in metodos:
+                    m_name = sanitize_identifier(m.get("nombre", ""))
+                    java_decl, _, _ = parse_java_parameters(str(m.get("parametros", "")))
+                    ret_type = map_java_type(m.get("retorno", "void")) if str(m.get("retorno", "")).lower() != "void" else "void"
+                    md += f"- `POST /api/v1/{ruta}/{m_name}` : Ejecutar `{m_name}({java_decl})` -> Retorna `{ret_type}`\n"
+                md += "\n"
+
             md += "---\n"
             
     return md
 
-def parsear_diagrama(diagram_json: dict, temp_dir: str, nombre_repo: str = "proyecto_db", db_password: str = "password", url_base: str = "http://localhost:8080") -> str:
+def parsear_diagrama(diagram_json: dict, temp_dir: str, nombre_repo: str = "proyecto_db", db_password: str = "password", url_base: str = "http://localhost:8080", descripcion_proyecto: str = "") -> str:
     """
     Orquestador del parser. Retorna la documentación en formato MD.
     """
     inicializar_estructura_spring(temp_dir, nombre_repo, db_password)
     generar_archivos_java(diagram_json, temp_dir)
-    return generar_documentacion_md(diagram_json, url_base, nombre_repo)
+    return generar_documentacion_md(diagram_json, url_base, nombre_repo, descripcion_proyecto)
 

@@ -9,6 +9,7 @@ class ExportarProyectoRequest(BaseModel):
     nombre_repo: str
     diagram_json: Dict[str, Any]
     auto_deploy: Optional[bool] = False
+    descripcion_proyecto: Optional[str] = None
 
 class ExportarProyectoResponse(BaseModel):
     url_repositorio: str

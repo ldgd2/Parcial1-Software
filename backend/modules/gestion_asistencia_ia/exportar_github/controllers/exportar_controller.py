@@ -132,7 +132,14 @@ async def exportar_proyecto(
         else:
             url_base = "http://localhost:8080"
             
-        carpeta_temporal, api_docs_md = await generar_spring_boot(payload.diagram_json, payload.nombre_repo, db_password, url_base)
+        descripcion = payload.descripcion_proyecto or (proyecto.descripcion if proyecto else "") or ""
+        carpeta_temporal, api_docs_md = await generar_spring_boot(
+            payload.diagram_json, 
+            payload.nombre_repo, 
+            db_password, 
+            url_base,
+            descripcion_proyecto=descripcion
+        )
         
         if proyecto.github_repo_url:
             # 5a. Ya tiene repo: Actualizar código

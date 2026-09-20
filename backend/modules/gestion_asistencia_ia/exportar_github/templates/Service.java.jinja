@@ -79,8 +79,8 @@ public class {{ clase.nombre }}Service {
     }
 
     {% for metodo in clase.metodos %}
-    public {{ metodo.retorno }} {{ metodo.nombre }}({{ metodo.parametros }}) {
-        // @IA_PROMPT_START: "Implementa la lógica del método {{ metodo.nombre }} de la clase {{ clase.nombre }} que retorna {{ metodo.retorno }} recibiendo los parámetros: {{ metodo.parametros }}"
+    public {{ metodo.retorno }} {{ metodo.nombre }}({{ metodo.java_decl }}) {
+        // @IA_PROMPT_START: "Implementa la lógica del método {{ metodo.nombre }} de la clase {{ clase.nombre }} que retorna {{ metodo.retorno }} recibiendo los parámetros: {{ metodo.java_decl }}"
         // @IA_PROMPT_END
     }
     {% endfor %}
