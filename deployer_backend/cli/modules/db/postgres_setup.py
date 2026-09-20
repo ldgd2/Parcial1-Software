@@ -4,7 +4,7 @@ from cli.console import console, print_header
 from rich.prompt import Prompt
 from dotenv import load_dotenv, set_key
 
-ENV_FILE = os.path.join(os.path.dirname(__file__), "../../../../.env")
+ENV_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.env"))
 
 def menu_postgres():
     while True:

@@ -15,10 +15,12 @@ def menu_config():
         main_api = os.getenv("MAIN_API_URL", "https://api-diagramador.example.com")
         server_host = os.getenv("SERVER_HOST", "localhost")
         pg_password = os.getenv("PG_PASSWORD", "postgres")
+        pg_host = os.getenv("PG_HOST", "localhost")
         
         console.print(f"[bold yellow]1.[/bold yellow] MAIN_API_URL: [green]{main_api}[/green]")
         console.print(f"[bold yellow]2.[/bold yellow] SERVER_HOST: [green]{server_host}[/green]")
         console.print(f"[bold yellow]3.[/bold yellow] PG_PASSWORD: [green]{pg_password}[/green]")
+        console.print(f"[bold yellow]4.[/bold yellow] PG_HOST: [green]{pg_host}[/green]")
         console.print("[0] Volver")
         
         op = Prompt.ask("\n¿Qué variable deseas actualizar? (Dejar en blanco para mantener actual)", default="0")
@@ -29,7 +31,8 @@ def menu_config():
         key_map = {
             "1": "MAIN_API_URL",
             "2": "SERVER_HOST",
-            "3": "PG_PASSWORD"
+            "3": "PG_PASSWORD",
+            "4": "PG_HOST"
         }
         
         if op in key_map:
