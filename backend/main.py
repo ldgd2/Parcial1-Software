@@ -21,7 +21,7 @@ from backend.modules.gestion_usuarios.registrar_usuario.controllers.user_control
 from backend.modules.gestion_usuarios.iniciar_sesion.controllers.login_controller import router as login_router
 from backend.modules.gestion_usuarios.cerrar_sesion.controllers.logout_controller import router as logout_router
 from backend.modules.gestion_usuarios.recuperar_password.controllers.reset_controller import router as reset_password_router
-
+from backend.modules.gestion_usuarios.configurar_perfil.controllers.config_controller import router as config_router
 from backend.modules.gestion_proyectos.crear_proyecto.controllers.crear_controller import router as crear_proyecto_router
 from backend.modules.gestion_proyectos.administrar_proyecto.controllers.admin_controller import router as admin_proyecto_router
 from backend.modules.gestion_proyectos.compartir_proyecto.controllers.compartir_controller import router as compartir_proyecto_router
@@ -78,7 +78,7 @@ app.include_router(register_router)
 app.include_router(login_router)
 app.include_router(logout_router)
 app.include_router(reset_password_router)
-app.include_router(config_controller.router)
+app.include_router(config_router)
 
 # Registrar routers de proyectos
 app.include_router(crear_proyecto_router)
