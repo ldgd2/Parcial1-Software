@@ -258,6 +258,26 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
     else:
         print(f"[{project_id}] El proceso de Spring Boot (PID {process.pid}) está activo en el puerto {deployment.port}.")
         
+        # Otorgar permisos sobre todas las tablas recién creadas por Flyway/Hibernate al usuario del proyecto
+        if db_name and owner_prefix:
+            try:
+                env = os.environ.copy()
+                env["PGPASSWORD"] = settings.PG_PASSWORD
+                pg_host = settings.PG_HOST
+                psql_db_cmd = ["psql", "-U", "postgres", "-h", pg_host, "-d", db_name]
+                grant_sql = (
+                    f'ALTER SCHEMA public OWNER TO "{owner_prefix}"; '
+                    f'GRANT ALL ON SCHEMA public TO "{owner_prefix}"; '
+                    f'GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "{owner_prefix}"; '
+                    f'GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "{owner_prefix}"; '
+                    f'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "{owner_prefix}"; '
+                    f'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO "{owner_prefix}";'
+                )
+                subprocess.run(psql_db_cmd + ["-c", grant_sql], env=env, check=False)
+                print(f"[{project_id}] Permisos sobre tablas otorgados a {owner_prefix} en BD {db_name}.")
+            except Exception as e:
+                print(f"[{project_id}] Advertencia al otorgar permisos post-despliegue: {e}")
+        
     # 7. Configurar Nginx Dinámicamente si hay owner_prefix
     deployment_url = f"http://{settings.SERVER_HOST}:{deployment.port}"
     if owner_prefix and db_name:
