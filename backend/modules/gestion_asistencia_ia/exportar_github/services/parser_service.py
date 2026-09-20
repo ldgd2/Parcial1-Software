@@ -30,31 +30,20 @@ def map_java_type(tipo_uml: str) -> str:
 
 
 def obtener_ejemplo_atributo_raw(nombre: str, tipo: str) -> str:
-    """Genera un valor de ejemplo realista en formato texto sin comillas envolventes."""
+    """Genera un valor de ejemplo dinámico basado exclusivamente en el tipo de dato de la variable."""
     n = str(nombre).lower().strip()
     t = str(tipo).lower().strip()
-    if "email" in n or "correo" in n:
-        return "usuario@ejemplo.com"
-    if "nombre" in n or "name" in n or "titulo" in n or "title" in n or "criterio" in n or "criterion" in n:
-        return f"Ejemplo {nombre.capitalize()}"
-    if "desc" in n or "description" in n:
-        return f"Descripción detallada de {nombre}"
-    if "telefono" in n or "phone" in n or "celular" in n:
-        return "+59171234567"
-    if "password" in n or "clave" in n or "pass" in n:
-        return "Secreto123!"
-    if "fecha" in n or "date" in n or "due" in n:
-        return "2026-09-20"
-    if "score" in n or "punto" in n or "nota" in n or "max" in n or "min" in n:
-        return "100"
-    if "bool" in t or "activo" in n or "is" in n or "group" in n:
-        return "true"
-    if "double" in t or "float" in t or "precio" in n or "monto" in n or "total" in n or "costo" in n:
-        return "99.50"
-    if "int" in t or "integer" in t or "edad" in n or "stock" in n or "cantidad" in n:
-        return "10"
-    if "uuid" in t or n == "id":
+    
+    if n == "id" or "uuid" in t:
         return "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+    if "bool" in t:
+        return "true"
+    if "int" in t or "integer" in t or "long" in t or "short" in t:
+        return "10"
+    if "double" in t or "float" in t or "decimal" in t:
+        return "99.50"
+    if "date" in t or "time" in t:
+        return "2026-09-20"
     return f"ejemplo_{n}"
 
 
@@ -738,7 +727,7 @@ def generar_documentacion_md(diagram_json: dict, url_base: str, nombre_repo: str
                     m_name = sanitize_identifier(m.get("nombre", ""))
                     if m_name.lower() in RESERVED_CRUD_METHODS:
                         continue
-                    java_decl, call_args, _ = parse_java_parameters(str(m.get("parametros", "")), m_name)
+                    java_decl, call_args, _, _ = parse_java_parameters(str(m.get("parametros", "")), m_name)
                     ret_type = map_java_type(m.get("retorno", "void")) if str(m.get("retorno", "")).lower() != "void" else "void"
                     
                     query_example = ""
