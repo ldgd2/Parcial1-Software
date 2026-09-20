@@ -13,7 +13,7 @@ async def webhook_deploy(
     db: AsyncSession = Depends(get_db)
 ):
     # Execute deployment in background to not block the webhook response
-    background_tasks.add_task(deploy_project, payload.repo_url, payload.project_id, db)
+    background_tasks.add_task(deploy_project, payload.repo_url, payload.project_id, db, payload.db_name, payload.db_password, payload.owner_prefix)
     
     return DeployResponse(
         status="accepted",

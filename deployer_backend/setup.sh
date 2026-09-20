@@ -25,7 +25,7 @@ function install_system_deps() {
     echo "[*] Actualizando sistema..."
     sudo apt-get update && sudo apt-get upgrade -y
     echo "[*] Instalando dependencias base..."
-    sudo apt-get install -y curl wget git python3 python3-pip python3-venv openjdk-17-jdk maven net-tools
+    sudo apt-get install -y curl wget git python3 python3-pip python3-venv openjdk-17-jdk maven net-tools nodejs npm
     echo "[+] Dependencias del sistema instaladas."
 }
 
@@ -80,11 +80,15 @@ function setup_env() {
         read -p "Ingresa la URL de la base de datos principal [postgresql+asyncpg://user:pass@localhost/db]: " MAIN_DB_URL
     fi
     
+    read -p "Ingresa tu API Key de Gemini: " GEMINI_API
+    
     cat <<EOF > .env
 API_V1_STR=/api/v1
 PROJECT_NAME="Deployer Backend"
 MAIN_DB_URL=$MAIN_DB_URL
 BASE_DOMAIN=$BASE_DOMAIN
+GEMINI_API=$GEMINI_API
+OPENROUTE_API=$GEMINI_API
 EOF
     
     echo "[+] Entorno virtual y .env configurados."
@@ -94,24 +98,30 @@ function setup_nginx_and_services() {
     echo "[*] Instalando y configurando Nginx..."
     sudo apt-get install -y nginx
 
-    # Frontend Nginx Config
+    # Frontend Build
+    echo "[*] Compilando Frontend (React Build)..."
+    cd ../frontend
+    npm install
+    npm run build
+    FRONTEND_DIST_PATH="$(pwd)/dist"
+    cd ../deployer_backend
+
+    # Frontend Nginx Config (Static serving)
     if [ ! -f "/etc/nginx/sites-available/diagramador" ]; then
-        echo "[*] Creando configuración Nginx para el Frontend..."
-        sudo bash -c 'cat <<EOF > /etc/nginx/sites-available/diagramador
+        echo "[*] Creando configuración Nginx para el Frontend estático..."
+        sudo bash -c "cat <<EOF > /etc/nginx/sites-available/diagramador
 server {
     listen 80;
     server_name diagramador.gerlextech.com;
 
+    root $FRONTEND_DIST_PATH;
+    index index.html;
+
     location / {
-        proxy_pass http://localhost:5173;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
+        try_files \\\$uri \\\$uri/ /index.html;
     }
 }
-EOF'
+EOF"
     else
         echo "[!] Configuración de Nginx para frontend ya existe. Omitiendo."
     fi
@@ -126,8 +136,10 @@ server {
 
     location / {
         proxy_pass http://localhost:8000;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
     }
 }
 EOF'
@@ -147,30 +159,6 @@ EOF'
     fi
 
     echo "[*] Configurando servicios SystemD..."
-    
-    # Frontend Service
-    if [ ! -f "/etc/systemd/system/diagramador-frontend.service" ]; then
-        echo "[*] Creando servicio SystemD para Frontend..."
-        sudo bash -c "cat <<EOF > /etc/systemd/system/diagramador-frontend.service
-[Unit]
-Description=Diagramador Frontend (Vite)
-After=network.target
-
-[Service]
-User=\$USER
-WorkingDirectory=$(pwd)/../frontend
-ExecStart=/usr/bin/npm run dev -- --host 0.0.0.0
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-EOF"
-        sudo systemctl daemon-reload
-        sudo systemctl enable diagramador-frontend.service
-        sudo systemctl start diagramador-frontend.service
-    else
-        echo "[!] Servicio SystemD Frontend ya existe. Omitiendo."
-    fi
 
     # Backend Service
     if [ ! -f "/etc/systemd/system/diagramador-backend.service" ]; then
@@ -184,7 +172,7 @@ After=network.target
 User=\$USER
 WorkingDirectory=$(pwd)/../backend
 Environment=\"PATH=$(pwd)/../backend/venv/bin\"
-ExecStart=$(pwd)/../backend/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+ExecStart=$(pwd)/../backend/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
 Restart=always
 
 [Install]

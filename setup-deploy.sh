@@ -11,7 +11,7 @@ echo "==================================================="
 echo -e "\n[1/4] Verificando dependencias del sistema..."
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     sudo apt-get update
-    sudo apt-get install -y python3 python3-venv python3-pip nginx sqlite3
+    sudo apt-get install -y python3 python3-venv python3-pip nginx sqlite3 postgresql postgresql-contrib
 else
     echo "⚠️ Sistema no Linux detectado. Se omiten instalaciones apt-get."
 fi
@@ -50,29 +50,58 @@ if [ ! -f ".env" ]; then
 fi
 
 # 3. Configuración Nginx y SystemD
-echo -e "\n[3/4] Configurando Nginx y SystemD (deploy.gerlex.com)..."
+echo -e "\n[3/4] Configurando Nginx y SystemD..."
 
 PROJECT_ROOT=$(pwd)
+
+# Prompt for the deployer domain
+read -p "Ingresa el subdominio de este VPS (ej. host.gerlextech.com) [host.gerlextech.com]: " DEPLOYER_DOMAIN
+DEPLOYER_DOMAIN=${DEPLOYER_DOMAIN:-host.gerlextech.com}
 
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     # -- NGINX --
     if [ ! -f "/etc/nginx/sites-available/deployer" ]; then
-        echo "Creando configuración Nginx para Deployer..."
-        sudo bash -c 'cat <<EOF > /etc/nginx/sites-available/deployer
+        echo "Creando configuración Nginx para Deployer en $DEPLOYER_DOMAIN..."
+        sudo bash -c "mkdir -p /etc/nginx/deploy_apps
+chmod 777 /etc/nginx/deploy_apps
+
+# Asegurar que deploy_apps está incluido en nginx.conf
+if ! grep -q \"include /etc/nginx/deploy_apps/\\*.conf;\" /etc/nginx/nginx.conf; then
+    sed -i '/include \\/etc\\/nginx\\/conf\\.d\\/\\*\\.conf;/a \\ \\ \\ \\ include /etc/nginx/deploy_apps/*.conf;' /etc/nginx/nginx.conf
+fi
+
+cat <<EOF > /etc/nginx/sites-available/gerlextech
 server {
     listen 80;
-    server_name deploy.gerlex.com;
+    server_name $DOMAIN_NAME;
 
+    # Frontend estático
     location / {
-        proxy_pass http://localhost:8001;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
+        root $CURRENT_DIR/frontend/dist;
+        index index.html;
+        try_files \\\$uri \\\$uri/ /index.html;
+    }
+
+    # API principal
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host \\\$host;
+        proxy_set_header X-Real-IP \\\$remote_addr;
+        proxy_set_header X-Forwarded-For \\\$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \\\$scheme;
+    }
+
+    # API Deployer
+    location /deploy-api/ {
+        proxy_pass http://127.0.0.1:8001/;
+        proxy_set_header Host \\\$host;
+        proxy_set_header X-Real-IP \\\$remote_addr;
+        proxy_set_header X-Forwarded-For \\\$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \\\$scheme;
     }
 }
-EOF'
-        sudo ln -sf /etc/nginx/sites-available/deployer /etc/nginx/sites-enabled/
+EOF"
+        sudo ln -sf /etc/nginx/sites-available/gerlextech /etc/nginx/sites-enabled/
         sudo nginx -t && sudo systemctl reload nginx
     else
         echo "La configuración de Nginx (deployer) ya existe."

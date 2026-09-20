@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     # Base domain/IP for deployed projects
     BASE_DOMAIN: str = os.getenv("BASE_DOMAIN", "http://localhost")
     
+    # PostgreSQL Admin Password
+    PG_PASSWORD: str = os.getenv("PG_PASSWORD", "postgres")
+    
     class Config:
         env_file = ".env"
 

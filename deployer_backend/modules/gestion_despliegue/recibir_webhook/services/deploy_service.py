@@ -9,6 +9,7 @@ from sqlalchemy.future import select
 from sqlalchemy import func
 from models import Deployment
 import platform
+import psutil
 
 async def ensure_dependencies():
     """Verify and install dependencies like Git, Java, Maven if on Linux."""
@@ -51,9 +52,27 @@ def get_free_port(start_port: int = 8080) -> int:
         port += 1
     raise Exception("No hay puertos libres disponibles.")
 
-async def deploy_project(repo_url: str, project_id: int, db: AsyncSession):
+def kill_process_on_port(port: int):
+    """Encuentra y mata de forma segura el proceso (Spring Boot) que esté usando el puerto."""
+    try:
+        for conn in psutil.net_connections(kind='inet'):
+            if conn.laddr.port == port and conn.status == 'LISTEN':
+                if conn.pid:
+                    try:
+                        proc = psutil.Process(conn.pid)
+                        print(f"Matando proceso {proc.pid} ({proc.name()}) en el puerto {port}")
+                        proc.terminate()
+                        proc.wait(timeout=5)
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        pass
+                    except psutil.TimeoutExpired:
+                        proc.kill()
+    except Exception as e:
+        print(f"Error al intentar buscar/matar proceso en puerto {port}: {e}")
+
+async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_name: str = None, db_password: str = None, owner_prefix: str = None):
     """
-    Main deployment pipeline:
+    Background task to clone, build, and run the project.
     1. Git clone / pull
     2. Build (mvn clean package)
     3. Find free port
@@ -79,6 +98,30 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession):
         subprocess.run(["git", "clone", repo_url, project_dir], check=True)
         
     # 2. Build with Maven
+    # 3. Create Database in Postgres (if auto_deploy requested)
+    if db_name and db_password and owner_prefix:
+        print(f"[{project_id}] Aprovisionando base de datos PostgreSQL: {db_name} con usuario {owner_prefix}...")
+        db_user = owner_prefix
+        
+        # We run psql commands as the 'postgres' user. This requires 'sudo -u postgres psql'
+        # or passwordless psql access for the system user.
+        # Ensure that the deployer VPS has postgresql installed and the deployer runs with proper rights.
+        try:
+            # We use an inline script to create user and db, ignoring errors if they exist.
+            create_role_sql = f'DO \\$\\$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = \'{db_user}\') THEN CREATE ROLE "{db_user}" WITH LOGIN ENCRYPTED PASSWORD \'{db_password}\'; END IF; END \\$\\$;'
+            create_db_sql = f'SELECT \'CREATE DATABASE {db_name} OWNER "{db_user}"\' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = \'{db_name}\')\\gexec'
+            
+            env = os.environ.copy()
+            env["PGPASSWORD"] = settings.PG_PASSWORD
+            
+            subprocess.run(["psql", "-U", "postgres", "-h", "127.0.0.1", "-c", create_role_sql], env=env, check=True)
+            subprocess.run(["psql", "-U", "postgres", "-h", "127.0.0.1", "-c", create_db_sql], env=env, check=True)
+            print(f"[{project_id}] Base de datos {db_name} lista.")
+        except subprocess.CalledProcessError as e:
+            print(f"[{project_id}] Error aprovisionando BD PostgreSQL: {e}")
+            # Non-fatal error, but Spring Boot might fail to connect
+    
+    # 4. Build the project using Maven
     print("Building project with Maven...")
     # Using shell=True for mvn command in Windows if needed, but subprocess with list is safer
     mvn_cmd = "mvn.cmd" if platform.system() == "Windows" else "mvn"
@@ -96,6 +139,8 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession):
     if not jar_file:
         raise Exception("JAR file not found after build.")
         
+    target_jar = jar_file
+
     # 3. Database operations (Find deployment, assign port)
     result = await db.execute(select(Deployment).where(Deployment.project_id == project_id))
     deployment = result.scalar_one_or_none()
@@ -119,35 +164,93 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession):
         await db.commit()
         await db.refresh(deployment)
         
-    # 4. Kill old process
-    if deployment.pid:
-        print(f"Killing old process {deployment.pid}")
-        try:
-            if platform.system() == "Windows":
-                subprocess.run(["taskkill", "/F", "/PID", str(deployment.pid)])
-            else:
-                subprocess.run(["kill", "-9", str(deployment.pid)])
-        except Exception as e:
-            print(f"Could not kill process: {e}")
+    # 4. Kill old process safely by port
+    if deployment.port:
+        print(f"Asegurando que el puerto {deployment.port} esté libre...")
+        kill_process_on_port(deployment.port)
             
-    # 5. Start new process
-    print(f"Starting JAR on port {deployment.port}...")
+    # 5. Run the Spring Boot application
+    print(f"[{project_id}] Starting Spring Boot application on port {deployment.port}...")
     log_file = open(os.path.join(project_dir, "app.log"), "w")
     
-    # We pass the port to Spring Boot via system property
-    java_cmd = ["java", f"-Dserver.port={deployment.port}", "-jar", jar_file]
+    java_cmd = [
+        "java",
+        f"-Dserver.port={deployment.port}",
+    ]
+    
+    if db_name and db_password and owner_prefix:
+        java_cmd.extend([
+            f"--spring.datasource.password={db_password}",
+            f"--spring.datasource.username={owner_prefix}",
+            f"--spring.datasource.url=jdbc:postgresql://127.0.0.1:5432/{db_name}"
+        ])
+        
+    if owner_prefix and db_name:
+        java_cmd.append(f"--server.servlet.context-path=/host/{owner_prefix}/{db_name}")
+        
+    java_cmd.extend(["-jar", target_jar])
     
     if platform.system() == "Windows":
-        # In Windows, we can use creationflags to detach, but simple Popen works for dev
         process = subprocess.Popen(java_cmd, cwd=project_dir, stdout=log_file, stderr=log_file)
     else:
         # In Linux, nohup equivalent or just detaching
         process = subprocess.Popen(java_cmd, cwd=project_dir, stdout=log_file, stderr=log_file, start_new_session=True)
         
-    # 6. Update DB
+    # 6. Configurar Nginx Dinámicamente si hay owner_prefix
+    deployment_url = f"http://{os.getenv('SERVER_HOST', 'localhost')}:{deployment.port}"
+    if owner_prefix and db_name:
+        try:
+            nginx_conf_dir = "/etc/nginx/deploy_apps"
+            os.makedirs(nginx_conf_dir, exist_ok=True)
+            
+            nginx_conf_path = os.path.join(nginx_conf_dir, f"{project_id}.conf")
+            nginx_conf_content = f'''location /host/{owner_prefix}/{db_name}/ {{
+    proxy_pass http://localhost:{deployment.port}/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}}
+'''
+            with open(nginx_conf_path, "w", encoding="utf-8") as f:
+                f.write(nginx_conf_content)
+                
+            subprocess.run(["sudo", "systemctl", "reload", "nginx"], check=True)
+            print(f"[{project_id}] Nginx reload OK. App en /host/{owner_prefix}/{db_name}/")
+            deployment_url = f"https://host.gerlextech.com/host/{owner_prefix}/{db_name}/"
+        except Exception as e:
+            print(f"[{project_id}] Error configurando Nginx: {e}")
+
+    # 7. Update DB
     deployment.pid = process.pid
-    deployment.status = 'running'
+    deployment.status = "running"
+    deployment.deployed_url = deployment_url
     await db.commit()
     
+    # 8. Notify Main API
     print(f"Deployment successful. PID: {deployment.pid}, Port: {deployment.port}")
+    
+    import httpx
+    main_api_url = os.getenv("MAIN_API_URL", "https://api-diagramador.gerlextech.com")
+    callback_url = f"{main_api_url}/deploy-callback"
+    
+    # We will assume a pattern like http://deploy.gerlextech.com:{port} or use the SERVER_DOMAIN env variable
+    server_domain = os.getenv("SERVER_DOMAIN", "http://host.gerlextech.com")
+    
+    # Send the friendly deployment URL to the main API
+    payload = {
+        "project_id": project_id,
+        "deployment_url": deployment_url
+    }
+    
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            resp = await client.post(callback_url, json=payload)
+            if resp.status_code == 200:
+                print("Callback to main API successful.")
+            else:
+                print(f"Callback to main API failed with status {resp.status_code}: {resp.text}")
+        except Exception as e:
+            print(f"Could not reach main API for callback: {e}")
+            
     return deployment

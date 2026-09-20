@@ -224,10 +224,26 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
         repoName = "update"; 
     }
 
+    const autoDeploy = confirm("¿Deseas auto-alojar (desplegar automáticamente)?");
+
     const state = getDiagramState();
     try {
-        const res = await exportarProyecto(sala.proyecto_id, repoName, state);
-        if (res) showNotification('success', res.mensaje);
+        const res = await exportarProyecto(sala.proyecto_id, repoName, state, autoDeploy);
+        if (res) {
+            showNotification('success', res.mensaje);
+            
+            if (res.api_docs_md) {
+                const blob = new Blob([res.api_docs_md], { type: 'text/markdown;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', `API_Docs_${sala.proyecto_nombre.replace(/\s+/g, '_')}.md`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }
+        }
         
         if (!sala.github_repo_url && res && res.url_repositorio) {
             setTimeout(() => window.location.reload(), 2000);

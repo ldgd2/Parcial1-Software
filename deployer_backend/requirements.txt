@@ -5,3 +5,6 @@ pydantic-settings
 sqlalchemy
 aiosqlite
 httpx
+psutil
+rich
+python-dotenv

@@ -1,6 +1,5 @@
 import { TokenService } from '@/shared/lib/TokenService';
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+import { API_URL } from '@/shared/lib/api';
 
 const getAuthHeaders = () => {
     const token = TokenService.getToken();
@@ -43,14 +42,15 @@ export const exportarGithubApi = {
         return response.json();
     },
 
-    exportarProyecto: async (proyecto_id: number, nombre_repo: string, diagram_json: any): Promise<{ url_repositorio: string, mensaje: string }> => {
+    exportarProyecto: async (proyecto_id: number, nombre_repo: string, diagram_json: any, auto_deploy: boolean = false): Promise<{ url_repositorio: string, mensaje: string, api_docs_md?: string }> => {
         const response = await fetch(`${API_URL}/exportar-github/exportar`, {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify({
                 proyecto_id,
                 nombre_repo,
-                diagram_json
+                diagram_json,
+                auto_deploy
             }),
         });
         if (!response.ok) {
