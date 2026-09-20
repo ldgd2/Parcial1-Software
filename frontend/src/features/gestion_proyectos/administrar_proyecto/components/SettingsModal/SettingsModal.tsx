@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { configApi } from '@/features/gestion_usuarios/configurar_perfil/services/config_api';
 import { API_URL } from '@/shared/lib/api';
 import './SettingsModal.css';
@@ -8,6 +9,11 @@ interface Props {
 }
 
 export const SettingsModal: React.FC<Props> = ({ onClose }) => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate('/me/config');
+    onClose();
+  }, [navigate, onClose]);
   const [githubVinculado, setGithubVinculado] = useState(false);
   const [githubUsername, setGithubUsername] = useState<string | null>(null);
   const [dbConfigurada, setDbConfigurada] = useState(false);

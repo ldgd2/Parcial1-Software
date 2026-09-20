@@ -7,6 +7,7 @@ import { DashboardView } from '../features/gestion_proyectos/administrar_proyect
 import { SalaView } from '../features/gestion_salas/entrar_sala/views/SalaView';
 import { UnirseView } from '../features/gestion_salas/entrar_sala/views/UnirseView';
 import { GithubCallbackView } from '../features/gestion_asistencia_ia/exportar_github/views/GithubCallbackView';
+import { ConfiguracionView } from '../features/gestion_usuarios/configurar_perfil/views/ConfiguracionView';
 
 export const AppRouter = () => {
   return (
@@ -17,6 +18,7 @@ export const AppRouter = () => {
         <Route path="/register" element={<RegisterView />} />
         <Route path="/reset-password" element={<ResetPasswordView />} />
         <Route path="/dashboard" element={<DashboardView />} />
+        <Route path="/me/config" element={<ConfiguracionView />} />
         <Route path="/diagrama/:id" element={<SalaView />} />
         <Route path="/unirse/:codigo" element={<UnirseView />} />
         <Route path="/github/callback" element={<GithubCallbackView />} />

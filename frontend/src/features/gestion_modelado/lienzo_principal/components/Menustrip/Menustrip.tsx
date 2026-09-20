@@ -258,11 +258,11 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
       items: [
         { label: 'Asistente IA (Chat)', action: () => { onOpenChat(); setOpenMenu(null); } },
         { label: 'Permisos de Acceso', action: () => { setShowPermisos(true); setOpenMenu(null); } },
-        { label: 'Configuración de Cuenta & DB', action: () => { setShowSettings(true); setOpenMenu(null); } },
+        { label: 'Configuración de Cuenta & DB', action: () => { navigate('/me/config'); setOpenMenu(null); } },
         { separator: true, action: () => {} },
         { 
           label: githubUsername ? `GitHub: Conectado (@${githubUsername})` : (isLoadingStatus ? 'Cargando GitHub...' : 'Vincular con GitHub'), 
-          action: () => { if(!githubUsername && !isLoadingStatus) setShowSettings(true); setOpenMenu(null); } 
+          action: () => { navigate('/me/config?tab=github'); setOpenMenu(null); } 
         },
         { label: 'Generar / Desplegar Backend', action: () => { openExportModal(); setOpenMenu(null); } },
       ]
