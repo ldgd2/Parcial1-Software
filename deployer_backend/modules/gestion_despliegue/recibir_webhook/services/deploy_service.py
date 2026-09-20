@@ -42,15 +42,26 @@ async def ensure_dependencies():
 
 import socket
 
-def get_free_port(start_port: int = 8080) -> int:
-    """Encuentra el primer puerto libre a partir de start_port."""
+def get_free_port(start_port: int = 8080, exclude_ports: set = None) -> int:
+    """Encuentra el primer puerto libre que no esté asignado en la BD ni reservado por el sistema."""
+    if exclude_ports is None:
+        exclude_ports = set()
+        
+    reserved_system_ports = {80, 443, 5432, 8000, 8001}.union(exclude_ports)
     port = start_port
     while port < 65535:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            if s.connect_ex(('localhost', port)) != 0:
-                return port
+        if port in reserved_system_ports:
+            port += 1
+            continue
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(0.5)
+                if s.connect_ex(('127.0.0.1', port)) != 0:
+                    return port
+        except Exception:
+            pass
         port += 1
-    raise Exception("No hay puertos libres disponibles.")
+    raise Exception("No hay puertos libres disponibles en el servidor.")
 
 def kill_process_on_port(port: int):
     """Encuentra y mata de forma segura el proceso (Spring Boot) que esté usando el puerto."""
@@ -153,14 +164,12 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
     result = await db.execute(select(Deployment).where(Deployment.project_id == project_id))
     deployment = result.scalar_one_or_none()
     
+    # Puertos ocupados por otros proyectos en la BD
+    other_deployments = await db.execute(select(Deployment.port).where(Deployment.project_id != project_id))
+    used_ports_in_db = set(p for p in other_deployments.scalars().all() if p is not None)
+    
     if not deployment:
-        # Find next available port starting from max in DB + 1, or 8080
-        max_port_query = await db.execute(select(func.max(Deployment.port)))
-        max_port_val = max_port_query.scalar()
-        start_port = max_port_val + 1 if max_port_val and max_port_val >= 8080 else 8080
-        
-        # Verify physical port availability
-        port = get_free_port(start_port)
+        port = get_free_port(start_port=8080, exclude_ports=used_ports_in_db)
         
         deployment = Deployment(
             project_id=project_id,
@@ -169,6 +178,12 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
             status='deploying'
         )
         db.add(deployment)
+        await db.commit()
+        await db.refresh(deployment)
+    elif deployment.port in used_ports_in_db:
+        # Si el puerto del proyecto actual colisiona en la BD con otro proyecto, reasignar
+        new_port = get_free_port(start_port=8080, exclude_ports=used_ports_in_db)
+        deployment.port = new_port
         await db.commit()
         await db.refresh(deployment)
         
