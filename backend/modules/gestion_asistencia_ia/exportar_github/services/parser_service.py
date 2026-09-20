@@ -586,56 +586,135 @@ def generar_archivos_java(diagram_json: dict, temp_dir: str):
             with open(os.path.join(src_main_java, "dtos", f"{clase_data['nombre']}ResponseDTO.java"), "w", encoding="utf-8") as f:
                 f.write(codigo_res_dto)
 
+def obtener_ejemplo_atributo(nombre: str, tipo: str) -> str:
+    """Genera un valor de ejemplo realista según el nombre del campo y tipo de dato."""
+    n = str(nombre).lower().strip()
+    t = str(tipo).lower().strip()
+    if "email" in n or "correo" in n:
+        return '"usuario@ejemplo.com"'
+    if "nombre" in n or "name" in n or "titulo" in n or "title" in n:
+        return f'"Ejemplo {nombre.capitalize()}"'
+    if "telefono" in n or "phone" in n or "celular" in n:
+        return '"+59171234567"'
+    if "password" in n or "clave" in n or "pass" in n:
+        return '"Secreto123!"'
+    if "fecha" in n or "date" in n:
+        return '"2026-09-20"'
+    if "bool" in t or "activo" in n or "is" in n:
+        return 'true'
+    if "double" in t or "float" in t or "precio" in n or "monto" in n or "total" in n or "costo" in n:
+        return '99.50'
+    if "int" in t or "integer" in t or "edad" in n or "stock" in n or "cantidad" in n:
+        return '25'
+    if "uuid" in t or n == "id":
+        return '"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"'
+    return f'"ejemplo_{n}"'
+
 def generar_documentacion_md(diagram_json: dict, url_base: str, nombre_repo: str, descripcion_proyecto: str = "") -> str:
-    """Genera la documentación en formato Markdown de las APIs expuestas."""
+    """Genera la documentación en formato Markdown detallada con ejemplos prácticos de cURL, JSON y parámetros."""
     nodos = diagram_json.get("nodes", [])
     
-    md = f"# Documentación de la API: {nombre_repo.capitalize()}\n\n"
+    md = f"# Documentación Interactiva de APIs: {nombre_repo.capitalize()}\n\n"
     if descripcion_proyecto:
-        md += f"**Descripción del Proyecto:** {descripcion_proyecto}\n\n"
-    md += f"Tu proyecto está alojado y disponible en: **{url_base}**\n\n"
-    md += f"## 📚 Swagger UI (Interfaz Gráfica Interactiva)\n"
-    md += f"Puedes probar todas las peticiones desde tu navegador ingresando a:\n"
+        md += f"**Propósito del Proyecto:** {descripcion_proyecto}\n\n"
+    md += f"Servicio activo y desplegado en: **{url_base}**\n\n"
+    md += f"## 📚 Swagger UI (Pruebas Gráficas en Vivo)\n"
+    md += f"Puedes ejecutar y probar todas las peticiones interactivamente ingresando a:\n"
     md += f"👉 **[{url_base}/help]({url_base}/help)**\n\n"
     md += "---\n\n"
-    md += "## 🚀 Referencia Rápida de Endpoints\n\n"
+    md += "## 🚀 Guía Completa de Endpoints y Ejemplos de Petición\n\n"
     
     for nodo in nodos:
         if nodo.get("type") in ["class", "interface"]:
             nombre = sanitize_identifier(nodo.get("nombre", "Entidad")).capitalize()
-            ruta = nombre.lower() + "s" # plural simple
+            ruta = nombre.lower() + "s"
+            base_endpoint = f"{url_base}/api/v1/{ruta}"
+            
             md += f"### Entidad: `{nombre}`\n"
-            md += f"Ruta Base: `{url_base}/api/v1/{ruta}`\n\n"
+            md += f"Ruta Base: `{base_endpoint}`\n\n"
             
             atributos = [a for a in nodo.get("atributos", []) if a.get("visibilidad") != "PK"]
+            json_example_lines = []
+            json_patch_example_lines = []
+            
             if atributos:
-                md += "**Estructura JSON (Body):**\n```json\n{\n"
-                for i, a in enumerate(atributos):
+                for a in atributos:
                     n = sanitize_identifier(a.get("nombre", ""))
                     t = map_java_type(a.get("tipo", ""))
-                    coma = "," if i < len(atributos) - 1 else ""
-                    val = '"string"' if t == "String" else ("true" if t == "Boolean" else "0")
-                    md += f'  "{n}": {val}{coma} // Tipo: {t}\n'
-                md += "}\n```\n\n"
+                    ex_val = obtener_ejemplo_atributo(n, t)
+                    json_example_lines.append(f'  "{n}": {ex_val}')
+                
+                if len(atributos) > 0:
+                    first_attr = sanitize_identifier(atributos[0].get("nombre", ""))
+                    first_type = map_java_type(atributos[0].get("tipo", ""))
+                    json_patch_example_lines.append(f'  "{first_attr}": {obtener_ejemplo_atributo(first_attr, first_type)}')
             
-            md += "**Operaciones Standard (CRUD):**\n"
-            md += f"- `GET /api/v1/{ruta}` : Listar todos los registros.\n"
-            md += f"- `GET /api/v1/{ruta}/{{id}}` : Obtener un registro por su ID (UUID).\n"
-            md += f"- `POST /api/v1/{ruta}` : Crear un nuevo registro (enviar JSON en el body).\n"
-            md += f"- `PUT /api/v1/{ruta}/{{id}}` : Actualizar un registro (enviar JSON en el body).\n"
-            md += f"- `DELETE /api/v1/{ruta}/{{id}}` : Eliminar un registro.\n\n"
+            body_json_full = "{\n" + ",\n".join(json_example_lines) + "\n}" if json_example_lines else "{}"
+            body_json_patch = "{\n" + ",\n".join(json_patch_example_lines) + "\n}" if json_patch_example_lines else "{}"
+            
+            md += "**Estructura de Datos JSON (Ejemplo de Body):**\n```json\n" + body_json_full + "\n```\n\n"
+            
+            md += "#### 🛠️ Operaciones CRUD Estándar:\n\n"
+            
+            # GET ALL
+            md += f"1. **`GET {base_endpoint}`** — Listar todos los registros\n"
+            md += f"   - **Ejemplo `curl`:**\n"
+            md += f"     ```bash\n     curl -X GET \"{base_endpoint}\"\n     ```\n\n"
+            
+            # GET BY ID
+            md += f"2. **`GET {base_endpoint}/{{id}}`** — Obtener por UUID\n"
+            md += f"   - **Ejemplo `curl`:**\n"
+            md += f"     ```bash\n     curl -X GET \"{base_endpoint}/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11\"\n     ```\n\n"
+            
+            # POST
+            md += f"3. **`POST {base_endpoint}`** — Crear nuevo registro\n"
+            md += f"   - **Header:** `Content-Type: application/json`\n"
+            md += f"   - **Ejemplo `curl`:**\n"
+            md += f"     ```bash\n     curl -X POST \"{base_endpoint}\" \\\n       -H \"Content-Type: application/json\" \\\n       -d '{body_json_full}'\n     ```\n\n"
+            
+            # PUT
+            md += f"4. **`PUT {base_endpoint}/{{id}}`** — Actualización completa por UUID\n"
+            md += f"   - **Header:** `Content-Type: application/json`\n"
+            md += f"   - **Ejemplo `curl`:**\n"
+            md += f"     ```bash\n     curl -X PUT \"{base_endpoint}/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11\" \\\n       -H \"Content-Type: application/json\" \\\n       -d '{body_json_full}'\n     ```\n\n"
+            
+            # PATCH
+            md += f"5. **`PATCH {base_endpoint}/{{id}}`** — Actualización parcial (solo campos enviados)\n"
+            md += f"   - **Header:** `Content-Type: application/json`\n"
+            md += f"   - **Ejemplo `curl`:**\n"
+            md += f"     ```bash\n     curl -X PATCH \"{base_endpoint}/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11\" \\\n       -H \"Content-Type: application/json\" \\\n       -d '{body_json_patch}'\n     ```\n\n"
+            
+            # DELETE
+            md += f"6. **`DELETE {base_endpoint}/{{id}}`** — Eliminar registro por UUID\n"
+            md += f"   - **Ejemplo `curl`:**\n"
+            md += f"     ```bash\n     curl -X DELETE \"{base_endpoint}/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11\"\n     ```\n\n"
 
             metodos = nodo.get("metodos", [])
             if metodos:
-                md += "**Operaciones de Lógica de Negocio Personalizadas:**\n"
+                md += "#### ⚡ APIs de Lógica de Negocio Personalizadas (Generadas por IA):\n\n"
                 for m in metodos:
                     m_name = sanitize_identifier(m.get("nombre", ""))
-                    java_decl, _, _ = parse_java_parameters(str(m.get("parametros", "")))
+                    java_decl, call_args, _ = parse_java_parameters(str(m.get("parametros", "")))
                     ret_type = map_java_type(m.get("retorno", "void")) if str(m.get("retorno", "")).lower() != "void" else "void"
-                    md += f"- `POST /api/v1/{ruta}/{m_name}` : Ejecutar `{m_name}({java_decl})` -> Retorna `{ret_type}`\n"
-                md += "\n"
+                    
+                    # Construir query string de ejemplo si recibe parametros
+                    query_example = ""
+                    if call_args:
+                        params_list = [p.strip() for p in call_args.split(",") if p.strip()]
+                        query_parts = []
+                        for p in params_list:
+                            query_parts.append(f"{p}=ejemplo_{p}")
+                        query_example = "?" + "&".join(query_parts)
 
-            md += "---\n"
+                    method_endpoint = f"{base_endpoint}/{m_name}"
+                    md += f"- **`POST {method_endpoint}`** — Función `{m_name}({java_decl})`\n"
+                    md += f"  - **Retorno:** `{ret_type}`\n"
+                    if query_example:
+                        md += f"  - **Parámetros Query:** `{query_example}`\n"
+                    md += f"  - **Ejemplo `curl`:**\n"
+                    md += f"    ```bash\n    curl -X POST \"{method_endpoint}{query_example}\"\n    ```\n\n"
+
+            md += "---\n\n"
             
     return md
 

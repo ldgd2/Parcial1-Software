@@ -47,6 +47,12 @@ public class {{ clase.nombre }}Controller {
         return ResponseEntity.ok(service.update(id, dto));
     }
 
+    @Operation(summary = "Actualización parcial", description = "Actualiza campos específicos de un {{ clase.nombre }} por su UUID")
+    @PatchMapping("/{id}")
+    public ResponseEntity<{{ clase.nombre }}ResponseDTO> patch(@PathVariable UUID id, @RequestBody {{ clase.nombre }}RequestDTO dto) {
+        return ResponseEntity.ok(service.patch(id, dto));
+    }
+
     @Operation(summary = "Eliminar", description = "Elimina un {{ clase.nombre }} por su UUID")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {

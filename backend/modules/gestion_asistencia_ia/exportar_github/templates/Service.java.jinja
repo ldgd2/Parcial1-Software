@@ -52,6 +52,14 @@ public class {{ clase.nombre }}Service {
         repository.deleteById(id);
     }
 
+    public {{ clase.nombre }}ResponseDTO patch(UUID id, {{ clase.nombre }}RequestDTO dto) {
+        {{ clase.nombre }} entity = repository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("{{ clase.nombre }} no encontrado con id: " + id));
+        mapToEntityPartial(dto, entity);
+        {{ clase.nombre }} updated = repository.save(entity);
+        return mapToResponseDTO(updated);
+    }
+
     // Mapeos Manuales
     private {{ clase.nombre }}ResponseDTO mapToResponseDTO({{ clase.nombre }} entity) {
         {{ clase.nombre }}ResponseDTO dto = new {{ clase.nombre }}ResponseDTO();
@@ -74,6 +82,16 @@ public class {{ clase.nombre }}Service {
         {% for attr in clase.atributos %}
         {% if attr.nombre | lower not in ['id', 'createdat', 'updatedat', 'isactive'] %}
         entity.set{{ attr.nombre_capitalizado }}(dto.get{{ attr.nombre_capitalizado }}());
+        {% endif %}
+        {% endfor %}
+    }
+
+    private void mapToEntityPartial({{ clase.nombre }}RequestDTO dto, {{ clase.nombre }} entity) {
+        {% for attr in clase.atributos %}
+        {% if attr.nombre | lower not in ['id', 'createdat', 'updatedat', 'isactive'] %}
+        if (dto.get{{ attr.nombre_capitalizado }}() != null) {
+            entity.set{{ attr.nombre_capitalizado }}(dto.get{{ attr.nombre_capitalizado }}());
+        }
         {% endif %}
         {% endfor %}
     }
