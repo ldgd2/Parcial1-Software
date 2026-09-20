@@ -10,6 +10,7 @@ from sqlalchemy import func
 from models import Deployment
 import platform
 import psutil
+import socket
 
 async def ensure_dependencies():
     """Verify and install dependencies like Git, Java, Maven if on Linux."""
@@ -18,7 +19,6 @@ async def ensure_dependencies():
         return
         
     try:
-        # Check if java is installed
         res_java = subprocess.run(["java", "-version"], capture_output=True)
         if res_java.returncode != 0:
             print("Installing default-jre...")
@@ -26,21 +26,17 @@ async def ensure_dependencies():
             subprocess.run(["sudo", "apt-get", "install", "-y", "default-jre"], check=True)
             subprocess.run(["sudo", "apt-get", "install", "-y", "default-jdk"], check=True)
             
-        # Check if maven is installed
         res_mvn = subprocess.run(["mvn", "-version"], capture_output=True)
         if res_mvn.returncode != 0:
             print("Installing maven...")
             subprocess.run(["sudo", "apt-get", "install", "-y", "maven"], check=True)
             
-        # Check git
         res_git = subprocess.run(["git", "--version"], capture_output=True)
         if res_git.returncode != 0:
             print("Installing git...")
             subprocess.run(["sudo", "apt-get", "install", "-y", "git"], check=True)
     except Exception as e:
         print(f"Error ensuring dependencies: {e}")
-
-import socket
 
 def get_free_port(start_port: int = 8080, exclude_ports: set = None) -> int:
     """Encuentra el primer puerto libre que no esté asignado en la BD ni reservado por el sistema."""
@@ -115,12 +111,6 @@ def kill_process_on_port(port: int):
 async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_name: str = None, db_password: str = None, owner_prefix: str = None):
     """
     Background task to clone, build, and run the project.
-    1. Git clone / pull
-    2. Build (mvn clean package)
-    3. Find free port
-    4. Kill old process if exists
-    5. Start new process
-    6. Update DB
     """
     await ensure_dependencies()
     
@@ -139,15 +129,10 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
         print(f"Cloning {repo_url} into {project_dir}...")
         subprocess.run(["git", "clone", repo_url, project_dir], check=True)
         
-    # 2. Build with Maven
-    # 3. Create Database in Postgres (if auto_deploy requested)
+    # 2. Create Database in Postgres (if auto_deploy requested)
     if db_name and db_password and owner_prefix:
         print(f"[{project_id}] Aprovisionando base de datos PostgreSQL: {db_name} con usuario {owner_prefix}...")
         db_user = owner_prefix
-        
-        # We run psql commands as the 'postgres' user. This requires 'sudo -u postgres psql'
-        # or passwordless psql access for the system user.
-        # Ensure that the deployer VPS has postgresql installed and the deployer runs with proper rights.
         try:
             env = os.environ.copy()
             env["PGPASSWORD"] = settings.PG_PASSWORD
@@ -161,13 +146,23 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
             if "1" not in check_result.stdout:
                 subprocess.run(psql_cmd + ["-c", f'CREATE DATABASE "{db_name}" OWNER "{db_user}";'], env=env, check=True)
             
-            subprocess.run(psql_cmd + ["-c", f'GRANT ALL PRIVILEGES ON DATABASE "{db_name}" TO "{db_user}";'], env=env, check=True)
-            print(f"[{project_id}] Base de datos {db_name} lista y permisos otorgados a {db_user}.")
+            # Otorgar permisos completos sobre la BD, esquema public, tablas y secuencias
+            psql_db_cmd = ["psql", "-U", "postgres", "-h", pg_host, "-d", db_name]
+            grant_schema_sql = (
+                f'ALTER SCHEMA public OWNER TO "{db_user}"; '
+                f'GRANT ALL PRIVILEGES ON DATABASE "{db_name}" TO "{db_user}"; '
+                f'GRANT ALL ON SCHEMA public TO "{db_user}"; '
+                f'GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "{db_user}"; '
+                f'GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "{db_user}"; '
+                f'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "{db_user}"; '
+                f'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO "{db_user}";'
+            )
+            subprocess.run(psql_db_cmd + ["-c", grant_schema_sql], env=env, check=True)
+            print(f"[{project_id}] Base de datos {db_name} lista y permisos totales otorgados a {db_user}.")
         except subprocess.CalledProcessError as e:
             print(f"[{project_id}] Error aprovisionando BD PostgreSQL: {e}")
-            # Non-fatal error, but Spring Boot might fail to connect
-    
-    # 4. Build the project using Maven
+
+    # 3. Build the project using Maven
     print("Building project with Maven...")
     mvn_cmd = "mvn.cmd" if platform.system() == "Windows" else "mvn"
     maven_env = os.environ.copy()
@@ -176,7 +171,7 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
         maven_env["JAVA_HOME"] = java17_home
         maven_env["PATH"] = f"{java17_home}/bin:" + maven_env.get("PATH", "")
     subprocess.run([mvn_cmd, "clean", "package", "-DskipTests"], cwd=project_dir, env=maven_env, check=True)
-    
+
     # Find the generated jar
     target_dir = os.path.join(project_dir, "target")
     jar_file = None
@@ -191,10 +186,10 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
         
     target_jar = jar_file
 
-    # 3. Database operations (Find deployment, assign port)
+    # 4. Database operations (Find deployment, assign port)
     result = await db.execute(select(Deployment).where(Deployment.project_id == project_id))
     deployment = result.scalar_one_or_none()
-    
+
     # Puertos ocupados por otros proyectos en la BD
     other_deployments = await db.execute(select(Deployment.port).where(Deployment.project_id != project_id))
     used_ports_in_db = set(p for p in other_deployments.scalars().all() if p is not None)
@@ -212,18 +207,17 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
         await db.commit()
         await db.refresh(deployment)
     elif deployment.port in used_ports_in_db:
-        # Si el puerto del proyecto actual colisiona en la BD con otro proyecto, reasignar
         new_port = get_free_port(start_port=8080, exclude_ports=used_ports_in_db)
         deployment.port = new_port
         await db.commit()
         await db.refresh(deployment)
         
-    # 4. Kill old process safely by port
+    # 5. Kill old process safely by port
     if deployment.port:
         print(f"Asegurando que el puerto {deployment.port} esté libre...")
         kill_process_on_port(deployment.port)
             
-    # 5. Run the Spring Boot application
+    # 6. Run the Spring Boot application
     print(f"[{project_id}] Starting Spring Boot application on port {deployment.port}...")
     log_file = open(os.path.join(project_dir, "app.log"), "w")
     
@@ -246,7 +240,6 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
     if platform.system() == "Windows":
         process = subprocess.Popen(java_cmd, cwd=project_dir, stdout=log_file, stderr=log_file)
     else:
-        # In Linux, nohup equivalent or just detaching
         process = subprocess.Popen(java_cmd, cwd=project_dir, stdout=log_file, stderr=log_file, start_new_session=True)
         
     print(f"[{project_id}] Esperando 6 segundos a que Spring Boot inicie en puerto {deployment.port}...")
@@ -265,7 +258,7 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
     else:
         print(f"[{project_id}] El proceso de Spring Boot (PID {process.pid}) está activo en el puerto {deployment.port}.")
         
-    # 6. Configurar Nginx Dinámicamente si hay owner_prefix
+    # 7. Configurar Nginx Dinámicamente si hay owner_prefix
     deployment_url = f"http://{settings.SERVER_HOST}:{deployment.port}"
     if owner_prefix and db_name:
         try:
@@ -296,19 +289,18 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
         except Exception as e:
             print(f"[{project_id}] Error configurando Nginx: {e}")
 
-    # 7. Update DB
+    # 8. Update DB
     deployment.pid = process.pid
     deployment.status = "running"
     deployment.deployed_url = deployment_url
     await db.commit()
     
-    # 8. Notify Main API
+    # 9. Notify Main API
     print(f"Deployment successful. PID: {deployment.pid}, Port: {deployment.port}")
     
     import httpx
     callback_url = f"{settings.MAIN_API_URL}/deploy-callback"
     
-    # Send the friendly deployment URL to the main API
     payload = {
         "project_id": project_id,
         "deployment_url": deployment_url
