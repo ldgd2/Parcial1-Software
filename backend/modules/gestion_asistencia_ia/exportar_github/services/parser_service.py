@@ -75,6 +75,10 @@ def inicializar_estructura_spring(temp_dir: str, nombre_repo: str = "proyecto_db
             <artifactId>flyway-core</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
@@ -179,8 +183,9 @@ application-local.properties
         f.write('''spring.datasource.url=jdbc:postgresql://${DB_IP:127.0.0.1}:${DB_PORT:5432}/${DB_NAME:dbname}
 spring.datasource.username=${DB_USER:postgres}
 spring.datasource.password=${DB_PASSWORD:password}
-spring.jpa.hibernate.ddl-auto=validate
+spring.jpa.hibernate.ddl-auto=update
 spring.flyway.enabled=true
+spring.flyway.baseline-on-migrate=true
 springdoc.swagger-ui.path=/help
 springdoc.api-docs.path=/v3/api-docs
 ''')
