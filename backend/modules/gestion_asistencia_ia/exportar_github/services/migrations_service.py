@@ -115,9 +115,12 @@ async def solicitar_constraints_ia(nodos: list, relaciones: list) -> str:
     Nodos: {[{'id': n['id'], 'nombre': n['nombre']} for n in nodos if n.get('type') in ['class', 'interface']]}
     Relaciones: {relaciones}
     
-    Genera ÚNICAMENTE las sentencias SQL (ALTER TABLE ADD CONSTRAINT o CREATE TABLE para N:M)
-    necesarias para mapear estas relaciones. 
-    Asume que todas las tablas terminan en 's' y su PK principal es de tipo UUID.
+    Genera únicamente sentencias SQL seguras en PostgreSQL.
+    Asume que todas las tablas terminan en 's' y su PK principal es de tipo UUID ('id').
+    Para cada relación de Foreign Key (FK):
+    1. Asegúrate de añadir primero la columna si no existe: `ALTER TABLE ... ADD COLUMN IF NOT EXISTS ... UUID;`
+    2. Luego añade la constraint dentro de un bloque seguro:
+       `DO $$ BEGIN ALTER TABLE ... ADD CONSTRAINT ... FOREIGN KEY (...) REFERENCES ...; EXCEPTION WHEN OTHERS THEN NULL; END $$;`
     No incluyas formato Markdown, explicaciones, ni etiquetas de código. SOLO el SQL válido.
     """
     
@@ -138,7 +141,6 @@ async def solicitar_constraints_ia(nodos: list, relaciones: list) -> str:
             if response.status_code == 200:
                 data = response.json()
                 raw_sql = data['choices'][0]['message']['content'].strip()
-                # Filtrar cualquier línea explicativa no-SQL
                 sql_lines = []
                 for line in raw_sql.splitlines():
                     ls = line.strip()
@@ -159,7 +161,7 @@ async def generar_migracion_sql(diagram_json: dict, temp_dir: str):
     y apoyándose en la IA para las relaciones abstractas.
     """
     nodos = diagram_json.get("nodes", [])
-    relaciones = diagram_json.get("relations", [])
+    relaciones = diagram_json.get("edges", []) or diagram_json.get("relations", [])
     
     sql_script = "-- Migración autogenerada por IA\n\n"
     sql_script += generar_tablas_basicas(nodos)
