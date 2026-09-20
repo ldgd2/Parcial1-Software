@@ -197,7 +197,7 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
         process = subprocess.Popen(java_cmd, cwd=project_dir, stdout=log_file, stderr=log_file, start_new_session=True)
         
     # 6. Configurar Nginx Dinámicamente si hay owner_prefix
-    deployment_url = f"http://{os.getenv('SERVER_HOST', 'localhost')}:{deployment.port}"
+    deployment_url = f"http://{settings.SERVER_HOST}:{deployment.port}"
     if owner_prefix and db_name:
         try:
             nginx_conf_dir = "/etc/nginx/deploy_apps"
@@ -217,8 +217,7 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
                 
             subprocess.run(["sudo", "systemctl", "reload", "nginx"], check=True)
             print(f"[{project_id}] Nginx reload OK. App en /host/{owner_prefix}/{db_name}/")
-            server_domain = os.getenv("SERVER_DOMAIN", "http://host.example.com")
-            deployment_url = f"{server_domain}/host/{owner_prefix}/{db_name}/"
+            deployment_url = f"{settings.SERVER_DOMAIN}/host/{owner_prefix}/{db_name}/"
         except Exception as e:
             print(f"[{project_id}] Error configurando Nginx: {e}")
 
@@ -232,11 +231,7 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
     print(f"Deployment successful. PID: {deployment.pid}, Port: {deployment.port}")
     
     import httpx
-    main_api_url = os.getenv("MAIN_API_URL", "https://api-diagramador.example.com")
-    callback_url = f"{main_api_url}/deploy-callback"
-    
-    # We will assume a pattern like http://deploy.example.com:{port} or use the SERVER_DOMAIN env variable
-    server_domain = os.getenv("SERVER_DOMAIN", "http://host.example.com")
+    callback_url = f"{settings.MAIN_API_URL}/deploy-callback"
     
     # Send the friendly deployment URL to the main API
     payload = {

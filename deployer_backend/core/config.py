@@ -14,13 +14,13 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite+aiosqlite:///./deployer.db"
     
     # External DB (Main Backend DB - PostgreSQL)
-    MAIN_DB_URL: str = os.getenv("MAIN_DB_URL", "postgresql+asyncpg://postgres:postgres@localhost/diagramador_db")
+    MAIN_DB_URL: str = "postgresql+asyncpg://postgres:postgres@localhost/diagramador_db"
     
     # Base domain/IP for deployed projects
-    BASE_DOMAIN: str = os.getenv("BASE_DOMAIN", "http://localhost")
+    BASE_DOMAIN: str = "http://localhost"
     
-    # PostgreSQL Admin Password
-    PG_PASSWORD: str = os.getenv("PG_PASSWORD", "postgres")
+    # PostgreSQL Admin Password (for provisioning DBs)
+    PG_PASSWORD: str = "postgres"
     
     # PostgreSQL Host (for provisioning DBs for deployed Spring Boot apps)
     PG_HOST: str = "127.0.0.1"
@@ -28,8 +28,11 @@ class Settings(BaseSettings):
     # Main API URL (for callbacks to the diagramador backend)
     MAIN_API_URL: str = "http://localhost:8000"
     
-    # Public domain for deployed apps
+    # Public domain for deployed apps (used in nginx conf and deployment URLs)
     SERVER_DOMAIN: str = "http://localhost"
+    
+    # Server host (IP or hostname of this VPS)
+    SERVER_HOST: str = "localhost"
     
     class Config:
         env_file = ".env"

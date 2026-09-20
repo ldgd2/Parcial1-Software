@@ -7,43 +7,43 @@ ENV_FILE = os.path.join(os.path.dirname(__file__), "../../../.env")
 
 def menu_config():
     while True:
-        print_header("Configuración (.env) del Deployer")
+        print_header("Configuracion (.env) del Deployer")
         
-        load_dotenv(ENV_FILE)
+        load_dotenv(ENV_FILE, override=True)
         
-        # Current values
-        main_api = os.getenv("MAIN_API_URL", "https://api-diagramador.example.com")
-        server_host = os.getenv("SERVER_HOST", "localhost")
-        pg_password = os.getenv("PG_PASSWORD", "postgres")
-        pg_host = os.getenv("PG_HOST", "localhost")
+        variables = [
+            ("MAIN_API_URL", "URL del backend principal (diagramador)", "http://localhost:8000"),
+            ("SERVER_DOMAIN", "Dominio publico para apps desplegadas (ej: https://host.example.com)", "http://localhost"),
+            ("SERVER_HOST", "IP o hostname de este VPS", "localhost"),
+            ("PG_PASSWORD", "Password de PostgreSQL (admin)", "postgres"),
+            ("PG_HOST", "Host de PostgreSQL", "127.0.0.1"),
+            ("MAIN_DB_URL", "URL completa de la BD principal", "postgresql+asyncpg://postgres:postgres@localhost/diagramador_db"),
+        ]
         
-        console.print(f"[bold yellow]1.[/bold yellow] MAIN_API_URL: [green]{main_api}[/green]")
-        console.print(f"[bold yellow]2.[/bold yellow] SERVER_HOST: [green]{server_host}[/green]")
-        console.print(f"[bold yellow]3.[/bold yellow] PG_PASSWORD: [green]{pg_password}[/green]")
-        console.print(f"[bold yellow]4.[/bold yellow] PG_HOST: [green]{pg_host}[/green]")
+        for i, (key, desc, default) in enumerate(variables, 1):
+            val = os.getenv(key, default)
+            console.print(f"[bold yellow]{i}.[/bold yellow] {key}: [green]{val}[/green]  [dim]({desc})[/dim]")
+        
         console.print("[0] Volver")
         
-        op = Prompt.ask("\n¿Qué variable deseas actualizar? (Dejar en blanco para mantener actual)", default="0")
+        op = Prompt.ask("\nSelecciona variable a actualizar", default="0")
         
         if op == "0":
             break
             
-        key_map = {
-            "1": "MAIN_API_URL",
-            "2": "SERVER_HOST",
-            "3": "PG_PASSWORD",
-            "4": "PG_HOST"
-        }
-        
-        if op in key_map:
-            key = key_map[op]
-            current_val = os.getenv(key, "")
-            new_val = Prompt.ask(f"Nuevo valor para {key} (Actual: {current_val})")
-            if new_val.strip() != "":
-                if not os.path.exists(ENV_FILE):
-                    open(ENV_FILE, 'w').close()
-                set_key(ENV_FILE, key, new_val)
-                console.print(f"[bold green]✔ {key} actualizado correctamente a '{new_val}'[/bold green]")
-                input("Presiona Enter para continuar...")
-        else:
-            console.print("[red]Opción inválida[/red]")
+        try:
+            idx = int(op) - 1
+            if 0 <= idx < len(variables):
+                key, desc, default = variables[idx]
+                current_val = os.getenv(key, default)
+                new_val = Prompt.ask(f"Nuevo valor para {key} (Actual: {current_val})")
+                if new_val.strip() != "":
+                    if not os.path.exists(ENV_FILE):
+                        open(ENV_FILE, 'w').close()
+                    set_key(ENV_FILE, key, new_val)
+                    console.print(f"[bold green]>> {key} actualizado a '{new_val}'[/bold green]")
+                    input("Presiona Enter para continuar...")
+            else:
+                console.print("[red]Opcion invalida[/red]")
+        except ValueError:
+            console.print("[red]Opcion invalida[/red]")
