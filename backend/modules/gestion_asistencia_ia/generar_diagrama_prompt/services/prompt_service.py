@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from backend.core.config import settings
 
 def deduplicar_resultado(resultado: dict) -> dict:
-    """Elimina relaciones duplicadas entre el mismo par de nodos."""
+    """Elimina relaciones idénticas (mismo tipo y label) entre el mismo par de nodos."""
     relations = resultado.get("relations", [])
     seen_relations = set()
     unique_relations = []
@@ -12,11 +12,17 @@ def deduplicar_resultado(resultado: dict) -> dict:
     for r in relations:
         s_id = r.get("sourceId") or r.get("origen") or r.get("source")
         t_id = r.get("targetId") or r.get("destino") or r.get("target")
+        rel_type = str(r.get("type") or "association").lower().strip()
+        label = str(r.get("label") or "").strip()
+
         if not s_id or not t_id:
             continue
-        pair_key = tuple(sorted([str(s_id), str(t_id)]))
-        if pair_key not in seen_relations:
-            seen_relations.add(pair_key)
+            
+        pair_nodes = tuple(sorted([str(s_id), str(t_id)]))
+        rel_signature = (pair_nodes, rel_type, label)
+
+        if rel_signature not in seen_relations:
+            seen_relations.add(rel_signature)
             unique_relations.append(r)
             
     resultado["relations"] = unique_relations
@@ -40,11 +46,12 @@ async def _llamar_gemini(prompt: str, context: str | None = None) -> dict:
         "REGLAS CRÍTICAS:\n"
         "1. Revisa detenidamente el 'Contexto Actual' antes de crear o editar.\n"
         "2. Si vas a modificar una clase existente, REUTILIZA SU MISMO 'id' original.\n"
-        "3. PROHIBIDO duplicar relaciones entre las mismas dos clases (sourceId y targetId). Si ya están relacionadas, NO agregues otra relación duplicada.\n"
-        "4. Si se solicita conectar una clase que está suelta, conéctala de forma coherente con la clase más apropiada.\n"
-        "5. Formato de 'attributes': 'nombre: tipo' (sin -, +, #).\n"
-        "6. Formato de 'methods': 'nombre(parametros): retorno' (sin -, +, #).\n"
-        "7. Incluye OBLIGATORIAMENTE un campo 'summary' en español que describa con claridad y precisión los cambios que realizaste en el diagrama.\n\n"
+        "3. PROHIBIDO duplicar relaciones IDÉNTICAS (mismo tipo y misma multiplicidad/label) entre las mismas dos clases. (No crees 1:1 y 1:1 repetidos).\n"
+        "4. PERMITIDO: Se pueden tener diferentes tipos o cardinalidades de relaciones entre las mismas dos clases cuando la lógica de negocio lo justifique (ejemplo: una relación 1:1 'Líder' y una relación 1:* 'Miembro' entre Estudiante y Grupo).\n"
+        "5. Si se solicita conectar una clase que está suelta, conéctala de forma coherente con la clase más apropiada.\n"
+        "6. Formato de 'attributes': 'nombre: tipo' (sin -, +, #).\n"
+        "7. Formato de 'methods': 'nombre(parametros): retorno' (sin -, +, #).\n"
+        "8. Incluye OBLIGATORIAMENTE un campo 'summary' en español que describa con claridad y precisión los cambios que realizaste en el diagrama.\n\n"
         "ESTRUCTURA DE RESPUESTA JSON:\n"
         "{\n"
         "  \"summary\": \"Resumen amigable y claro en español de las adiciones, modificaciones y relaciones creadas...\",\n"

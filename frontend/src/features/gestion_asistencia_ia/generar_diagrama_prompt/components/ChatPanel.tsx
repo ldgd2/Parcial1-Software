@@ -118,17 +118,23 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
             }
         });
 
-        // Insert relations (evitando duplicados)
+        // Insert relations (evitando duplicaciones idénticas de tipo y label)
         const currentRelations = getDiagramState().relations || [];
         
         result.relations.forEach(rel => {
             const sourceId = nodeMap.get(rel.sourceId) || rel.sourceId;
             const targetId = nodeMap.get(rel.targetId) || rel.targetId;
             if (sourceId && targetId && sourceId !== targetId) {
-                const alreadyExists = currentRelations.some((existing: any) => 
-                    (existing.sourceId === sourceId && existing.targetId === targetId) ||
-                    (existing.sourceId === targetId && existing.targetId === sourceId)
-                );
+                const relType = (rel.type || 'association').toLowerCase();
+                const relLabel = (rel.label || '').trim();
+
+                const alreadyExists = currentRelations.some((existing: any) => {
+                    const sameNodes = (existing.sourceId === sourceId && existing.targetId === targetId) ||
+                                      (existing.sourceId === targetId && existing.targetId === sourceId);
+                    const sameType = (existing.type || 'association').toLowerCase() === relType;
+                    const sameLabel = (existing.label || '').trim() === relLabel;
+                    return sameNodes && sameType && sameLabel;
+                });
                 
                 if (!alreadyExists) {
                     const relData: any = {
