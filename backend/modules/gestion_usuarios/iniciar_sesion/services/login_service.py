@@ -14,7 +14,7 @@ async def autenticar_usuario(login_data: LoginRequest, db: AsyncSession) -> Toke
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    if not verify_password(login_data.password, user.hashed_password):
+    if not user.hashed_password or not verify_password(login_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciales incorrectas",
