@@ -221,7 +221,7 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
     } else {
         const confirmar = confirm("¿Deseas actualizar el código en el repositorio existente en GitHub?");
         if (!confirmar) return;
-        repoName = "update"; 
+        repoName = sala.github_repo_url.split('/').pop()?.replace('.git', '') || sala.proyecto_nombre.toLowerCase().replace(/\s+/g, '-');
     }
 
     const autoDeploy = confirm("¿Deseas auto-alojar (desplegar automáticamente)?");
