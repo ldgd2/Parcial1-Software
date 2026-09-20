@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     FRONTEND_URL: str = "http://localhost:5173"
+    DEPLOYER_URL: str = "http://localhost:8081"
     
     # Base de datos
     DB_IP: str = "localhost"
