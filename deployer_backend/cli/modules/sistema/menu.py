@@ -14,6 +14,10 @@ def menu_sistema():
         console.print("[1] Configurar Deployer por Dominio (Ej. deploy.tusitio.com)")
         console.print("[2] Configurar Deployer por IP (Directo al VPS)")
         console.print("[3] Detener y Eliminar Servicios del Deployer")
+        console.print("[4] Ver Estado del Servicio Deployer")
+        console.print("[5] Ver Logs del Deployer en Tiempo Real (journalctl)")
+        console.print("[6] Ver Logs de Errores Nginx")
+        console.print("[7] Reiniciar Servicio Deployer")
         console.print("[0] Volver")
         
         op = Prompt.ask("\nSelecciona una opción", default="0")
@@ -24,6 +28,30 @@ def menu_sistema():
             crear_servicios(modo="ip")
         elif op == "3":
             eliminar_servicios()
+        elif op == "4":
+            if os.name != 'nt':
+                os.system("sudo systemctl status deployer-backend")
+                input("\nPresiona Enter para continuar...")
+        elif op == "5":
+            if os.name != 'nt':
+                console.print("[cyan]Mostrando logs en tiempo real. Presiona Ctrl+C para salir.[/cyan]")
+                try:
+                    os.system("sudo journalctl -u deployer-backend -f -n 50")
+                except KeyboardInterrupt:
+                    pass
+        elif op == "6":
+            if os.name != 'nt':
+                console.print("[cyan]Mostrando últimos 50 errores de Nginx. Presiona Ctrl+C para salir.[/cyan]")
+                try:
+                    os.system("sudo tail -f -n 50 /var/log/nginx/error.log")
+                except KeyboardInterrupt:
+                    pass
+        elif op == "7":
+            if os.name != 'nt':
+                console.print("[cyan]Reiniciando Deployer...[/cyan]")
+                os.system("sudo systemctl restart deployer-backend")
+                console.print("[bold green]✔ Servicio reiniciado.[/bold green]")
+                input("\nPresiona Enter para continuar...")
         elif op == "0":
             break
 
