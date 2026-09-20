@@ -4,7 +4,7 @@ import os
 
 DEPLOYER_URL = os.getenv("DEPLOYER_URL", "http://localhost:8001/api/v1/deploy/webhook")
 
-async def notificar_deployer(project_id: int, repo_url: str):
+async def notificar_deployer(project_id: int, repo_url: str, db_name: str = None, db_password: str = None, owner_prefix: str = None):
     """
     Envía una petición POST al Deployer Backend para que inicie el proceso de despliegue.
     """
@@ -12,6 +12,11 @@ async def notificar_deployer(project_id: int, repo_url: str):
         "project_id": project_id,
         "repo_url": repo_url
     }
+    if db_name and db_password:
+        payload["db_name"] = db_name
+        payload["db_password"] = db_password
+    if owner_prefix:
+        payload["owner_prefix"] = owner_prefix
     
     async with httpx.AsyncClient(timeout=10.0) as client:
         try:

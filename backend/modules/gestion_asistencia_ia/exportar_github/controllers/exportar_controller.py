@@ -61,40 +61,72 @@ async def exportar_proyecto(
     Si ya tiene repositorio vinculado, hace commit con IA y push.
     """
     try:
-        # 1. Buscamos el proyecto
-        from backend.modules.gestion_proyectos.models import Proyecto
+        # 1. Buscamos el proyecto y al anfitrión
+        from backend.modules.gestion_proyectos.models import Proyecto, ColaboradorProyecto
         result_proj = await db.execute(select(Proyecto).where(Proyecto.id == payload.proyecto_id))
         proyecto = result_proj.scalars().first()
         
         if not proyecto:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado.")
 
-        # 2. Buscamos el vínculo con GitHub
-        result = await db.execute(select(UsuarioGitHub).where(UsuarioGitHub.usuario_id == current_user.id))
-        vinculo = result.scalars().first()
+        # Buscar al anfitrión
+        result_colab = await db.execute(
+            select(ColaboradorProyecto).where(
+                (ColaboradorProyecto.proyecto_id == payload.proyecto_id) & 
+                (ColaboradorProyecto.rol_proyecto == "anfitrion")
+            )
+        )
+        anfitrion_colab = result_colab.scalars().first()
+        if not anfitrion_colab:
+            raise HTTPException(status_code=500, detail="Error: El proyecto no tiene un anfitrión válido.")
+            
+        anfitrion_id = anfitrion_colab.usuario_id
+        
+        # Obtener el Usuario anfitrión
+        result_user = await db.execute(select(Usuario).where(Usuario.id == anfitrion_id))
+        anfitrion = result_user.scalars().first()
+
+        # 2. Buscamos el vínculo con GitHub del anfitrión
+        result_gh = await db.execute(select(UsuarioGitHub).where(UsuarioGitHub.usuario_id == anfitrion_id))
+        vinculo = result_gh.scalars().first()
         
         if not vinculo:
-            raise HTTPException(status_code=400, detail="Debes vincular tu cuenta de GitHub primero.")
+            raise HTTPException(status_code=400, detail="El anfitrión del proyecto aún no ha vinculado su cuenta de GitHub en Configuración.")
             
-        # 3. Desencriptamos el token
+        if payload.auto_deploy and not anfitrion.db_password_encrypted:
+            raise HTTPException(status_code=400, detail="El anfitrión del proyecto no ha configurado una contraseña de Base de Datos para el auto-alojamiento. (Dile que vaya al engranaje en su Dashboard)")
+
+        # 3. Desencriptamos tokens
         token_real = desencriptar_dato(vinculo.encrypted_token)
+        db_password = desencriptar_dato(anfitrion.db_password_encrypted) if anfitrion.db_password_encrypted else "password"
         
         # 4. Generar código en carpeta temporal
-        carpeta_temporal = await generar_spring_boot(payload.diagram_json, payload.nombre_repo)
+        db_name = payload.nombre_repo.lower().replace("-", "_")
+        
+        owner_prefix = anfitrion.email.split("@")[0] if anfitrion.email else "user"
+        if payload.auto_deploy:
+            url_base = f"https://host.gerlextech.com/host/{owner_prefix}/{db_name}"
+        else:
+            url_base = "http://localhost:8080"
+            
+        carpeta_temporal, api_docs_md = await generar_spring_boot(payload.diagram_json, payload.nombre_repo, db_password, url_base)
         
         if proyecto.github_repo_url:
             # 5a. Ya tiene repo: Actualizar código
             from backend.modules.gestion_asistencia_ia.exportar_github.services.git_service import actualizar_codigo_en_github
             mensaje = await actualizar_codigo_en_github(carpeta_temporal, proyecto.github_repo_url, token_real)
             
-            # Notificar al webhook (asíncrono, no bloqueante)
-            from backend.modules.gestion_proyectos.notificar_despliegue.services.webhook_service import notificar_deployer
-            import asyncio
-            asyncio.create_task(notificar_deployer(proyecto.id, proyecto.github_repo_url))
+            if payload.auto_deploy:
+                # Notificar al webhook (asíncrono, no bloqueante) con URL autenticada
+                url_auth = proyecto.github_repo_url.replace("https://", f"https://x-access-token:{token_real}@")
+                from backend.modules.gestion_proyectos.notificar_despliegue.services.webhook_service import notificar_deployer
+                import asyncio
+                asyncio.create_task(notificar_deployer(proyecto.id, url_auth, db_name, db_password, anfitrion.email))
 
             return ExportarProyectoResponse(
                 url_repositorio=proyecto.github_repo_url,
-                mensaje=f"Código actualizado en GitHub y despliegue iniciado. Detalle: {mensaje}"
+                mensaje=f"Código actualizado en GitHub. {'Despliegue iniciado.' if payload.auto_deploy else ''} Detalle: {mensaje}",
+                api_docs_md=api_docs_md
             )
         else:
             # 5b. No tiene repo: Crear y subir inicial
@@ -105,14 +137,17 @@ async def exportar_proyecto(
             proyecto.github_repo_url = url_repositorio
             await db.commit()
             
-            # Notificar al webhook (asíncrono, no bloqueante)
-            from backend.modules.gestion_proyectos.notificar_despliegue.services.webhook_service import notificar_deployer
-            import asyncio
-            asyncio.create_task(notificar_deployer(proyecto.id, url_repositorio))
+            if payload.auto_deploy:
+                # Notificar al webhook (asíncrono, no bloqueante) con URL autenticada
+                url_auth = url_repositorio.replace("https://", f"https://x-access-token:{token_real}@")
+                from backend.modules.gestion_proyectos.notificar_despliegue.services.webhook_service import notificar_deployer
+                import asyncio
+                asyncio.create_task(notificar_deployer(proyecto.id, url_auth, db_name, db_password, anfitrion.email))
             
             return ExportarProyectoResponse(
                 url_repositorio=url_repositorio,
-                mensaje=f"¡Éxito! Tu código está en: {url_repositorio} y el despliegue se ha iniciado."
+                mensaje=f"¡Éxito! Tu código está en: {url_repositorio}. {'Y el despliegue se ha iniciado.' if payload.auto_deploy else ''}",
+                api_docs_md=api_docs_md
             )
             
     except HTTPException as e:

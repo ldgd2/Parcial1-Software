@@ -26,7 +26,7 @@ def map_java_type(tipo_uml: str) -> str:
     return "String"
 
 
-def inicializar_estructura_spring(temp_dir: str, nombre_repo: str = "proyecto_db"):
+def inicializar_estructura_spring(temp_dir: str, nombre_repo: str = "proyecto_db", db_password: str = "password"):
     """
     Crea la estructura de carpetas y archivos base (pom.xml, Application.java, properties)
     para un proyecto Spring Boot estándar sin depender de un .zip
@@ -128,8 +128,8 @@ def inicializar_estructura_spring(temp_dir: str, nombre_repo: str = "proyecto_db
         f.write(f'''DB_IP=127.0.0.1
 DB_PORT=5432
 DB_NAME={db_name_sanitizado}
-DB_USER=postgres
-DB_PASSWORD=password
+DB_USER={db_name_sanitizado}_user
+DB_PASSWORD={db_password}
 ''')
 
     # .gitignore
@@ -181,6 +181,8 @@ spring.datasource.username=${DB_USER:postgres}
 spring.datasource.password=${DB_PASSWORD:password}
 spring.jpa.hibernate.ddl-auto=validate
 spring.flyway.enabled=true
+springdoc.swagger-ui.path=/help
+springdoc.api-docs.path=/v3/api-docs
 ''')
 
     # Application.java
@@ -415,9 +417,51 @@ def generar_archivos_java(diagram_json: dict, temp_dir: str):
             with open(os.path.join(src_main_java, "dtos", f"{clase_data['nombre']}ResponseDTO.java"), "w", encoding="utf-8") as f:
                 f.write(codigo_res_dto)
 
-def parsear_diagrama(diagram_json: dict, temp_dir: str, nombre_repo: str = "proyecto_db"):
+def generar_documentacion_md(diagram_json: dict, url_base: str, nombre_repo: str) -> str:
+    """Genera la documentación en formato Markdown de las APIs expuestas."""
+    nodos = diagram_json.get("nodes", [])
+    
+    md = f"# Documentación de la API: {nombre_repo.capitalize()}\n\n"
+    md += f"Tu proyecto está alojado y disponible en: **{url_base}**\n\n"
+    md += f"## 📚 Swagger UI (Interfaz Gráfica Interactiva)\n"
+    md += f"Puedes probar todas las peticiones desde tu navegador ingresando a:\n"
+    md += f"👉 **[{url_base}/help]({url_base}/help)**\n\n"
+    md += "---\n\n"
+    md += "## 🚀 Referencia Rápida de Endpoints\n\n"
+    
+    for nodo in nodos:
+        if nodo.get("type") in ["class", "interface"]:
+            nombre = sanitize_identifier(nodo.get("nombre", "Entidad")).capitalize()
+            ruta = nombre.lower() + "s" # plural simple
+            md += f"### Entidad: `{nombre}`\n"
+            md += f"Ruta Base: `{url_base}/api/v1/{ruta}`\n\n"
+            
+            atributos = [a for a in nodo.get("atributos", []) if a.get("visibilidad") != "PK"]
+            if atributos:
+                md += "**Estructura JSON (Body):**\n```json\n{\n"
+                for i, a in enumerate(atributos):
+                    n = sanitize_identifier(a.get("nombre", ""))
+                    t = map_java_type(a.get("tipo", ""))
+                    coma = "," if i < len(atributos) - 1 else ""
+                    val = '"string"' if t == "String" else ("true" if t == "Boolean" else "0")
+                    md += f'  "{n}": {val}{coma} // Tipo: {t}\n'
+                md += "}\n```\n\n"
+            
+            md += "**Operaciones:**\n"
+            md += f"- `GET /api/v1/{ruta}` : Listar todos los registros.\n"
+            md += f"- `GET /api/v1/{ruta}/{{id}}` : Obtener un registro por su ID (UUID).\n"
+            md += f"- `POST /api/v1/{ruta}` : Crear un nuevo registro (enviar JSON en el body).\n"
+            md += f"- `PUT /api/v1/{ruta}/{{id}}` : Actualizar un registro (enviar JSON en el body).\n"
+            md += f"- `DELETE /api/v1/{ruta}/{{id}}` : Eliminar un registro.\n\n"
+            md += "---\n"
+            
+    return md
+
+def parsear_diagrama(diagram_json: dict, temp_dir: str, nombre_repo: str = "proyecto_db", db_password: str = "password", url_base: str = "http://localhost:8080") -> str:
     """
-    Orquestador del parser.
+    Orquestador del parser. Retorna la documentación en formato MD.
     """
-    inicializar_estructura_spring(temp_dir, nombre_repo)
+    inicializar_estructura_spring(temp_dir, nombre_repo, db_password)
     generar_archivos_java(diagram_json, temp_dir)
+    return generar_documentacion_md(diagram_json, url_base, nombre_repo)
+

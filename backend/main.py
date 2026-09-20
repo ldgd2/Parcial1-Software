@@ -25,6 +25,7 @@ from backend.modules.gestion_usuarios.recuperar_password.controllers.reset_contr
 from backend.modules.gestion_proyectos.crear_proyecto.controllers.crear_controller import router as crear_proyecto_router
 from backend.modules.gestion_proyectos.administrar_proyecto.controllers.admin_controller import router as admin_proyecto_router
 from backend.modules.gestion_proyectos.compartir_proyecto.controllers.compartir_controller import router as compartir_proyecto_router
+from backend.modules.gestion_proyectos.notificar_despliegue.controllers.callback_controller import router as callback_router
 from backend.modules.gestion_salas.controllers.sala_controller import router as sala_router
 from backend.modules.gestion_concurrencia.sincronizacion_tiempo_real.controllers.ws_sync_controller import router as ws_router
 
@@ -77,11 +78,13 @@ app.include_router(register_router)
 app.include_router(login_router)
 app.include_router(logout_router)
 app.include_router(reset_password_router)
+app.include_router(config_controller.router)
 
 # Registrar routers de proyectos
 app.include_router(crear_proyecto_router)
 app.include_router(admin_proyecto_router)
 app.include_router(compartir_proyecto_router)
+app.include_router(callback_router)
 app.include_router(sala_router)
 app.include_router(ws_router)
 

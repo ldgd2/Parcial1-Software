@@ -12,6 +12,7 @@ class Usuario(Base):
     hashed_password = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     tipo = Column(String, nullable=False, default="registrado")
+    db_password_encrypted = Column(String, nullable=True)
     
     rol_id = Column(Integer, ForeignKey("roles.id"), nullable=True)
     rol = relationship("Rol", lazy="selectin")

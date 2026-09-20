@@ -40,5 +40,8 @@ class Proyecto(Base):
     # URL del repositorio de GitHub vinculado
     github_repo_url = Column(String, nullable=True, default=None)
     
+    # URL del despliegue en el servidor
+    deployment_url = Column(String, nullable=True, default=None)
+    
     # Carga eager o lazy según necesidad
     colaboradores = relationship("ColaboradorProyecto", back_populates="proyecto", cascade="all, delete-orphan")
