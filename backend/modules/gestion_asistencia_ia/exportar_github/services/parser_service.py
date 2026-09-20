@@ -738,30 +738,47 @@ def generar_documentacion_md(diagram_json: dict, url_base: str, nombre_repo: str
 
             metodos = nodo.get("metodos", [])
             if metodos:
-                md += "#### APIs de Lógica de Negocio Personalizadas (Generadas por IA):\n\n"
+                md += "#### APIs de Lógica de Negocio Personalizadas:\n\n"
                 for m in metodos:
                     m_name = sanitize_identifier(m.get("nombre", ""))
                     if m_name.lower() in RESERVED_CRUD_METHODS:
                         continue
-                    java_decl, call_args, _, _ = parse_java_parameters(str(m.get("parametros", "")), m_name)
+                    java_decl, call_args, _, json_body_ex = parse_java_parameters(str(m.get("parametros", "")), m_name)
                     ret_type = map_java_type(m.get("retorno", "void")) if str(m.get("retorno", "")).lower() != "void" else "void"
                     
-                    query_example = ""
+                    method_endpoint = f"{base_endpoint}/{m_name}"
+                    md += f"##### 🔹 `POST {method_endpoint}`\n"
+                    md += f"- **Operación:** `{m_name}({java_decl})`\n"
+                    md += f"- **Tipo de Retorno:** `{ret_type}`\n"
+                    
                     if call_args:
                         params_list = [p.strip() for p in call_args.split(",") if p.strip()]
-                        query_parts = []
+                        md += f"- **Parámetros Requeridos:**\n"
                         for p in params_list:
-                            ex = obtener_ejemplo_atributo_raw(p, "String")
-                            query_parts.append(f"{p}={ex}")
+                            md += f"  - `{p}` (`String`): Parámetro para la función {m_name}\n"
+                        
+                        clean_json_body = json_body_ex.replace('\\n', '\n').replace('\\"', '"')
+                        if clean_json_body:
+                            md += f"\n- **Estructura JSON (Request Body):**\n```json\n{clean_json_body}\n```\n"
+                        
+                        query_parts = [f"{p}={obtener_ejemplo_atributo_raw(p, 'String')}" for p in params_list]
                         query_example = "?" + "&".join(query_parts)
-
-                    method_endpoint = f"{base_endpoint}/{m_name}"
-                    md += f"- **`POST {method_endpoint}`** — Función `{m_name}({java_decl})`\n"
-                    md += f"  - **Retorno:** `{ret_type}`\n"
-                    if query_example:
-                        md += f"  - **Parámetros Query:** `{query_example}`\n"
-                    md += f"  - **Ejemplo `curl`:**\n"
-                    md += f"    ```bash\n    curl -X POST \"{method_endpoint}{query_example}\"\n    ```\n\n"
+                        
+                        if clean_json_body:
+                            md += f"\n- **Ejemplo `curl` (vía JSON Body):**\n"
+                            md += f"  ```bash\n  curl -X POST \"{method_endpoint}\" \\\n    -H \"Content-Type: application/json\" \\\n    -d '{clean_json_body}'\n  ```\n"
+                        
+                        md += f"\n- **Ejemplo `curl` (vía Query Params):**\n"
+                        md += f"  ```bash\n  curl -X POST \"{method_endpoint}{query_example}\"\n  ```\n\n"
+                    else:
+                        md += f"- **Parámetros:** Ninguno\n"
+                        md += f"- **Ejemplo `curl`:**\n"
+                        md += f"  ```bash\n  curl -X POST \"{method_endpoint}\"\n  ```\n\n"
+                    
+                    md += f"- **Respuestas HTTP:**\n"
+                    md += f"  - `200 OK`: Operación '{m_name}' ejecutada con éxito.\n"
+                    md += f"  - `400 Bad Request`: Parámetros de entrada inválidos.\n"
+                    md += f"  - `500 Internal Server Error`: Error ejecutando la lógica de negocio.\n\n"
 
             md += "---\n\n"
             
