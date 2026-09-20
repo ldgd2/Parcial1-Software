@@ -346,30 +346,31 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
           {saving ? (
             <>
               <span className="menustrip__spinner-sm" />
-              Guardando...
+              <span>Guardando...</span>
             </>
           ) : (
             <>
-              <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-              Guardar
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><circle cx="8" cy="12" r="2"/><circle cx="16" cy="12" r="2"/><path d="M6 16h12"/><path d="M10 12h4"/></svg>
+              <span>Guardar</span>
             </>
           )}
         </button>
 
-        {/* Deploy/Export Action */}
+        {/* Deploy/Host Action */}
         <button 
           className="menustrip__export-btn" 
           onClick={openExportModal}
+          title="Desplegar y Hostear Backend"
         >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          Desplegar
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/><path d="M12 13v6"/><path d="M9 16l3-3 3 3"/></svg>
+          <span>Desplegar</span>
         </button>
 
         {/* Share button */}
         <div className="menustrip__share-wrap">
-          <button className="menustrip__share-btn" onClick={() => setShowShare(!showShare)}>
-            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-            Compartir
+          <button className="menustrip__share-btn" onClick={() => setShowShare(!showShare)} title="Compartir Sala de Diagramación">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            <span>Compartir</span>
           </button>
           {showShare && (
             <div className="menustrip__share-popover">
