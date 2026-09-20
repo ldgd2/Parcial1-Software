@@ -217,7 +217,8 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
                 
             subprocess.run(["sudo", "systemctl", "reload", "nginx"], check=True)
             print(f"[{project_id}] Nginx reload OK. App en /host/{owner_prefix}/{db_name}/")
-            deployment_url = f"https://host.example.com/host/{owner_prefix}/{db_name}/"
+            server_domain = os.getenv("SERVER_DOMAIN", "http://host.example.com")
+            deployment_url = f"{server_domain}/host/{owner_prefix}/{db_name}/"
         except Exception as e:
             print(f"[{project_id}] Error configurando Nginx: {e}")
 
