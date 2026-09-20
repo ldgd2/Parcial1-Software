@@ -1,113 +1,275 @@
 .unirse-view {
   min-height: 100vh;
-  background: var(--bg-color);
+  background: #090d16;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 2rem;
+  position: relative;
+  overflow: hidden;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.unirse-view__ambient-glow {
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.05) 50%, transparent 70%);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  filter: blur(40px);
 }
 
 .unirse-card {
-  background: var(--surface-color);
-  border: 1px solid var(--border-color);
-  padding: 3rem 2.5rem;
-  max-width: 440px;
+  position: relative;
+  z-index: 10;
+  background: rgba(18, 24, 38, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 2.5rem 2rem;
+  max-width: 460px;
   width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
+  gap: 1.5rem;
   text-align: center;
-  animation: cardIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  animation: cardScaleIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-@keyframes cardIn {
-  from { opacity: 0; transform: translateY(-20px) scale(0.97); }
+@keyframes cardScaleIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-.unirse-card__icon {
-  font-size: 2.5rem;
-  animation: pulse 2s ease infinite;
-}
-.unirse-card__icon--loading { color: var(--secondary); }
-.unirse-card__icon--aprobado { color: #a3e6a3; }
-.unirse-card__icon--pendiente { color: var(--primary); }
-.unirse-card__icon--error { color: #e6a3a3; }
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(0.92); }
+.unirse-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.unirse-card h2 {
-  font-size: 1rem;
+.unirse-card__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: #818cf8;
+  font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.15em;
-  color: var(--text-primary);
-  margin: 0;
+  letter-spacing: 0.05em;
 }
 
-.unirse-card p {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
+.unirse-card__code {
+  font-size: 0.78rem;
+  color: #94a3b8;
+  font-family: monospace;
+}
+
+.unirse-card__icon-wrapper {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.unirse-card__icon-wrapper--loading {
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  color: #818cf8;
+}
+
+.unirse-card__icon-wrapper--aprobado {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #34d399;
+}
+
+.unirse-card__icon-wrapper--pendiente {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+}
+
+.unirse-card__icon-wrapper--error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+.unirse-card__svg-icon.spin {
+  animation: spin 1.2s linear infinite;
+}
+
+.unirse-card__svg-icon.pulse-glow {
+  animation: pulseGlow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.92); opacity: 0.7; }
+}
+
+.unirse-card__body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.unirse-card__body h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #f8fafc;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.unirse-title--success {
+  color: #34d399 !important;
+}
+
+.unirse-title--error {
+  color: #f87171 !important;
+}
+
+.unirse-card__body p {
+  font-size: 0.9rem;
+  color: #94a3b8;
   line-height: 1.5;
   margin: 0;
 }
 
-.unirse-card strong { color: var(--text-primary); }
-
-.unirse-card__sub {
-  font-size: 0.78rem !important;
-  color: var(--secondary) !important;
-}
-
-.unirse-spinner {
-  width: 36px;
-  height: 36px;
-  border: 2px solid var(--border-color);
-  border-top-color: var(--primary);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin { to { transform: rotate(360deg); } }
-
-.unirse-progress {
+.unirse-message {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 10px 14px;
   width: 100%;
-  height: 2px;
-  background: var(--border-color);
-  position: relative;
+}
+
+.unirse-user-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
+  font-size: 0.82rem;
+  color: #cbd5e1;
+  margin-top: 4px;
+}
+
+.unirse-user-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #38bdf8;
+  box-shadow: 0 0 8px #38bdf8;
+}
+
+.unirse-waiting-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 1rem 0 0.5rem;
+}
+
+.unirse-waiting-indicator .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #fbbf24;
+  animation: dotBounce 1.4s infinite ease-in-out both;
+}
+
+.unirse-waiting-indicator .dot-1 { animation-delay: -0.32s; }
+.unirse-waiting-indicator .dot-2 { animation-delay: -0.16s; }
+
+@keyframes dotBounce {
+  0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+.unirse-progress-bar {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 9999px;
   overflow: hidden;
+  margin-top: 0.75rem;
 }
 
-.unirse-progress::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: #a3e6a3;
-  animation: progressFill 1.5s ease forwards;
+.unirse-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #34d399);
+  width: 100%;
+  animation: fillProgress 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-@keyframes progressFill {
-  from { transform: scaleX(0); transform-origin: left; }
-  to { transform: scaleX(1); transform-origin: left; }
+@keyframes fillProgress {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
 }
 
-.unirse-card__btn {
-  background: none;
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  padding: 0.625rem 1.5rem;
+.unirse-card__btn-cancel,
+.unirse-card__btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0.75rem 1.25rem;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  font-weight: 600;
   cursor: pointer;
-  font-family: var(--font-sans);
-  transition: border-color 0.2s, color 0.2s;
-  margin-top: 0.5rem;
+  transition: all 0.2s ease;
+  margin-top: 0.75rem;
 }
-.unirse-card__btn:hover {
-  border-color: var(--primary);
-  color: var(--primary);
+
+.unirse-card__btn-cancel {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+}
+
+.unirse-card__btn-cancel:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+.unirse-card__btn-primary {
+  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+  border: none;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
+}
+
+.unirse-card__btn-primary:hover {
+  background: linear-gradient(135deg, #4338ca 0%, #4f46e5 100%);
+  box-shadow: 0 6px 20px rgba(79, 70, 229, 0.6);
+  transform: translateY(-1px);
 }

@@ -18,13 +18,28 @@ export const configApi = {
         return response.json();
     },
 
-    configurarDbPassword: async (dbPassword: string) => {
+    solicitarOtpDb: async () => {
+        const response = await fetch(`${API_URL}/configuracion/solicitar-otp`, {
+            method: 'POST',
+            headers: getAuthHeaders()
+        });
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.detail || 'Error al solicitar código OTP');
+        }
+        return response.json();
+    },
+
+    configurarDbPassword: async (dbPassword: string, codigoOtp: string) => {
         const response = await fetch(`${API_URL}/configuracion/db`, {
             method: 'POST',
             headers: getAuthHeaders(),
-            body: JSON.stringify({ db_password: dbPassword })
+            body: JSON.stringify({ db_password: dbPassword, codigo_otp: codigoOtp })
         });
-        if (!response.ok) throw new Error('Error al configurar la contraseña');
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.detail || 'Error al configurar la contraseña');
+        }
         return response.json();
     }
 };

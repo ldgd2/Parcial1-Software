@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useDiagram } from '@/features/gestion_modelado/shared/context/DiagramContext';
 import { useRealTimeSync } from '@/features/gestion_concurrencia/sincronizacion_tiempo_real/context/RealTimeSyncContext';
 import { PermisosModal } from '../PermisosModal/PermisosModal';
+import { SettingsModal } from '@/features/gestion_proyectos/administrar_proyecto/components/SettingsModal/SettingsModal';
+import { ExportModal } from '@/features/gestion_asistencia_ia/exportar_github/components/ExportModal/ExportModal';
 import { TokenService } from '@/shared/lib/TokenService';
 import { API_URL } from '@/shared/lib/api';
 import type { SalaInfo } from '@/features/gestion_modelado/shared/types/types';
@@ -30,10 +32,12 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [showShare, setShowShare] = useState(false);
   const [showPermisos, setShowPermisos] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   const [copiado, setCopiado] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   
-  const { githubUsername, isExporting, isLoadingStatus, iniciarVinculacion, exportarProyecto } = useExportarGithub();
+  const { githubUsername, isExporting, isLoadingStatus } = useExportarGithub();
 
   const shareLink = `${window.location.origin}/unirse/${sala.codigo_acceso}`;
 
@@ -208,52 +212,13 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
     setTimeout(() => setNotification(null), 5000);
   };
 
-  const handleExportarGithub = async () => {
+  const openExportModal = () => {
     if (!githubUsername) {
-        showNotification('error', "Por favor vincula tu cuenta de GitHub primero desde 'Herramientas'.");
-        return;
+      showNotification('error', "Por favor vincula tu cuenta de GitHub primero desde la Configuración.");
+      setShowSettings(true);
+      return;
     }
-
-    let repoName = "";
-    if (!sala.github_repo_url) {
-        repoName = prompt("Ingresa el nombre para tu nuevo repositorio en GitHub:", sala.proyecto_nombre.toLowerCase().replace(/\s+/g, '-')) || "";
-        if (!repoName) return;
-    } else {
-        const confirmar = confirm("¿Deseas actualizar el código en el repositorio existente en GitHub?");
-        if (!confirmar) return;
-        repoName = sala.github_repo_url.split('/').pop()?.replace('.git', '') || sala.proyecto_nombre.toLowerCase().replace(/\s+/g, '-');
-        if (repoName.toLowerCase() === 'update') {
-            repoName = sala.proyecto_nombre.toLowerCase().replace(/\s+/g, '-');
-        }
-    }
-
-    const autoDeploy = confirm("¿Deseas auto-alojar (desplegar automáticamente)?");
-
-    const state = getDiagramState();
-    try {
-        const res = await exportarProyecto(sala.proyecto_id, repoName, state, autoDeploy);
-        if (res) {
-            showNotification('success', res.mensaje);
-            
-            if (res.api_docs_md) {
-                const blob = new Blob([res.api_docs_md], { type: 'text/markdown;charset=utf-8;' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.setAttribute('download', `API_Docs_${sala.proyecto_nombre.replace(/\s+/g, '_')}.md`);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-            }
-        }
-        
-        if (!sala.github_repo_url && res && res.url_repositorio) {
-            setTimeout(() => window.location.reload(), 2000);
-        }
-    } catch (err: any) {
-        showNotification('error', "Error al exportar: " + (err.message || "Revisa la consola"));
-    }
+    setShowExportModal(true);
   };
 
   const menus: MenuItem[] = [
@@ -293,12 +258,13 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
       items: [
         { label: 'Asistente IA (Chat)', action: () => { onOpenChat(); setOpenMenu(null); } },
         { label: 'Permisos de Acceso', action: () => { setShowPermisos(true); setOpenMenu(null); } },
+        { label: 'Configuración de Cuenta & DB', action: () => { setShowSettings(true); setOpenMenu(null); } },
         { separator: true, action: () => {} },
         { 
-          label: githubUsername ? `GitHub: Conectado como ${githubUsername}` : (isLoadingStatus ? 'Cargando GitHub...' : 'Vincular con GitHub'), 
-          action: () => { if(!githubUsername && !isLoadingStatus) iniciarVinculacion(); setOpenMenu(null); } 
+          label: githubUsername ? `GitHub: Conectado (@${githubUsername})` : (isLoadingStatus ? 'Cargando GitHub...' : 'Vincular con GitHub'), 
+          action: () => { if(!githubUsername && !isLoadingStatus) setShowSettings(true); setOpenMenu(null); } 
         },
-        { label: isExporting ? (sala.github_repo_url ? 'Actualizando en GitHub...' : 'Subiendo a GitHub...') : (sala.github_repo_url ? 'Actualizar Backend (GitHub)' : 'Generar Backend (GitHub)'), action: () => { handleExportarGithub(); setOpenMenu(null); } },
+        { label: 'Generar / Desplegar Backend', action: () => { openExportModal(); setOpenMenu(null); } },
       ]
     }
   ];
@@ -360,42 +326,45 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
           className={`menustrip__save-btn ${saving ? 'menustrip__save-btn--saving' : ''}`}
           onClick={onSave}
           disabled={saving}
-          id="btn-guardar-lienzo"
+          title="Guardar diagrama (Ctrl+S)"
         >
-          {saving ? 'GUARDANDO...' : 'GUARDAR'}
+          {saving ? (
+            <>
+              <span className="menustrip__spinner-sm" />
+              Guardando...
+            </>
+          ) : (
+            <>
+              <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              Guardar
+            </>
+          )}
         </button>
 
-        {/* Share */}
+        {/* Deploy/Export Action */}
+        <button 
+          className="menustrip__export-btn" 
+          onClick={openExportModal}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Desplegar
+        </button>
+
+        {/* Share button */}
         <div className="menustrip__share-wrap">
-          <button
-            className="menustrip__share-btn"
-            onClick={() => setShowShare(v => !v)}
-            id="btn-compartir-sala"
-          >
-            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight:4}}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> COMPARTIR
+          <button className="menustrip__share-btn" onClick={() => setShowShare(!showShare)}>
+            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+            Compartir
           </button>
           {showShare && (
-            <div className="menustrip__share-panel">
-              <div className="menustrip__share-label">ENLACE DE INVITACIÓN</div>
-              <div className="menustrip__share-row">
-                <input
-                  id="input-share-link"
-                  className="menustrip__share-input"
-                  value={shareLink}
-                  readOnly
-                  onClick={e => (e.target as HTMLInputElement).select()}
-                />
-                <button
-                  id="btn-copiar-enlace"
-                  className={`menustrip__share-copy ${copiado ? 'menustrip__share-copy--done' : ''}`}
-                  onClick={copiarLink}
-                >
-                  {copiado ? <><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight:4}}><polyline points="20 6 9 17 4 12"/></svg> COPIADO</> : 'COPIAR'}
+            <div className="menustrip__share-popover">
+              <p className="menustrip__share-title">Enlace de acceso rápido</p>
+              <div className="menustrip__share-input-wrap">
+                <input type="text" readOnly value={shareLink} className="menustrip__share-input" />
+                <button className="menustrip__share-copy-btn" onClick={copiarLink}>
+                  {copiado ? <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg> : <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>}
                 </button>
               </div>
-              <p className="menustrip__share-hint">
-                Cualquier persona con este enlace puede solicitar unirse al diagrama.
-              </p>
             </div>
           )}
         </div>
@@ -409,12 +378,29 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
         />
       )}
 
+      {showSettings && (
+        <SettingsModal 
+          onClose={() => setShowSettings(false)} 
+        />
+      )}
+
+      {showExportModal && (
+        <ExportModal
+          proyectoId={sala.proyecto_id}
+          proyectoNombre={sala.proyecto_nombre}
+          githubRepoUrl={sala.github_repo_url}
+          diagramState={getDiagramState()}
+          onClose={() => setShowExportModal(false)}
+          onSuccessNotification={showNotification}
+        />
+      )}
+
       {/* OVERLAY DE CARGA */}
       {isExporting && (
         <div className="menustrip__loading-overlay">
           <div className="menustrip__spinner"></div>
           <div className="menustrip__loading-text">
-            Procesando y exportando a GitHub...
+            Procesando y desplegando backend...
           </div>
         </div>
       )}
