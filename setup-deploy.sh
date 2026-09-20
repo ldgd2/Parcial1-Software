@@ -11,9 +11,12 @@ echo "==================================================="
 echo -e "\n[1/4] Verificando dependencias del sistema..."
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     sudo apt-get update
-    sudo apt-get install -y python3 python3-venv python3-pip nginx sqlite3 postgresql postgresql-contrib
+    sudo apt-get install -y python3 python3-venv python3-pip nginx sqlite3 postgresql postgresql-contrib openjdk-17-jdk maven
+    # Asegurar que JAVA_HOME apunta a JDK 17
+    export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+    sudo update-alternatives --set java /usr/lib/jvm/java-17-openjdk-amd64/bin/java 2>/dev/null || true
 else
-    echo "⚠️ Sistema no Linux detectado. Se omiten instalaciones apt-get."
+    echo "Sistema no Linux detectado. Se omiten instalaciones apt-get."
 fi
 
 # 2. Setup del entorno Python
