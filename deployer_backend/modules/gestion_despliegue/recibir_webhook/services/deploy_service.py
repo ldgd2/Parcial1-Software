@@ -107,15 +107,15 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
         # or passwordless psql access for the system user.
         # Ensure that the deployer VPS has postgresql installed and the deployer runs with proper rights.
         try:
-            # We use an inline script to create user and db, ignoring errors if they exist.
-            create_role_sql = f'DO \\$\\$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = \'{db_user}\') THEN CREATE ROLE "{db_user}" WITH LOGIN ENCRYPTED PASSWORD \'{db_password}\'; END IF; END \\$\\$;'
-            create_db_sql = f'SELECT \'CREATE DATABASE {db_name} OWNER "{db_user}"\' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = \'{db_name}\')\\gexec'
-            
             env = os.environ.copy()
             env["PGPASSWORD"] = settings.PG_PASSWORD
+            pg_host = settings.PG_HOST
             
-            subprocess.run(["psql", "-U", "postgres", "-h", "127.0.0.1", "-c", create_role_sql], env=env, check=True)
-            subprocess.run(["psql", "-U", "postgres", "-h", "127.0.0.1", "-c", create_db_sql], env=env, check=True)
+            create_role_sql = f"DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '{db_user}') THEN CREATE ROLE \"{db_user}\" WITH LOGIN ENCRYPTED PASSWORD '{db_password}'; END IF; END $$;"
+            create_db_sql = f"SELECT 'CREATE DATABASE {db_name} OWNER \"{db_user}\"' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '{db_name}')\\gexec"
+            
+            subprocess.run(["psql", "-U", "postgres", "-h", pg_host, "-c", create_role_sql], env=env, check=True)
+            subprocess.run(["psql", "-U", "postgres", "-h", pg_host, "-c", create_db_sql], env=env, check=True)
             print(f"[{project_id}] Base de datos {db_name} lista.")
         except subprocess.CalledProcessError as e:
             print(f"[{project_id}] Error aprovisionando BD PostgreSQL: {e}")
