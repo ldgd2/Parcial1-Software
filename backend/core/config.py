@@ -37,6 +37,17 @@ class Settings(BaseSettings):
     HOST_DOMAIN: str = "http://localhost"
 
     @property
+    def EFFECTIVE_HOST_DOMAIN(self) -> str:
+        if self.HOST_DOMAIN and self.HOST_DOMAIN != "http://localhost":
+            return self.HOST_DOMAIN.rstrip("/")
+        if self.DEPLOYER_URL and "localhost" not in self.DEPLOYER_URL:
+            from urllib.parse import urlparse
+            parsed = urlparse(self.DEPLOYER_URL)
+            if parsed.scheme and parsed.netloc:
+                return f"{parsed.scheme}://{parsed.netloc}"
+        return self.HOST_DOMAIN.rstrip("/")
+
+    @property
     def DATABASE_URL(self) -> str:
         from urllib.parse import quote_plus
         encoded_password = quote_plus(self.DB_PASSWORD)

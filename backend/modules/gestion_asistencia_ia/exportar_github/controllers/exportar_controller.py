@@ -122,10 +122,10 @@ async def exportar_proyecto(
         owner_prefix = anfitrion.email.split("@")[0] if anfitrion.email else "user"
         if payload.auto_deploy:
             from backend.core.config import settings
-            domain = settings.HOST_DOMAIN.rstrip("/")
+            domain = settings.EFFECTIVE_HOST_DOMAIN
             if domain == "http://localhost" and request:
                 host_header = request.headers.get("x-forwarded-host") or request.headers.get("host")
-                if host_header:
+                if host_header and not host_header.startswith("localhost") and not host_header.startswith("127.0.0.1"):
                     scheme = request.headers.get("x-forwarded-proto", "http")
                     domain = f"{scheme}://{host_header}"
             url_base = f"{domain}/host/{owner_prefix}/{db_name}"
