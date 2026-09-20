@@ -182,8 +182,31 @@ spring.datasource.password=${DB_PASSWORD:password}
 spring.jpa.hibernate.ddl-auto=update
 spring.flyway.enabled=true
 spring.flyway.baseline-on-migrate=true
+server.forward-headers-strategy=framework
 springdoc.swagger-ui.path=/help
 springdoc.api-docs.path=/v3/api-docs
+''')
+
+    # HomeController.java
+    with open(os.path.join(src_main_java, "controllers", "HomeController.java"), "w", encoding="utf-8") as f:
+        f.write('''package com.proyecto.controllers;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+import java.util.Map;
+
+@RestController
+public class HomeController {
+
+    @GetMapping("/")
+    public Map<String, Object> home() {
+        return Map.of(
+            "status", "online",
+            "message", "Servicio Spring Boot activo y en línea",
+            "swagger_docs", "help"
+        );
+    }
+}
 ''')
 
     # Application.java

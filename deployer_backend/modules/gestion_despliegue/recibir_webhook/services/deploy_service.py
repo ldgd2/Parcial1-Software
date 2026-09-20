@@ -219,27 +219,64 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
     else:
         print(f"[{project_id}] El proceso de Spring Boot (PID {process.pid}) está activo en el puerto {deployment.port}.")
         
+def ensure_nginx_include():
+    """Asegura que 'include /etc/nginx/deploy_apps/*.conf;' esté dentro de un bloque server activo de Nginx."""
+    if platform.system() != "Linux":
+        return
+    try:
+        sites_dir = Path("/etc/nginx/sites-enabled")
+        if not sites_dir.exists():
+            return
+            
+        already_included = False
+        target_file = None
+        
+        for conf_file in sites_dir.glob("*"):
+            try:
+                content = conf_file.read_text(encoding="utf-8", errors="ignore")
+                if "deploy_apps/*.conf" in content:
+                    already_included = True
+                    break
+                if not target_file and "server {" in content:
+                    target_file = conf_file
+            except Exception:
+                pass
+                
+        if not already_included and target_file:
+            content = target_file.read_text(encoding="utf-8", errors="ignore")
+            new_content = content.replace("server {", "server {\n    include /etc/nginx/deploy_apps/*.conf;\n")
+            target_file.write_text(new_content, encoding="utf-8")
+            print(f"Incluido /etc/nginx/deploy_apps/*.conf en {target_file}")
+    except Exception as e:
+        print(f"Advertencia al incluir deploy_apps en Nginx: {e}")
+
     # 6. Configurar Nginx Dinámicamente si hay owner_prefix
     deployment_url = f"http://{settings.SERVER_HOST}:{deployment.port}"
     if owner_prefix and db_name:
         try:
+            ensure_nginx_include()
             nginx_conf_dir = "/etc/nginx/deploy_apps"
             os.makedirs(nginx_conf_dir, exist_ok=True)
             
             nginx_conf_path = os.path.join(nginx_conf_dir, f"{project_id}.conf")
             nginx_conf_content = f'''location /host/{owner_prefix}/{db_name} {{
-    proxy_pass http://localhost:{deployment.port};
+    proxy_pass http://127.0.0.1:{deployment.port};
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Prefix /host/{owner_prefix}/{db_name};
 }}
 '''
             with open(nginx_conf_path, "w", encoding="utf-8") as f:
                 f.write(nginx_conf_content)
                 
-            subprocess.run(["sudo", "systemctl", "reload", "nginx"], check=True)
-            print(f"[{project_id}] Nginx reload OK. App en /host/{owner_prefix}/{db_name}/")
+            test_res = subprocess.run(["sudo", "nginx", "-t"], capture_output=True, text=True)
+            if test_res.returncode != 0:
+                print(f"[{project_id}] ERROR Sintaxis Nginx: {test_res.stderr}")
+            else:
+                subprocess.run(["sudo", "systemctl", "reload", "nginx"], check=True)
+                print(f"[{project_id}] Nginx reload OK. App en /host/{owner_prefix}/{db_name}/")
             deployment_url = f"{settings.SERVER_DOMAIN}/host/{owner_prefix}/{db_name}/"
         except Exception as e:
             print(f"[{project_id}] Error configurando Nginx: {e}")
