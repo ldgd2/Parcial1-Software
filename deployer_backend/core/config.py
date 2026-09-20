@@ -22,6 +22,15 @@ class Settings(BaseSettings):
     # PostgreSQL Admin Password
     PG_PASSWORD: str = os.getenv("PG_PASSWORD", "postgres")
     
+    # PostgreSQL Host (for provisioning DBs for deployed Spring Boot apps)
+    PG_HOST: str = "127.0.0.1"
+    
+    # Main API URL (for callbacks to the diagramador backend)
+    MAIN_API_URL: str = "http://localhost:8000"
+    
+    # Public domain for deployed apps
+    SERVER_DOMAIN: str = "http://localhost"
+    
     class Config:
         env_file = ".env"
 
