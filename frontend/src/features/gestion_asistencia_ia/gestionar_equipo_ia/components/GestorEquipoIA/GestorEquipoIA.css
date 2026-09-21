@@ -1,0 +1,238 @@
+.gestor-equipo {
+  background: #15151e;
+  border: 1px solid #2e2e4a;
+  border-radius: 14px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.gestor-equipo__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.gestor-equipo__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #3d3780, #7c6ef8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.gestor-equipo__title {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #d0d0f0;
+}
+
+.gestor-equipo__sub {
+  display: block;
+  font-size: 11px;
+  color: #6060a0;
+  margin-top: 2px;
+}
+
+.gestor-equipo__error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+  font-size: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.gestor-equipo__section-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #5050a0;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.gestor-equipo__devs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gestor-equipo__dev-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gestor-equipo__dev-name {
+  font-size: 12px;
+  color: #a0a0c0;
+  min-width: 90px;
+  font-weight: 500;
+}
+
+.gestor-equipo__dev-input {
+  flex: 1;
+  background: #1e1e2e;
+  border: 1px solid #2e2e4a;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #d0d0f0;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.gestor-equipo__dev-input:focus {
+  border-color: #7c6ef8;
+}
+
+.gestor-equipo__dev-input::placeholder {
+  color: #404060;
+}
+
+.gestor-equipo__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.gestor-equipo__btn-primary {
+  flex: 1;
+  background: linear-gradient(135deg, #5b52d0, #7c6ef8);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 9px 14px;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.15s;
+}
+
+.gestor-equipo__btn-primary:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.gestor-equipo__btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.gestor-equipo__btn-secondary {
+  background: #1e1e2e;
+  border: 1px solid #3b3b5c;
+  border-radius: 8px;
+  color: #a0a0c0;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 9px 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.gestor-equipo__btn-secondary:hover:not(:disabled) {
+  background: #2a2a40;
+  color: #fff;
+}
+
+/* Resultado */
+.gestor-equipo__resultado {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.gestor-equipo__dev-card {
+  background: #1a1a2e;
+  border: 1px solid #2e2e4a;
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gestor-equipo__dev-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.gestor-equipo__dev-card-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #d0d0f0;
+}
+
+.gestor-equipo__dev-card-pct {
+  font-size: 11px;
+  color: #7c6ef8;
+  font-weight: 700;
+}
+
+.gestor-equipo__bar-wrap {
+  height: 3px;
+  background: #2e2e4a;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.gestor-equipo__bar {
+  height: 100%;
+  background: linear-gradient(90deg, #7c6ef8, #a78bfa);
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+
+.gestor-equipo__tareas-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.gestor-equipo__tarea {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 11px;
+  color: #a0a0c0;
+}
+
+.gestor-equipo__tarea--done {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+.gestor-equipo__tarea-tipo {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.gestor-equipo__tarea-tipo--diagrama {
+  background: rgba(124, 110, 248, 0.15);
+  color: #a78bfa;
+}
+
+.gestor-equipo__tarea-tipo--desarrollo {
+  background: rgba(34, 197, 94, 0.1);
+  color: #4ade80;
+}
+
+.gestor-equipo__tarea-titulo {
+  line-height: 1.4;
+}

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Text, JSON
 from sqlalchemy.orm import relationship
 from backend.core.database import Base, heredar
 from backend.core.permissions.models import Rol 
@@ -13,6 +13,7 @@ class Usuario(Base):
     is_active = Column(Boolean, default=True)
     tipo = Column(String, nullable=False, default="registrado")
     db_password_encrypted = Column(String, nullable=True)
+    etiquetas_habilidades = Column(JSON, nullable=True, default=None)
     
     rol_id = Column(Integer, ForeignKey("roles.id"), nullable=True)
     rol = relationship("Rol", lazy="selectin")
@@ -45,3 +46,20 @@ class UsuarioGitHub(Base):
     github_username = Column(String)
     encrypted_token = Column(String, nullable=False)
 
+
+class TareaIA(Base):
+    """Checklist de tareas generado por la IA para cada colaborador en un proyecto."""
+    __tablename__ = "tareas_ia"
+
+    id = Column(Integer, primary_key=True, index=True)
+    proyecto_id = Column(Integer, ForeignKey("proyectos.id", ondelete="CASCADE"), nullable=False, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # 'diagrama' = tarea dentro del diagramador | 'desarrollo' = tarea externa
+    tipo = Column(String, nullable=False, default="diagrama")
+    titulo = Column(String, nullable=False)
+    descripcion = Column(Text, nullable=True)
+    completada = Column(Boolean, nullable=False, default=False)
+    orden = Column(Integer, nullable=False, default=0)
+
+    usuario = relationship("Usuario")
