@@ -11,17 +11,26 @@ from backend.modules.gestion_asistencia_ia.gestionar_equipo_ia.schemas.request i
 )
 
 
-def _construir_prompt(req: GenerarEquipoRequest) -> str:
+def _construir_prompt(req: GenerarEquipoRequest, historial: list[TareaIA] = None) -> str:
     devs_str = "\n".join(
         f"- usuario_id={d.usuario_id}, nombre={d.nombre}, etiquetas=[{', '.join(d.etiquetas)}]"
         for d in req.desarrolladores
     )
+
+    historial_str = "No hay tareas previas."
+    if historial and len(historial) > 0:
+        historial_str = "\n".join(
+            f"- [Asignada a usuario_id={t.usuario_id}] {t.titulo} ({'Completada' if t.completada else 'Pendiente'})"
+            for t in historial
+        )
+
     return (
         f"Eres un Project Manager de software experimentado.\n"
         f"Proyecto: {req.descripcion_proyecto}\n\n"
         f"Desarrolladores disponibles:\n{devs_str}\n\n"
+        f"HISTORIAL DE TAREAS YA EXISTENTES (No repitas estas tareas):\n{historial_str}\n\n"
         f"INSTRUCCIONES:\n"
-        f"1. Analiza el proyecto y divídelo en módulos lógicos.\n"
+        f"1. Analiza el proyecto y el historial. Tu objetivo es generar NUEVAS tareas que completen el desarrollo sin duplicar lo ya asignado.\n"
         f"2. Asigna tareas a los desarrolladores según sus etiquetas/habilidades. "
         f"Quien tenga más experiencia en un área recibe más responsabilidad en esa área.\n"
         f"3. Cada tarea debe tener un 'tipo': 'diagrama' (para hacer dentro del diagramador UML) "
@@ -83,20 +92,20 @@ async def _llamar_gemini_equipo(prompt: str) -> dict:
 
 
 async def generar_y_persistir_tareas(req: GenerarEquipoRequest, db: AsyncSession) -> list[TareaIA]:
-    prompt = _construir_prompt(req)
+    # Obtener historial para evitar repeticiones
+    result = await db.execute(
+        select(TareaIA).where(TareaIA.proyecto_id == req.proyecto_id)
+    )
+    tareas_existentes = result.scalars().all()
+
+    prompt = _construir_prompt(req, list(tareas_existentes))
     resultado = await _llamar_gemini_equipo(prompt)
 
     tareas_data: list[dict] = resultado.get("tareas", [])
     if not tareas_data:
         raise HTTPException(status_code=500, detail="La IA no generó ninguna tarea")
 
-    # Eliminar tareas previas de IA para este proyecto
-    result = await db.execute(
-        select(TareaIA).where(TareaIA.proyecto_id == req.proyecto_id)
-    )
-    tareas_existentes = result.scalars().all()
-    for t in tareas_existentes:
-        await db.delete(t)
+    # Eliminado el bloque de borrado de tareas previas para preservar el historial
 
     nuevas_tareas: list[TareaIA] = []
     for item in tareas_data:

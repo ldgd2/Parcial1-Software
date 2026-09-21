@@ -21,13 +21,24 @@ from backend.modules.gestion_asistencia_ia.gestionar_equipo_ia.services.equipo_s
 router = APIRouter(prefix="/api/ia/equipo", tags=["IA - Gestión de Equipo"])
 
 
+from backend.modules.gestion_proyectos.models import Proyecto
+from backend.core.websockets.connection_manager import manager
+
 @router.post("/generar", response_model=List[TareaIAOut])
 async def generar_tareas_equipo(
     req: GenerarEquipoRequest,
     db: AsyncSession = Depends(get_db),
     _: Usuario = Depends(get_current_user),
 ) -> List[TareaIA]:
-    return await generar_y_persistir_tareas(req, db)
+    nuevas_tareas = await generar_y_persistir_tareas(req, db)
+    
+    # Notificar por WebSocket a la sala para que refresquen tareas
+    result = await db.execute(select(Proyecto).where(Proyecto.id == req.proyecto_id))
+    proyecto = result.scalar_one_or_none()
+    if proyecto and proyecto.codigo_acceso:
+        await manager.broadcast_to_sala({"type": "tareas_actualizadas"}, proyecto.codigo_acceso)
+        
+    return nuevas_tareas
 
 
 @router.get("/proyecto/{proyecto_id}/mis-tareas", response_model=List[TareaIAOut])
