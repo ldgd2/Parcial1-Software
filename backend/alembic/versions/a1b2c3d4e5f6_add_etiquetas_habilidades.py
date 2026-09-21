@@ -7,6 +7,7 @@ Create Date: 2026-09-21 02:45:00.000000
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import text
 
 # revision identifiers, used by Alembic.
 revision = 'a1b2c3d4e5f6'
@@ -16,26 +17,30 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Agregar columna etiquetas_habilidades a la tabla usuarios
-    op.add_column(
-        'usuarios',
-        sa.Column('etiquetas_habilidades', sa.JSON(), nullable=True)
-    )
+    conn = op.get_bind()
 
-    # Crear tabla tareas_ia
-    op.create_table(
-        'tareas_ia',
-        sa.Column('id', sa.Integer(), primary_key=True, index=True),
-        sa.Column('proyecto_id', sa.Integer(), sa.ForeignKey('proyectos.id', ondelete='CASCADE'), nullable=False, index=True),
-        sa.Column('usuario_id', sa.Integer(), sa.ForeignKey('usuarios.id', ondelete='CASCADE'), nullable=False, index=True),
-        sa.Column('tipo', sa.String(), nullable=False, server_default='diagrama'),
-        sa.Column('titulo', sa.String(), nullable=False),
-        sa.Column('descripcion', sa.Text(), nullable=True),
-        sa.Column('completada', sa.Boolean(), nullable=False, server_default='false'),
-        sa.Column('orden', sa.Integer(), nullable=False, server_default='0'),
-    )
+    # Agregar columna solo si no existe ya
+    conn.execute(text("""
+        ALTER TABLE usuarios
+        ADD COLUMN IF NOT EXISTS etiquetas_habilidades JSONB
+    """))
+
+    # Crear tabla tareas_ia solo si no existe ya
+    conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS tareas_ia (
+            id SERIAL PRIMARY KEY,
+            proyecto_id INTEGER NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
+            usuario_id  INTEGER NOT NULL REFERENCES usuarios(id)  ON DELETE CASCADE,
+            tipo        VARCHAR NOT NULL DEFAULT 'diagrama',
+            titulo      VARCHAR NOT NULL,
+            descripcion TEXT,
+            completada  BOOLEAN NOT NULL DEFAULT false,
+            orden       INTEGER NOT NULL DEFAULT 0
+        )
+    """))
 
 
 def downgrade() -> None:
-    op.drop_table('tareas_ia')
-    op.drop_column('usuarios', 'etiquetas_habilidades')
+    conn = op.get_bind()
+    conn.execute(text("DROP TABLE IF EXISTS tareas_ia"))
+    conn.execute(text("ALTER TABLE usuarios DROP COLUMN IF EXISTS etiquetas_habilidades"))
