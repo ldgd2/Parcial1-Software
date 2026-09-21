@@ -8,9 +8,10 @@ interface Props {
   onEditar: (p: Proyecto) => void;
   onCompartir: (p: Proyecto) => void;
   onEliminar: (p: Proyecto) => void;
+  onGestionarEquipo?: (p: Proyecto) => void;
 }
 
-export const ProyectoCard: React.FC<Props> = ({ proyecto, onAbrir, onEditar, onCompartir, onEliminar }) => {
+export const ProyectoCard: React.FC<Props> = ({ proyecto, onAbrir, onEditar, onCompartir, onEliminar, onGestionarEquipo }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const fecha = new Date(proyecto.fecha_creacion).toLocaleDateString('es-ES', {
     day: '2-digit', month: 'short', year: 'numeric'
@@ -63,6 +64,11 @@ export const ProyectoCard: React.FC<Props> = ({ proyecto, onAbrir, onEditar, onC
             </button>
             {menuOpen && (
               <div className="proyecto-card__dropdown" onMouseLeave={() => setMenuOpen(false)}>
+                {onGestionarEquipo && (
+                  <button onClick={e => { e.stopPropagation(); setMenuOpen(false); onGestionarEquipo(proyecto); }}>
+                    GESTOR IA
+                  </button>
+                )}
                 <button onClick={e => { e.stopPropagation(); setMenuOpen(false); onEditar(proyecto); }}>
                   EDITAR
                 </button>

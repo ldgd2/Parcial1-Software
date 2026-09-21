@@ -34,6 +34,13 @@ export const ConfiguracionView: React.FC = () => {
   const ETIQUETAS_PREDEFINIDAS = [
     'backend', 'frontend', 'modelado', 'base de datos',
     'devops', 'ui/ux', 'mobile', 'seguridad', 'testing', 'arquitectura',
+    'python', 'django', 'laravel', 'node.js', 'apis rest', 'graphql', 'websockets', 'orm', 'microservicios',
+    'react', 'javascript', 'typescript', 'html5', 'css3', 'spa', 'pwa', 'responsive design',
+    'flutter', 'dart', 'android', 'ios', 'react native',
+    'postgresql', 'mysql', 'sql', 'nosql', 'mongodb', 'redis', 'migraciones', 'diagramas er',
+    'vps', 'linux', 'ubuntu', 'aws', 'nginx', 'proxy inverso', 'docker', 'ci/cd', 'bash scripting', 'certificados ssl', 'balanceo de carga',
+    'uml', 'mvc', 'patrones de diseño', 'clean architecture', 'ddd', 'serverless',
+    'redes', 'hardware', 'iot', 'microcontroladores', 'tcp/ip'
   ];
   const [etiquetasSeleccionadas, setEtiquetasSeleccionadas] = useState<string[]>([]);
   const [etiquetaCustom, setEtiquetaCustom] = useState('');
@@ -829,9 +836,9 @@ export const ConfiguracionView: React.FC = () => {
                             style={{
                               padding: '6px 14px',
                               borderRadius: '20px',
-                              border: etiquetasSeleccionadas.includes(tag) ? '1.5px solid #7c6ef8' : '1.5px solid #2e2e4a',
-                              background: etiquetasSeleccionadas.includes(tag) ? 'rgba(124,110,248,0.15)' : 'transparent',
-                              color: etiquetasSeleccionadas.includes(tag) ? '#a78bfa' : '#6060a0',
+                              border: etiquetasSeleccionadas.includes(tag) ? '1.5px solid var(--primary)' : '1.5px solid var(--border-color)',
+                              background: etiquetasSeleccionadas.includes(tag) ? 'var(--surface-color)' : 'transparent',
+                              color: etiquetasSeleccionadas.includes(tag) ? 'var(--primary)' : 'var(--text-secondary)',
                               fontSize: '12px',
                               fontWeight: 600,
                               cursor: 'pointer',
@@ -874,7 +881,7 @@ export const ConfiguracionView: React.FC = () => {
                               style={{
                                 display: 'inline-flex', alignItems: 'center', gap: '6px',
                                 padding: '4px 12px', borderRadius: '20px',
-                                background: 'rgba(124,110,248,0.2)', color: '#a78bfa',
+                                background: 'var(--surface-color)', border: '1px solid var(--primary)', color: 'var(--primary)',
                                 fontSize: '11px', fontWeight: 600,
                               }}
                             >
@@ -882,7 +889,7 @@ export const ConfiguracionView: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => toggleEtiqueta(tag)}
-                                style={{ background: 'none', border: 'none', color: '#7c6ef8', cursor: 'pointer', padding: 0, lineHeight: 1 }}
+                                style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: 0, lineHeight: 1 }}
                               >
                                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                               </button>

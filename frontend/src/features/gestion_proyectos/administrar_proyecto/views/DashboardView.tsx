@@ -12,6 +12,7 @@ import { NotifProvider, useNotif } from '@/features/gestion_proyectos/shared/con
 import { proyectoService } from '@/features/gestion_proyectos/shared/utils/proyectoService';
 import type { Proyecto } from '@/features/gestion_proyectos/shared/utils/types';
 import { apiFetch, API_URL } from '@/shared/lib/api';
+import { GestorEquipoIA } from '@/features/gestion_asistencia_ia/gestionar_equipo_ia/components/GestorEquipoIA/GestorEquipoIA';
 import './DashboardView.css';
 
 // Inner component to access context
@@ -30,6 +31,7 @@ const DashboardContent: React.FC = () => {
   const [proyectoCompartir, setProyectoCompartir] = useState<Proyecto | null>(null);
   const [proyectoEliminar, setProyectoEliminar] = useState<Proyecto | null>(null);
   const [eliminando, setEliminando] = useState(false);
+  const [proyectoGestorIA, setProyectoGestorIA] = useState<Proyecto | null>(null);
 
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
@@ -244,6 +246,7 @@ const DashboardContent: React.FC = () => {
                   onEditar={() => setProyectoEditar(p)}
                   onCompartir={() => setProyectoCompartir(p)}
                   onEliminar={() => setProyectoEliminar(p)}
+                  onGestionarEquipo={() => setProyectoGestorIA(p)}
                 />
               </div>
             ))}
@@ -306,6 +309,21 @@ const DashboardContent: React.FC = () => {
       </Modal>
 
       <ToastStack />
+
+      {/* Modal Gestor de Equipo IA */}
+      <Modal
+        isOpen={!!proyectoGestorIA}
+        onClose={() => setProyectoGestorIA(null)}
+        title="GESTOR DE EQUIPO IA"
+        width="520px"
+      >
+        {proyectoGestorIA && (
+          <GestorEquipoIA
+            proyectoId={proyectoGestorIA.id}
+            descripcionProyecto={proyectoGestorIA.descripcion ?? proyectoGestorIA.nombre}
+          />
+        )}
+      </Modal>
     </div>
   );
 };

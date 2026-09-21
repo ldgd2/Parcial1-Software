@@ -199,7 +199,7 @@ export const RegisterView: React.FC = () => {
                     padding: '6px 14px',
                     borderRadius: '20px',
                     border: etiquetasSeleccionadas.includes(tag) ? '1.5px solid var(--primary)' : '1.5px solid var(--border-color)',
-                    background: etiquetasSeleccionadas.includes(tag) ? 'rgba(124,110,248,0.15)' : 'transparent',
+                    background: etiquetasSeleccionadas.includes(tag) ? 'rgba(255,255,255,0.05)' : 'transparent',
                     color: etiquetasSeleccionadas.includes(tag) ? 'var(--primary)' : 'var(--text-secondary)',
                     fontSize: '12px',
                     fontWeight: 600,

@@ -9,6 +9,7 @@ import { MultiplayerCursors } from '@/features/gestion_salas/colaboracion_tiempo
 import { ChatPanel } from '@/features/gestion_asistencia_ia/generar_diagrama_prompt/components/ChatPanel';
 import { salaService } from '@/features/gestion_salas/shared/services/salaService';
 import { PropertiesPanel } from '@/features/gestion_modelado/editar_elemento/components/PropertiesPanel/PropertiesPanel';
+import { ChecklistPanel } from '@/features/gestion_asistencia_ia/gestionar_equipo_ia/components/ChecklistPanel/ChecklistPanel';
 import type { SalaInfo } from '@/features/gestion_modelado/shared/types/types';
 import './SalaView.css';
 
@@ -90,6 +91,9 @@ const SalaContent: React.FC<{ sala: SalaInfo }> = ({ sala }) => {
         <MultiplayerCursors />
         <ChatPanel isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
         <PropertiesPanel />
+        {sala.proyecto_id > 0 && !isGuest && (
+          <ChecklistPanel proyectoId={sala.proyecto_id} />
+        )}
       </div>
 
       {/* Save status toast */}
