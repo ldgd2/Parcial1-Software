@@ -1,6 +1,6 @@
 .gestor-equipo {
-  background: #15151e;
-  border: 1px solid #2e2e4a;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
   border-radius: 14px;
   padding: 18px;
   display: flex;
@@ -18,11 +18,11 @@
   width: 40px;
   height: 40px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #3d3780, #7c6ef8);
+  background: var(--primary);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--text-primary);
   flex-shrink: 0;
 }
 
@@ -31,13 +31,13 @@
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.1em;
-  color: #d0d0f0;
+  color: var(--text-primary);
 }
 
 .gestor-equipo__sub {
   display: block;
   font-size: 11px;
-  color: #6060a0;
+  color: var(--text-secondary);
   margin-top: 2px;
 }
 
@@ -54,7 +54,7 @@
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.12em;
-  color: #5050a0;
+  color: var(--text-secondary);
   display: block;
   margin-bottom: 8px;
 }
@@ -73,29 +73,29 @@
 
 .gestor-equipo__dev-name {
   font-size: 12px;
-  color: #a0a0c0;
+  color: var(--text-secondary);
   min-width: 90px;
   font-weight: 500;
 }
 
 .gestor-equipo__dev-input {
   flex: 1;
-  background: #1e1e2e;
-  border: 1px solid #2e2e4a;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
   border-radius: 6px;
   padding: 6px 10px;
   font-size: 12px;
-  color: #d0d0f0;
+  color: var(--text-primary);
   outline: none;
   transition: border-color 0.2s;
 }
 
 .gestor-equipo__dev-input:focus {
-  border-color: #7c6ef8;
+  border-color: var(--primary);
 }
 
 .gestor-equipo__dev-input::placeholder {
-  color: #404060;
+  color: var(--text-secondary);
 }
 
 .gestor-equipo__actions {
@@ -105,10 +105,10 @@
 
 .gestor-equipo__btn-primary {
   flex: 1;
-  background: linear-gradient(135deg, #5b52d0, #7c6ef8);
+  background: linear-gradient(135deg, #5b52d0, var(--primary));
   border: none;
   border-radius: 8px;
-  color: #fff;
+  color: var(--text-primary);
   font-size: 12px;
   font-weight: 600;
   padding: 9px 14px;
@@ -127,10 +127,10 @@
 }
 
 .gestor-equipo__btn-secondary {
-  background: #1e1e2e;
-  border: 1px solid #3b3b5c;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
-  color: #a0a0c0;
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
   padding: 9px 14px;
@@ -139,8 +139,8 @@
 }
 
 .gestor-equipo__btn-secondary:hover:not(:disabled) {
-  background: #2a2a40;
-  color: #fff;
+  background: var(--surface-color);
+  color: var(--text-primary);
 }
 
 /* Resultado */
@@ -153,8 +153,8 @@
 }
 
 .gestor-equipo__dev-card {
-  background: #1a1a2e;
-  border: 1px solid #2e2e4a;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
   border-radius: 10px;
   padding: 12px;
   display: flex;
@@ -171,25 +171,25 @@
 .gestor-equipo__dev-card-name {
   font-size: 12px;
   font-weight: 600;
-  color: #d0d0f0;
+  color: var(--text-primary);
 }
 
 .gestor-equipo__dev-card-pct {
   font-size: 11px;
-  color: #7c6ef8;
+  color: var(--primary);
   font-weight: 700;
 }
 
 .gestor-equipo__bar-wrap {
   height: 3px;
-  background: #2e2e4a;
+  background: var(--border-color);
   border-radius: 2px;
   overflow: hidden;
 }
 
 .gestor-equipo__bar {
   height: 100%;
-  background: linear-gradient(90deg, #7c6ef8, #a78bfa);
+  background: linear-gradient(90deg, var(--primary), var(--primary));
   border-radius: 2px;
   transition: width 0.4s ease;
 }
@@ -206,7 +206,7 @@
   align-items: flex-start;
   gap: 8px;
   font-size: 11px;
-  color: #a0a0c0;
+  color: var(--text-secondary);
 }
 
 .gestor-equipo__tarea--done {
@@ -224,8 +224,8 @@
 }
 
 .gestor-equipo__tarea-tipo--diagrama {
-  background: rgba(124, 110, 248, 0.15);
-  color: #a78bfa;
+  background: rgba(223,208,184,0.2);
+  color: var(--primary);
 }
 
 .gestor-equipo__tarea-tipo--desarrollo {

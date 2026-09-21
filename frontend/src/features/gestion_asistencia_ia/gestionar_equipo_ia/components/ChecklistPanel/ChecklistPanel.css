@@ -14,9 +14,9 @@
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: #1e1e2e;
-  border: 1.5px solid #3b3b5c;
-  color: #a0a0c0;
+  background: var(--surface-color);
+  border: 1.5px solid var(--border-color);
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -26,8 +26,8 @@
 }
 
 .checklist-panel__trigger:hover {
-  background: #2a2a40;
-  color: #ffffff;
+  background: var(--surface-color);
+  color: var(--text-primary);
   transform: scale(1.08);
 }
 
@@ -35,8 +35,8 @@
   position: absolute;
   top: -4px;
   right: -4px;
-  background: #7c6ef8;
-  color: #fff;
+  background: var(--primary);
+  color: var(--text-primary);
   font-size: 10px;
   font-weight: 700;
   width: 18px;
@@ -50,8 +50,8 @@
 .checklist-panel__drawer {
   width: 300px;
   max-height: 480px;
-  background: #1a1a2e;
-  border: 1px solid #2e2e4a;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
   border-radius: 14px;
   display: flex;
   flex-direction: column;
@@ -70,20 +70,20 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 14px 10px;
-  border-bottom: 1px solid #2e2e4a;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .checklist-panel__title {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.1em;
-  color: #a0a0c0;
+  color: var(--text-secondary);
 }
 
 .checklist-panel__close {
   background: none;
   border: none;
-  color: #6060a0;
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 2px;
   display: flex;
@@ -92,11 +92,11 @@
   transition: color 0.2s;
 }
 
-.checklist-panel__close:hover { color: #ffffff; }
+.checklist-panel__close:hover { color: var(--text-primary); }
 
 .checklist-panel__progress-bar-wrap {
   height: 3px;
-  background: #2e2e4a;
+  background: var(--border-color);
   margin: 0 14px;
   border-radius: 2px;
   overflow: hidden;
@@ -104,21 +104,21 @@
 
 .checklist-panel__progress-bar {
   height: 100%;
-  background: linear-gradient(90deg, #7c6ef8, #a78bfa);
+  background: linear-gradient(90deg, var(--primary), var(--primary));
   border-radius: 2px;
   transition: width 0.4s ease;
 }
 
 .checklist-panel__progress-label {
   font-size: 10px;
-  color: #6060a0;
+  color: var(--text-secondary);
   padding: 4px 14px 8px;
 }
 
 .checklist-panel__loading {
   padding: 20px;
   text-align: center;
-  color: #6060a0;
+  color: var(--text-secondary);
   font-size: 12px;
 }
 
@@ -134,7 +134,7 @@
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.12em;
-  color: #5050a0;
+  color: var(--text-secondary);
   padding: 4px 4px 6px;
 }
 
@@ -153,7 +153,7 @@
 
 .checklist-item--done .checklist-item__titulo {
   text-decoration: line-through;
-  color: #5050a0;
+  color: var(--text-secondary);
 }
 
 .checklist-item__checkbox {
@@ -168,13 +168,13 @@
   margin-top: 1px;
   transition: background 0.15s, border-color 0.15s;
   background: transparent;
-  color: #a78bfa;
+  color: var(--primary);
 }
 
 .checklist-item--done .checklist-item__checkbox {
-  background: #7c6ef8;
-  border-color: #7c6ef8;
-  color: #fff;
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--text-primary);
 }
 
 .checklist-item__body {
@@ -185,13 +185,13 @@
 
 .checklist-item__titulo {
   font-size: 12px;
-  color: #d0d0f0;
+  color: var(--text-primary);
   font-weight: 500;
   line-height: 1.3;
 }
 
 .checklist-item__desc {
   font-size: 10px;
-  color: #6060a0;
+  color: var(--text-secondary);
   line-height: 1.4;
 }
