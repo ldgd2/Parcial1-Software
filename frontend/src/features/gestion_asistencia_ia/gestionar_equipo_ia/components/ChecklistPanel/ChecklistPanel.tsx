@@ -1,5 +1,6 @@
 import React from 'react';
-import { useChecklistPanel } from '../hooks/useChecklistPanel';
+import type { TareaIA } from '../../services/equipoService';
+import { useChecklistPanel } from '../../hooks/useChecklistPanel';
 import './ChecklistPanel.css';
 
 interface Props {
@@ -12,15 +13,15 @@ export const ChecklistPanel: React.FC<Props> = ({ proyectoId }) => {
 
   if (tareas.length === 0 && !loading) return null;
 
-  const tareasDiagrama = tareas.filter(t => t.tipo === 'diagrama');
-  const tareasDesarrollo = tareas.filter(t => t.tipo === 'desarrollo');
+  const tareasDiagrama = tareas.filter((t: TareaIA) => t.tipo === 'diagrama');
+  const tareasDesarrollo = tareas.filter((t: TareaIA) => t.tipo === 'desarrollo');
 
   return (
     <div className={`checklist-panel ${open ? 'checklist-panel--open' : ''}`}>
       <button
         id="btn-toggle-checklist"
         className="checklist-panel__trigger"
-        onClick={() => setOpen(prev => !prev)}
+        onClick={() => setOpen((prev: boolean) => !prev)}
         title="Mis Tareas IA"
       >
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
@@ -56,7 +57,7 @@ export const ChecklistPanel: React.FC<Props> = ({ proyectoId }) => {
           {tareasDiagrama.length > 0 && (
             <div className="checklist-panel__section">
               <span className="checklist-panel__section-label">EN EL DIAGRAMADOR</span>
-              {tareasDiagrama.map(t => (
+              {tareasDiagrama.map((t: TareaIA) => (
                 <TareaItem key={t.id} tarea={t} onToggle={toggleTarea} />
               ))}
             </div>
@@ -65,7 +66,7 @@ export const ChecklistPanel: React.FC<Props> = ({ proyectoId }) => {
           {tareasDesarrollo.length > 0 && (
             <div className="checklist-panel__section">
               <span className="checklist-panel__section-label">DESARROLLO EXTERNO</span>
-              {tareasDesarrollo.map(t => (
+              {tareasDesarrollo.map((t: TareaIA) => (
                 <TareaItem key={t.id} tarea={t} onToggle={toggleTarea} />
               ))}
             </div>
@@ -76,7 +77,12 @@ export const ChecklistPanel: React.FC<Props> = ({ proyectoId }) => {
   );
 };
 
-const TareaItem: React.FC<{ tarea: import('../services/equipoService').TareaIA; onToggle: (id: number, v: boolean) => void }> = ({ tarea, onToggle }) => (
+interface TareaItemProps {
+  tarea: TareaIA;
+  onToggle: (id: number, v: boolean) => void;
+}
+
+const TareaItem: React.FC<TareaItemProps> = ({ tarea, onToggle }) => (
   <div
     className={`checklist-item ${tarea.completada ? 'checklist-item--done' : ''}`}
     onClick={() => onToggle(tarea.id, !tarea.completada)}
@@ -84,7 +90,7 @@ const TareaItem: React.FC<{ tarea: import('../services/equipoService').TareaIA; 
     role="checkbox"
     aria-checked={tarea.completada}
     tabIndex={0}
-    onKeyDown={e => e.key === 'Enter' && onToggle(tarea.id, !tarea.completada)}
+    onKeyDown={(e: React.KeyboardEvent) => e.key === 'Enter' && onToggle(tarea.id, !tarea.completada)}
   >
     <div className="checklist-item__checkbox">
       {tarea.completada && (

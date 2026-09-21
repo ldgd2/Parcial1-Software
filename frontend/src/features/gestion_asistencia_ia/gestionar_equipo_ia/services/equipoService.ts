@@ -1,6 +1,14 @@
-import { getAuthHeaders } from '@/features/gestion_usuarios/shared/utils/auth';
+import { TokenService } from '@/shared/lib/TokenService';
+import { API_URL } from '@/shared/lib/api';
 
-const BASE = '/api/ia/equipo';
+const getAuthHeaders = () => {
+  const token = TokenService.getToken();
+  return {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
+
+const BASE = `${API_URL}/api/ia/equipo`;
 
 export interface HabilidadDesarrollador {
   usuario_id: number;

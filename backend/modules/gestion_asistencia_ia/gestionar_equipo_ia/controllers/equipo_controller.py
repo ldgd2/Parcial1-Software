@@ -4,7 +4,7 @@ from sqlalchemy.future import select
 from typing import List
 
 from backend.core.database import get_db
-from backend.core.auth import get_current_user
+from backend.modules.gestion_usuarios.dependencies import get_current_user
 from backend.modules.gestion_usuarios.models import Usuario, TareaIA
 from backend.modules.gestion_asistencia_ia.gestionar_equipo_ia.schemas.request import (
     GenerarEquipoRequest,

@@ -4,7 +4,7 @@ import {
   obtenerTodasLasTareas,
   type TareaIA,
   type HabilidadDesarrollador,
-} from '../services/equipoService';
+} from '../../services/equipoService';
 import './GestorEquipoIA.css';
 
 interface ColaboradorInput {
