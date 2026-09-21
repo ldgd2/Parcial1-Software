@@ -5,13 +5,13 @@ import './ChecklistPanel.css';
 
 interface Props {
   proyectoId: number;
+  isHost?: boolean;
+  onOpenGestor?: () => void;
 }
 
-export const ChecklistPanel: React.FC<Props> = ({ proyectoId }) => {
+export const ChecklistPanel: React.FC<Props> = ({ proyectoId, isHost, onOpenGestor }) => {
   const { tareas, loading, open, setOpen, toggleTarea, completadas, porcentaje } =
     useChecklistPanel(proyectoId);
-
-  if (tareas.length === 0 && !loading) return null;
 
   const tareasDiagrama = tareas.filter((t: TareaIA) => t.tipo === 'diagrama');
   const tareasDesarrollo = tareas.filter((t: TareaIA) => t.tipo === 'desarrollo');
@@ -69,6 +69,34 @@ export const ChecklistPanel: React.FC<Props> = ({ proyectoId }) => {
               {tareasDesarrollo.map((t: TareaIA) => (
                 <TareaItem key={t.id} tarea={t} onToggle={toggleTarea} />
               ))}
+            </div>
+          )}
+
+          {!loading && tareas.length === 0 && (
+            <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+              No tienes tareas asignadas.
+            </div>
+          )}
+
+          {isHost && (
+            <div style={{ padding: '1rem', borderTop: '1px solid var(--border-color)', marginTop: '0.5rem' }}>
+              <button
+                onClick={onOpenGestor}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  background: 'var(--primary)',
+                  color: 'var(--bg-color)',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontWeight: 700,
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  textTransform: 'uppercase'
+                }}
+              >
+                Gestor Equipo IA
+              </button>
             </div>
           )}
         </div>

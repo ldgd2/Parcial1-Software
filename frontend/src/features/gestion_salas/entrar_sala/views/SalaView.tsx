@@ -10,6 +10,8 @@ import { ChatPanel } from '@/features/gestion_asistencia_ia/generar_diagrama_pro
 import { salaService } from '@/features/gestion_salas/shared/services/salaService';
 import { PropertiesPanel } from '@/features/gestion_modelado/editar_elemento/components/PropertiesPanel/PropertiesPanel';
 import { ChecklistPanel } from '@/features/gestion_asistencia_ia/gestionar_equipo_ia/components/ChecklistPanel/ChecklistPanel';
+import { GestorEquipoIA } from '@/features/gestion_asistencia_ia/gestionar_equipo_ia/components/GestorEquipoIA/GestorEquipoIA';
+import { Modal } from '@/features/gestion_proyectos/administrar_proyecto/components/Modal/Modal';
 import type { SalaInfo } from '@/features/gestion_modelado/shared/types/types';
 import './SalaView.css';
 
@@ -18,7 +20,9 @@ const SalaContent: React.FC<{ sala: SalaInfo }> = ({ sala }) => {
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isGestorOpen, setIsGestorOpen] = useState(false);
   const isGuest = new URLSearchParams(window.location.search).get('guest') === 'true';
+  const isHost = sala.rol_proyecto === 'anfitrion';
 
   // Load diagram on mount
   useEffect(() => {
@@ -92,9 +96,25 @@ const SalaContent: React.FC<{ sala: SalaInfo }> = ({ sala }) => {
         <ChatPanel isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
         <PropertiesPanel />
         {sala.proyecto_id > 0 && !isGuest && (
-          <ChecklistPanel proyectoId={sala.proyecto_id} />
+          <ChecklistPanel
+            proyectoId={sala.proyecto_id}
+            isHost={isHost}
+            onOpenGestor={() => setIsGestorOpen(true)}
+          />
         )}
       </div>
+
+      <Modal
+        isOpen={isGestorOpen}
+        onClose={() => setIsGestorOpen(false)}
+        title="GESTOR DE EQUIPO IA"
+        width="520px"
+      >
+        <GestorEquipoIA
+          proyectoId={sala.proyecto_id}
+          descripcionProyecto={sala.proyecto_nombre}
+        />
+      </Modal>
 
       {/* Save status toast */}
       {saveStatus !== 'idle' && (
