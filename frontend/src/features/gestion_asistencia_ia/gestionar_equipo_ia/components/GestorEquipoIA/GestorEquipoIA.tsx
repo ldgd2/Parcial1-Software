@@ -129,7 +129,7 @@ export const GestorEquipoIA: React.FC<Props> = ({
           onClick={handleVerProgreso}
           disabled={loading}
         >
-          Ver Progreso
+          {generado ? 'Refrescar' : 'Ver Progreso'}
         </button>
       </div>
 
