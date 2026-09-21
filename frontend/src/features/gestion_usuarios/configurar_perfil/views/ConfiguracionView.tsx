@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { configApi } from '../services/config_api';
 import { API_URL, apiFetch } from '@/shared/lib/api';
+import { actualizarHabilidades } from '@/features/gestion_asistencia_ia/gestionar_equipo_ia/services/equipoService';
 import './ConfiguracionView.css';
 
-type ConfigTab = 'cuenta' | 'recuperar' | 'host' | 'github' | 'preferencias';
+type ConfigTab = 'cuenta' | 'recuperar' | 'host' | 'github' | 'preferencias' | 'habilidades';
 
 export const ConfiguracionView: React.FC = () => {
   const navigate = useNavigate();
@@ -28,6 +29,42 @@ export const ConfiguracionView: React.FC = () => {
 
   // GitHub unlinking state
   const [unlinkingGithub, setUnlinkingGithub] = useState(false);
+
+  // Habilidades IA state
+  const ETIQUETAS_PREDEFINIDAS = [
+    'backend', 'frontend', 'modelado', 'base de datos',
+    'devops', 'ui/ux', 'mobile', 'seguridad', 'testing', 'arquitectura',
+  ];
+  const [etiquetasSeleccionadas, setEtiquetasSeleccionadas] = useState<string[]>([]);
+  const [etiquetaCustom, setEtiquetaCustom] = useState('');
+  const [savingHabilidades, setSavingHabilidades] = useState(false);
+
+  const toggleEtiqueta = (tag: string) => {
+    setEtiquetasSeleccionadas(prev =>
+      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+    );
+  };
+
+  const agregarCustom = () => {
+    const trimmed = etiquetaCustom.trim().toLowerCase();
+    if (trimmed && !etiquetasSeleccionadas.includes(trimmed)) {
+      setEtiquetasSeleccionadas(prev => [...prev, trimmed]);
+    }
+    setEtiquetaCustom('');
+  };
+
+  const handleGuardarHabilidades = async () => {
+    setSavingHabilidades(true);
+    setBanner(null);
+    try {
+      await actualizarHabilidades(etiquetasSeleccionadas);
+      setBanner({ type: 'success', text: 'Habilidades actualizadas correctamente.' });
+    } catch {
+      setBanner({ type: 'error', text: 'Error al guardar habilidades.' });
+    } finally {
+      setSavingHabilidades(false);
+    }
+  };
 
   // Password reset state (Cuenta)
   const [resetStep, setResetStep] = useState<1 | 2 | 3>(1);
@@ -316,6 +353,15 @@ export const ConfiguracionView: React.FC = () => {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 22v-4a48 48 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/></svg>
             <span>Vincular con GitHub</span>
             {githubVinculado && <span className="nav-status-badge">@ {githubUsername}</span>}
+          </button>
+
+          <div className="sidebar-section-label">IA & EQUIPO</div>
+          <button
+            className={`sidebar-nav-btn ${activeTab === 'habilidades' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('habilidades'); setBanner(null); }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            <span>Habilidades de Desarrollador</span>
           </button>
 
           <div className="sidebar-section-label">SISTEMA</div>
@@ -757,6 +803,105 @@ export const ConfiguracionView: React.FC = () => {
                         </div>
                       </div>
                       <span className="pref-badge active">Activo</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB: Habilidades de Desarrollador */}
+              {activeTab === 'habilidades' && (
+                <div className="tab-pane fadeIn">
+                  <div className="pane-header">
+                    <h2>Habilidades de Desarrollador</h2>
+                    <p>La IA usará estas etiquetas para asignarte tareas acordes a tu perfil técnico cuando el Anfitrión active el Gestor de Equipo.</p>
+                  </div>
+
+                  <div className="config-card">
+                    <div className="field-row">
+                      <label>Selecciona tus especialidades</label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                        {ETIQUETAS_PREDEFINIDAS.map(tag => (
+                          <button
+                            key={tag}
+                            id={`tag-${tag.replace(/\s/g, '-')}`}
+                            type="button"
+                            onClick={() => toggleEtiqueta(tag)}
+                            style={{
+                              padding: '6px 14px',
+                              borderRadius: '20px',
+                              border: etiquetasSeleccionadas.includes(tag) ? '1.5px solid #7c6ef8' : '1.5px solid #2e2e4a',
+                              background: etiquetasSeleccionadas.includes(tag) ? 'rgba(124,110,248,0.15)' : 'transparent',
+                              color: etiquetasSeleccionadas.includes(tag) ? '#a78bfa' : '#6060a0',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              transition: 'all 0.15s',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.06em',
+                            }}
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="field-row" style={{ marginTop: '16px' }}>
+                      <label>Agregar habilidad personalizada</label>
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                        <input
+                          id="input-habilidad-custom"
+                          className="config-input"
+                          type="text"
+                          placeholder="ej: machine learning, microservicios..."
+                          value={etiquetaCustom}
+                          onChange={e => setEtiquetaCustom(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && agregarCustom()}
+                        />
+                        <button className="btn-secondary" type="button" onClick={agregarCustom} id="btn-agregar-habilidad">
+                          Agregar
+                        </button>
+                      </div>
+                    </div>
+
+                    {etiquetasSeleccionadas.length > 0 && (
+                      <div className="field-row" style={{ marginTop: '16px' }}>
+                        <label>Tu perfil actual</label>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+                          {etiquetasSeleccionadas.map(tag => (
+                            <span
+                              key={tag}
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                                padding: '4px 12px', borderRadius: '20px',
+                                background: 'rgba(124,110,248,0.2)', color: '#a78bfa',
+                                fontSize: '11px', fontWeight: 600,
+                              }}
+                            >
+                              {tag}
+                              <button
+                                type="button"
+                                onClick={() => toggleEtiqueta(tag)}
+                                style={{ background: 'none', border: 'none', color: '#7c6ef8', cursor: 'pointer', padding: 0, lineHeight: 1 }}
+                              >
+                                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="card-actions-row" style={{ marginTop: '24px' }}>
+                      <button
+                        id="btn-guardar-habilidades"
+                        className="btn-primary"
+                        type="button"
+                        onClick={handleGuardarHabilidades}
+                        disabled={savingHabilidades || etiquetasSeleccionadas.length === 0}
+                      >
+                        {savingHabilidades ? 'Guardando...' : 'Guardar Habilidades'}
+                      </button>
                     </div>
                   </div>
                 </div>

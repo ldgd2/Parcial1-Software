@@ -71,7 +71,7 @@ app.add_middleware(
         "http://localhost:5173",
         "http://localhost:3000"
     ],
-    allow_origin_regex=r"https://diagramador\..*",
+    allow_origin_regex=r"https://.*\.gerlextech\.com",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
