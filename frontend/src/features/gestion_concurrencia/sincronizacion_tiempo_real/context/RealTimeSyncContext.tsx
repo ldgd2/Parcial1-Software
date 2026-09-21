@@ -197,6 +197,9 @@ export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: a
                 return newLocks;
               });
               break;
+            case 'tareas_actualizadas':
+              window.dispatchEvent(new Event('refetch_tareas_ia'));
+              break;
             case 'diagram_event':
               window.dispatchEvent(new CustomEvent('remote_diagram_event', { detail: data.payload }));
               break;

@@ -23,6 +23,12 @@ export function useChecklistPanel(proyectoId: number) {
     cargar();
   }, [cargar]);
 
+  useEffect(() => {
+    const handleRefetch = () => cargar();
+    window.addEventListener('refetch_tareas_ia', handleRefetch);
+    return () => window.removeEventListener('refetch_tareas_ia', handleRefetch);
+  }, [cargar]);
+
   const toggleTarea = async (tareaId: number, completada: boolean) => {
     const actualizada = await marcarTarea(tareaId, completada);
     setTareas(prev => prev.map(t => (t.id === actualizada.id ? actualizada : t)));

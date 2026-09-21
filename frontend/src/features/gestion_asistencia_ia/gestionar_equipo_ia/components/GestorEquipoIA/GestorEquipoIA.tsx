@@ -31,6 +31,7 @@ export const GestorEquipoIA: React.FC<Props> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [generado, setGenerado] = useState(false);
+  const [tabIndex, setTabIndex] = useState<'pendientes' | 'historial'>('pendientes');
 
   const actualizarEtiqueta = (idx: number, value: string) => {
     setDevs(prev => prev.map((d, i) => (i === idx ? { ...d, etiquetasRaw: value } : d)));
@@ -135,12 +136,30 @@ export const GestorEquipoIA: React.FC<Props> = ({
 
       {generado && Object.keys(tareasPorUsuario).length > 0 && (
         <div className="gestor-equipo__resultado">
-          <span className="gestor-equipo__section-label">DISTRIBUCIÓN DEL EQUIPO</span>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
+            <button 
+              className={`gestor-equipo__tab ${tabIndex === 'pendientes' ? 'active' : ''}`}
+              onClick={() => setTabIndex('pendientes')}
+              style={{ flex: 1, padding: '6px', background: tabIndex === 'pendientes' ? 'var(--primary)' : 'var(--surface-color)', color: tabIndex === 'pendientes' ? 'var(--bg-color)' : 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}
+            >
+              TAREAS PENDIENTES
+            </button>
+            <button 
+              className={`gestor-equipo__tab ${tabIndex === 'historial' ? 'active' : ''}`}
+              onClick={() => setTabIndex('historial')}
+              style={{ flex: 1, padding: '6px', background: tabIndex === 'historial' ? 'var(--primary)' : 'var(--surface-color)', color: tabIndex === 'historial' ? 'var(--bg-color)' : 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}
+            >
+              HISTORIAL
+            </button>
+          </div>
           {devs.map(d => {
-            const ts = tareasPorUsuario[d.usuario_id] ?? [];
-            if (ts.length === 0) return null;
-            const hechas = ts.filter(t => t.completada).length;
-            const pct = Math.round((hechas / ts.length) * 100);
+            const allTs = tareasPorUsuario[d.usuario_id] ?? [];
+            if (allTs.length === 0) return null;
+            const ts = allTs.filter(t => tabIndex === 'historial' ? t.completada : !t.completada);
+            if (ts.length === 0 && tabIndex === 'pendientes') return null; // Skip if no pending
+            
+            const hechas = allTs.filter(t => t.completada).length;
+            const pct = allTs.length > 0 ? Math.round((hechas / allTs.length) * 100) : 0;
             return (
               <div key={d.usuario_id} className="gestor-equipo__dev-card">
                 <div className="gestor-equipo__dev-card-header">
