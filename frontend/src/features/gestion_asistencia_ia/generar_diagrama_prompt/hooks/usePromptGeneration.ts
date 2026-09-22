@@ -21,7 +21,7 @@ export const usePromptGeneration = () => {
 
         const recognition = new SpeechRecognition();
         recognition.lang = 'es-ES';
-        recognition.continuous = false;
+        recognition.continuous = true;
         recognition.interimResults = true;
 
         recognition.onresult = (event: any) => {
@@ -29,12 +29,18 @@ export const usePromptGeneration = () => {
             for (let i = event.resultIndex; i < event.results.length; ++i) {
                 currentTranscript += event.results[i][0].transcript;
             }
-            setTranscript(currentTranscript);
+            if (currentTranscript.trim()) {
+                setTranscript(currentTranscript);
+            }
         };
 
         recognition.onerror = (event: any) => {
             console.error("Speech recognition error", event.error);
-            setError("Error en el reconocimiento de voz");
+            if (event.error === 'no-speech') {
+                // No emitir un error grave, solo es silencio
+                return;
+            }
+            setError("Error de micrófono: " + event.error);
             setIsListening(false);
         };
 
