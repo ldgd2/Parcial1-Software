@@ -81,7 +81,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
         const deletedRelationIds = new Set<string>();
 
         if (result.deletedNodes && result.deletedNodes.length > 0) {
-            result.deletedNodes.forEach(idOrName => {
+            result.deletedNodes.forEach(item => {
+                const idOrName = typeof item === 'string' ? item.trim() : (item.id || item.name || item.nombre || '').toString().trim();
+                if (!idOrName) return;
+
                 // Encontrar todos los nodos que coincidan con el ID o el nombre
                 const matchingNodes = nodes.filter(n => n.id === idOrName || n.nombre.toLowerCase() === idOrName.toLowerCase());
                 
@@ -104,7 +107,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
         }
         
         if (result.deletedRelations && result.deletedRelations.length > 0) {
-            result.deletedRelations.forEach(id => {
+            result.deletedRelations.forEach(item => {
+                const id = typeof item === 'string' ? item.trim() : (item.id || '').toString().trim();
+                if (!id) return;
                 deletedRelationIds.add(id);
                 deleteRelation(id);
             });
@@ -250,7 +255,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
                 const currentState = getDiagramState();
                 const contextStr = JSON.stringify(currentState);
                 const result = await generateDiagram(textToSend, contextStr);
-                if (!result) throw new Error("No se pudo generar el diagrama.");
                 injectResultToDiagram(result);
                 
                 const responseText = result.summary || `¡Listo! He procesado ${result.nodes.length} clases y ${result.relations.length} relaciones basado en tu solicitud.`;

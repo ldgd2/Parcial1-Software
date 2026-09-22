@@ -95,7 +95,7 @@ export const usePromptGeneration = () => {
             return data;
         } catch (err: any) {
             setError(err.message || "Error desconocido al generar diagrama");
-            return null;
+            throw err; // Lanzar el error real para que ChatPanel lo atrape
         } finally {
             setIsLoading(false);
         }
