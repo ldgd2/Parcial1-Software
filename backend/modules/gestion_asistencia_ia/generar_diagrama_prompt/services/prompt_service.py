@@ -95,7 +95,8 @@ async def _llamar_gemini(prompt: str, context: str | None = None) -> dict:
         "10. REGLA ESTRICTA DE IDENTIFICADOR: Toda clase debe tener un atributo identificador único (ej: 'id: int', 'id: UUID' o 'codigo: string'). Si el requerimiento no lo menciona y la clase no lo tiene, AGRÉGALO OBLIGATORIAMENTE. PERO, SI LA CLASE YA TIENE UNO (ej. 'idUsuario', 'codigo'), ¡NUNCA LO DUPLIQUES! (ej. no pongas 'id' y 'idUsuario' a la vez).\n"
         "11. HERENCIA: Para relaciones padre-hijo (herencia/generalización), DEBES usar el tipo de relación 'inheritance' (ej. {\"type\": \"inheritance\"}).\n"
         "12. TIPOS DE RELACIÓN: Los tipos válidos para 'type' en relations son: 'association', 'inheritance', 'composition', 'aggregation', 'dependency', 'realization' y 'association_class'.\n"
-        "13. CLASE ASOCIACIÓN: SOLO SI el requerimiento exige explícitamente una clase intermedia (Association Class), DEBES generar tres elementos: 1) La relación principal (type: 'association') entre las clases principales. 2) Un nodo (type: 'class') para la clase intermedia. 3) Una relación (type: 'association_class') cuyo 'sourceId' sea el ID de la clase intermedia y 'targetId' sea el ID de la relación principal. ¡No la uses si es una relación normal!\n\n"
+        "13. CLASE ASOCIACIÓN: SOLO SI el requerimiento exige explícitamente una clase intermedia (Association Class), DEBES generar tres elementos: 1) La relación principal (type: 'association') entre las clases principales. 2) Un nodo (type: 'class') para la clase intermedia. 3) Una relación (type: 'association_class') cuyo 'sourceId' sea el ID de la clase intermedia y 'targetId' sea el ID de la relación principal. ¡No la uses si es una relación normal!\n"
+        "14. ELIMINACIÓN: Si el usuario te pide explícitamente que elimines clases o relaciones, debes incluirlas en los arreglos 'deletedNodes' o 'deletedRelations' utilizando su 'id' respectivo.\n\n"
         "ESTRUCTURA DE RESPUESTA JSON:\n"
         "{\n"
         "  \"summary\": \"Resumen amigable y claro en español de las adiciones, modificaciones y relaciones creadas...\",\n"
@@ -104,7 +105,9 @@ async def _llamar_gemini(prompt: str, context: str | None = None) -> dict:
         "  ],\n"
         "  \"relations\": [\n"
         "    { \"id\": \"rel1\", \"sourceId\": \"id_fuente\", \"targetId\": \"id_destino\", \"type\": \"association\", \"label\": \"1..*\" }\n"
-        "  ]\n"
+        "  ],\n"
+        "  \"deletedNodes\": [\"id_de_clase_a_eliminar\"],\n"
+        "  \"deletedRelations\": [\"id_de_relacion_a_eliminar\"]\n"
         "}"
     )
 
@@ -177,7 +180,8 @@ async def _llamar_openrouter(prompt: str, context: str | None = None) -> dict:
         "2. Revisa detenidamente el 'Contexto Actual' antes de crear o editar.\n"
         "3. Si vas a modificar una clase existente, REUTILIZA SU MISMO 'id' original.\n"
         "4. PROHIBIDO duplicar relaciones IDÉNTICAS entre las mismas dos clases.\n"
-        "5. Incluye OBLIGATORIAMENTE un campo 'summary' en español que describa con claridad los cambios realizados.\n\n"
+        "5. Incluye OBLIGATORIAMENTE un campo 'summary' en español que describa con claridad los cambios realizados.\n"
+        "6. ELIMINACIÓN: Si el usuario te pide explícitamente que elimines clases o relaciones, debes incluirlas en los arreglos 'deletedNodes' o 'deletedRelations' utilizando su 'id' respectivo.\n\n"
         "ESTRUCTURA DE RESPUESTA JSON:\n"
         "{\n"
         "  \"summary\": \"Resumen claro en español...\",\n"
@@ -186,7 +190,9 @@ async def _llamar_openrouter(prompt: str, context: str | None = None) -> dict:
         "  ],\n"
         "  \"relations\": [\n"
         "    { \"id\": \"rel1\", \"sourceId\": \"id1\", \"targetId\": \"id2\", \"type\": \"association\", \"label\": \"1..*\" }\n"
-        "  ]\n"
+        "  ],\n"
+        "  \"deletedNodes\": [\"id_de_clase_a_eliminar\"],\n"
+        "  \"deletedRelations\": [\"id_de_relacion_a_eliminar\"]\n"
         "}"
     )
 

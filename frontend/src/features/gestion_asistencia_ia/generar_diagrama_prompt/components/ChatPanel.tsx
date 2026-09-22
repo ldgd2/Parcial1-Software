@@ -44,7 +44,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
     const animationFrameRef = useRef<number>(0);
     const streamRef = useRef<MediaStream | null>(null);
     
-    const { addNode, updateNode, addRelation, nodes, getDiagramState } = useDiagram();
+    const { addNode, updateNode, addRelation, nodes, getDiagramState, deleteNode, deleteRelation } = useDiagram();
     
     // Hooks de IA
     const { 
@@ -73,8 +73,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
     }, []);
 
     // ---- HANDLERS PARA INYECTAR EL RESULTADO AL LIENZO ----
-    const injectResultToDiagram = (result: { nodes: any[], relations: any[] } | null) => {
+    const injectResultToDiagram = (result: { nodes: any[], relations: any[], deletedNodes?: string[], deletedRelations?: string[] } | null) => {
         if (!result) return;
+        
+        // Procesar eliminaciones
+        if (result.deletedNodes && result.deletedNodes.length > 0) {
+            result.deletedNodes.forEach(id => deleteNode(id));
+        }
+        if (result.deletedRelations && result.deletedRelations.length > 0) {
+            result.deletedRelations.forEach(id => deleteRelation(id));
+        }
+
         const nodeMap = new Map<string, string>();
         let maxX = 0;
         let maxY = 0;
