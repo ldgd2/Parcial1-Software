@@ -88,6 +88,7 @@
 /* FLUID MOCKUP */
 .fluid-mockup-window {
   width: 100%;
+  min-width: 500px;
   max-width: 550px;
   background: rgba(57, 62, 70, 0.4);
   backdrop-filter: blur(12px);
@@ -98,8 +99,13 @@
   flex-direction: column;
   position: relative;
   z-index: 10;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 60px rgba(104, 211, 145, 0.3), 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   overflow: hidden;
+  transition: box-shadow 0.3s ease;
+}
+
+.fluid-mockup-window:hover {
+  box-shadow: 0 0 80px rgba(104, 211, 145, 0.5), 0 25px 50px -12px rgba(0, 0, 0, 0.6);
 }
 
 .fluid-mockup-body {
