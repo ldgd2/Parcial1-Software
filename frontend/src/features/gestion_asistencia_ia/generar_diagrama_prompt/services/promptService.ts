@@ -24,3 +24,22 @@ export const generarDiagramaPorPrompt = async (prompt: string, context: string |
 
     return await response.json();
 };
+
+export const transcribeAudioAPI = async (base64Data: string, mimeType: string = 'audio/webm'): Promise<string> => {
+    const token = TokenService.getToken();
+    const response = await fetch(`${API_URL}/prompt/transcribe-audio`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ audio_base64: base64Data, mime_type: mimeType })
+    });
+
+    if (!response.ok) {
+        throw new Error('Error al transcribir el audio');
+    }
+
+    const data = await response.json();
+    return data.text;
+};

@@ -4,16 +4,20 @@ import { Widget } from '../../../shared/components/ui/Widget';
 export const FeaturesSection: React.FC = () => {
   const features = [
     {
-      title: 'Sincronización Total',
-      description: 'Lienzo digital sin retrasos.',
+      title: 'Modelado UML',
+      description: 'Crea diagramas de clases, interfaces, enums y relaciones con una interfaz fluida e intuitiva.',
     },
     {
-      title: 'Generación IA',
-      description: 'Convierte UML a código fuente.',
+      title: 'Inteligencia Artificial',
+      description: 'Envía tus requerimientos y la IA estructurará y conectará los elementos del diagrama por ti.',
     },
     {
-      title: 'Historial Visual',
-      description: 'Control de versiones integrado.',
+      title: 'Colaboración en Tiempo Real',
+      description: 'Trabaja en equipo. Ve los cursores de tus compañeros y los cambios instantáneos.',
+    },
+    {
+      title: 'Control de Versiones y Offline',
+      description: 'Trabaja sin conexión y el sistema hará merge automático de los conflictos al reconectar.',
     }
   ];
 
@@ -32,9 +36,9 @@ export const FeaturesSection: React.FC = () => {
       <div className="features-grid-minimal">
         {features.map((feat, idx) => (
           <Widget.Animation.FadeIn key={idx} delay={0.3 + idx * 0.1} direction="up">
-            <Widget.Card.Interactive className="feature-card-flat">
-              <h3 className="feature-title-flat">0{idx + 1} // {feat.title}</h3>
-              <p className="feature-desc-flat">{feat.description}</p>
+            <Widget.Card.Interactive className="feature-card-fluid">
+              <h3 className="feature-title-fluid">0{idx + 1} // {feat.title}</h3>
+              <p className="feature-desc-fluid">{feat.description}</p>
             </Widget.Card.Interactive>
           </Widget.Animation.FadeIn>
         ))}
@@ -42,3 +46,4 @@ export const FeaturesSection: React.FC = () => {
     </section>
   );
 };
+

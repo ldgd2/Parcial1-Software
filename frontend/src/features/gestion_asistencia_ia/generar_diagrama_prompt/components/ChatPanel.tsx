@@ -6,7 +6,7 @@ import { generateDeterministicHash } from '../../../gestion_modelado/shared/util
 import { parseUmlAttribute, parseUmlMethod } from '../../../gestion_modelado/shared/utils/umlParser';
 import './ChatPanel.css';
 import type { NodeType } from '../../../gestion_modelado/shared/types/types';
-
+import { transcribeAudioAPI } from '../services/promptService';
 interface Message {
     id: string;
     role: 'user' | 'assistant' | 'system';
@@ -28,6 +28,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
     
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioChunksRef = useRef<BlobPart[]>([]);
     
     const { addNode, updateNode, addRelation, nodes, getDiagramState } = useDiagram();
     
@@ -180,40 +182,65 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
         }
     };
 
-    // ---- VOZ ----
-    const toggleVoice = () => {
-        if (isListening) return;
-        
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            alert('Tu navegador no soporta el reconocimiento de voz. Intenta usar Chrome o Edge.');
+    // ---- VOZ CON MEDIARECORDER Y GEMINI ----
+    const toggleVoice = async () => {
+        if (isListening) {
+            // Detener grabación
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+                mediaRecorderRef.current.stop();
+            }
             return;
         }
-
-        const recognition = new SpeechRecognition();
-        recognition.lang = 'es-ES';
-        recognition.interimResults = false;
-
-        recognition.onstart = () => setIsListening(true);
-        recognition.onresult = (event: any) => {
-            const transcript = event.results[0][0].transcript;
-            setPrompt(prev => prev + (prev ? ' ' : '') + transcript);
-        };
-        recognition.onerror = (event: any) => {
-            console.error("Error de micrófono:", event.error);
-            if (event.error === 'not-allowed') {
-                alert('Permiso de micrófono denegado. Por favor permite el acceso al micrófono en tu navegador.');
-            } else {
-                alert('Ocurrió un error con el reconocimiento de voz: ' + event.error);
-            }
-            setIsListening(false);
-        };
-        recognition.onend = () => setIsListening(false);
-
+        
         try {
-            recognition.start();
-        } catch (e: any) {
-            alert('No se pudo iniciar el reconocimiento de voz: ' + e.message);
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            
+            // Usamos webm como formato nativo de MediaRecorder
+            const mediaRecorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = mediaRecorder;
+            audioChunksRef.current = [];
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audioChunksRef.current.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = async () => {
+                setIsListening(false);
+                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+                
+                // Detener los tracks del micrófono
+                stream.getTracks().forEach(track => track.stop());
+
+                // Convert blob to base64
+                const reader = new FileReader();
+                reader.readAsDataURL(audioBlob);
+                reader.onloadend = async () => {
+                    const base64data = (reader.result as string).split(',')[1];
+                    try {
+                        const tempId = crypto.randomUUID();
+                        setMessages(prev => [...prev, { id: tempId, role: 'system', text: 'Transcribiendo audio...' }]);
+                        
+                        const text = await transcribeAudioAPI(base64data, 'audio/webm');
+                        
+                        // Quitar el mensaje temporal y actualizar el prompt
+                        setMessages(prev => prev.filter(m => m.id !== tempId));
+                        
+                        if (text) {
+                            setPrompt(prev => prev + (prev ? ' ' : '') + text);
+                        }
+                    } catch (error: any) {
+                        setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', text: `Error al transcribir: ${error.message}`, isError: true }]);
+                    }
+                };
+            };
+
+            mediaRecorder.start();
+            setIsListening(true);
+        } catch (err) {
+            console.error("Error accediendo al micrófono:", err);
+            alert("No se pudo acceder al micrófono para grabar.");
         }
     };
 

@@ -1,6 +1,71 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Widget } from '../../../shared/components/ui/Widget';
+import { ClassNode } from '@/features/gestion_modelado/editar_elemento/components/ClassNode/ClassNode';
+import { DiagramProvider, useDiagram } from '@/features/gestion_modelado/shared/context/DiagramContext';
+import { RealTimeSyncProvider } from '@/features/gestion_concurrencia/sincronizacion_tiempo_real/context/RealTimeSyncContext';
+import type { ClassNode as ClassNodeType } from '@/features/gestion_modelado/shared/types/types';
+
+const mockNodes: ClassNodeType[] = [
+  {
+    id: 'hero_node_1',
+    type: 'class',
+    x: 0,
+    y: 0,
+    width: 220,
+    nombre: 'Usuario',
+    color: '#ed8936',
+    version: 0,
+    hash: '',
+    atributos: [
+      { id: 'a1', nombre: 'id', tipo: 'UUID', visibilidad: '+', version: 0 },
+      { id: 'a2', nombre: 'email', tipo: 'String', visibilidad: '+', version: 0 }
+    ],
+    metodos: []
+  },
+  {
+    id: 'hero_node_2',
+    type: 'class',
+    x: 250,
+    y: 80,
+    width: 220,
+    nombre: 'Proyecto',
+    color: '#ed8936',
+    version: 0,
+    hash: '',
+    atributos: [
+      { id: 'b1', nombre: 'nombre', tipo: 'String', visibilidad: '+', version: 0 },
+      { id: 'b2', nombre: 'ownerId', tipo: 'UUID', visibilidad: '+', version: 0 }
+    ],
+    metodos: []
+  }
+];
+
+const MockupCanvas = () => {
+  const { loadDiagram } = useDiagram();
+
+  useEffect(() => {
+    loadDiagram({ nodes: mockNodes, relations: [], version: 1, correcciones: {} });
+  }, [loadDiagram]);
+
+  return (
+    <div className="fluid-mockup-body" style={{ position: 'relative', width: '100%', height: '100%', transform: 'scale(0.7)', transformOrigin: 'top left' }}>
+      <div style={{ position: 'absolute', top: '10%', left: '5%' }}>
+        <ClassNode node={mockNodes[0]} onDragStart={() => {}} />
+      </div>
+      <svg className="fluid-relation" style={{ top: '35%', left: '42%', width: '100px', height: '2px', position: 'absolute' }}>
+          <line x1="0" y1="1" x2="100" y2="1" stroke="var(--primary)" strokeWidth="2" strokeDasharray="5,5" />
+      </svg>
+      <div style={{ position: 'absolute', top: '30%', left: '45%' }}>
+        <ClassNode node={mockNodes[1]} onDragStart={() => {}} />
+      </div>
+      <div className="ai-voice-indicator" style={{ position: 'absolute', bottom: '10%', left: '30%' }}>
+          <div className="pulse-ring"></div>
+          <span>"Generar relación de 1 a muchos"</span>
+      </div>
+    </div>
+  );
+};
 
 export const HeroSection: React.FC = () => {
   const navigate = useNavigate();
@@ -10,73 +75,51 @@ export const HeroSection: React.FC = () => {
       {/* Left Side - Typography & CTAs */}
       <div className="hero-left">
         <Widget.Animation.FadeIn delay={0.1} direction="up">
-          <div className="hero-badge-minimal">SISTEMA v2.0</div>
-        </Widget.Animation.FadeIn>
-        
-        <Widget.Animation.FadeIn delay={0.2} direction="up">
           <h1 className="hero-title-massive">
-            DISEÑO /<br/>
-            ARQUITECTURA
+            MODELADO UML<br/>
+            INTELIGENTE
           </h1>
         </Widget.Animation.FadeIn>
 
-        <Widget.Animation.FadeIn delay={0.3} direction="up">
+        <Widget.Animation.FadeIn delay={0.2} direction="up">
           <p className="hero-desc-minimal">
-            Una herramienta pura y sin distracciones para ingenieros de software. Construye de forma colaborativa.
+            El diagrama perfecto a la velocidad de tu voz. Diseña sistemas de software complejos de forma colaborativa, con la asistencia de Inteligencia Artificial y control de versiones offline integrado.
           </p>
         </Widget.Animation.FadeIn>
 
-        <Widget.Animation.FadeIn delay={0.4} direction="up">
+        <Widget.Animation.FadeIn delay={0.3} direction="up">
           <div className="hero-actions-minimal">
             <Widget.Button.Primary onClick={() => navigate('/login')}>
-              EMPEZAR AHORA
+              COMENZAR AHORA
             </Widget.Button.Primary>
             <Widget.Button.Ghost onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>
-              SABER MÁS
+              VER CARACTERÍSTICAS
             </Widget.Button.Ghost>
           </div>
         </Widget.Animation.FadeIn>
       </div>
 
-      {/* Right Side - Flat Mockup & Shapes */}
+      {/* Right Side - Fluid Mockup & Shapes */}
       <div className="hero-right">
         {/* Animated Background Shapes */}
         <div className="shapes-container">
-           <Widget.Shapes.Circle size={150} color="var(--accent)" animation="float" className="shape-1" />
-           <Widget.Shapes.StripedSquare size={120} color="var(--primary)" animation="spin" className="shape-2" />
-           <Widget.Shapes.DotsPattern size={200} color="var(--secondary)" className="shape-3" />
+           <Widget.Shapes.Circle size={200} color="var(--primary)" animation="float" className="shape-1" />
+           <Widget.Shapes.Circle size={150} color="var(--secondary)" animation="spin" className="shape-2" />
+           <Widget.Shapes.DotsPattern size={250} color="var(--accent)" className="shape-3" />
         </div>
 
-        <Widget.Animation.FadeIn delay={0.5} direction="left">
-          {/* Flat Minimalist UML Mockup */}
-          <div className="flat-mockup-window">
-            <div className="flat-mockup-header">
-              <div className="flat-dots">
-                <span></span><span></span><span></span>
-              </div>
-              <div className="flat-title">architecture.sys</div>
-            </div>
-            <div className="flat-mockup-body">
-              {/* Box 1 */}
-              <div className="flat-node" style={{ top: '10%', left: '10%' }}>
-                <div className="node-head">User</div>
-                <div className="node-body">
-                  id: uuid<br/>email: string
-                </div>
-              </div>
-              {/* Line */}
-              <div className="flat-line" style={{ top: '30%', left: '40%', width: '60px' }}></div>
-              {/* Box 2 */}
-              <div className="flat-node outline" style={{ top: '25%', left: '55%' }}>
-                <div className="node-head outline-head">Session</div>
-                <div className="node-body">
-                  token: string<br/>valid: bool
-                </div>
-              </div>
-            </div>
+        <Widget.Animation.FadeIn delay={0.4} direction="left">
+          {/* Fluid Minimalist UML Mockup */}
+          <div className="fluid-mockup-window">
+            <RealTimeSyncProvider sala={{ isOfflineMode: true, codigo_acceso: 'demo' }}>
+              <DiagramProvider>
+                <MockupCanvas />
+              </DiagramProvider>
+            </RealTimeSyncProvider>
           </div>
         </Widget.Animation.FadeIn>
       </div>
     </section>
   );
 };
+

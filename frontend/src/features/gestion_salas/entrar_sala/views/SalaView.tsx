@@ -12,6 +12,7 @@ import { PropertiesPanel } from '@/features/gestion_modelado/editar_elemento/com
 import { ChecklistPanel } from '@/features/gestion_asistencia_ia/gestionar_equipo_ia/components/ChecklistPanel/ChecklistPanel';
 import { GestorEquipoIA } from '@/features/gestion_asistencia_ia/gestionar_equipo_ia/components/GestorEquipoIA/GestorEquipoIA';
 import { Modal } from '@/features/gestion_proyectos/administrar_proyecto/components/Modal/Modal';
+import { ConflictModal } from '@/features/gestion_concurrencia/sincronizar_estado_local/components/ConflictModal/ConflictModal';
 import type { SalaInfo } from '@/features/gestion_modelado/shared/types/types';
 import './SalaView.css';
 
@@ -102,6 +103,7 @@ const SalaContent: React.FC<{ sala: SalaInfo }> = ({ sala }) => {
             onOpenGestor={() => setIsGestorOpen(true)}
           />
         )}
+        <ConflictModal />
       </div>
 
       <Modal

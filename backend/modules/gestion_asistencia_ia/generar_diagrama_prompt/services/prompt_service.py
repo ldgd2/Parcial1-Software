@@ -32,6 +32,45 @@ async def generar_diagrama_desde_prompt(prompt: str, context: str | None = None)
     res = await _llamar_gemini(prompt, context)
     return deduplicar_resultado(res)
 
+async def transcribe_audio_with_gemini(base64_audio: str, mime_type: str = "audio/webm") -> str:
+    """Envía audio en base64 a Gemini para transcripción de voz a texto."""
+    api_key = settings.GEMINI_API
+    if not api_key:
+        raise HTTPException(status_code=500, detail="API Key de Gemini no configurada")
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    
+    payload = {
+        "contents": [{
+            "parts": [
+                {"text": "Transcribe exactamente el siguiente audio en español. Solo devuelve la transcripción de texto, sin comentarios ni explicaciones adicionales."},
+                {"inlineData": {"mimeType": mime_type, "data": base64_audio}}
+            ]
+        }],
+        "generationConfig": {
+            "temperature": 0.0
+        }
+    }
+
+    async with httpx.AsyncClient(timeout=90.0) as client:
+        try:
+            response = await client.post(url, json=payload)
+            data = response.json()
+            
+            if response.status_code != 200:
+                print("Gemini Audio Error:", data)
+                raise HTTPException(status_code=502, detail="Error transcribiendo audio con Gemini")
+                
+            if "candidates" not in data or not data["candidates"]:
+                raise HTTPException(status_code=500, detail="Gemini no devolvió transcripción")
+                
+            transcripcion = data["candidates"][0]["content"]["parts"][0]["text"]
+            return transcripcion.strip()
+            
+        except httpx.RequestError as exc:
+            raise HTTPException(status_code=502, detail="Error de red conectando a Gemini Audio")
+
+
 async def _llamar_gemini(prompt: str, context: str | None = None) -> dict:
     api_key = settings.GEMINI_API
     if not api_key:
