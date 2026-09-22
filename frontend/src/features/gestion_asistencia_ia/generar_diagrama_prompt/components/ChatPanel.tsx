@@ -77,11 +77,23 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
         if (!result) return;
         
         // Procesar eliminaciones
+        const deletedNodeIds = new Set<string>();
+        const deletedRelationIds = new Set<string>();
+
         if (result.deletedNodes && result.deletedNodes.length > 0) {
-            result.deletedNodes.forEach(id => deleteNode(id));
+            result.deletedNodes.forEach(idOrName => {
+                const nodeToDelete = nodes.find(n => n.id === idOrName || n.nombre.toLowerCase() === idOrName.toLowerCase());
+                const finalId = nodeToDelete ? nodeToDelete.id : idOrName;
+                deletedNodeIds.add(finalId);
+                deleteNode(finalId);
+            });
         }
+        
         if (result.deletedRelations && result.deletedRelations.length > 0) {
-            result.deletedRelations.forEach(id => deleteRelation(id));
+            result.deletedRelations.forEach(id => {
+                deletedRelationIds.add(id);
+                deleteRelation(id);
+            });
         }
 
         const nodeMap = new Map<string, string>();
@@ -103,6 +115,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
 
         // Insert nodes or Update them
         result.nodes.forEach(node => {
+            // Ignorar el nodo si está marcado para ser eliminado
+            if (deletedNodeIds.has(node.id) || deletedNodeIds.has(node.name)) {
+                return;
+            }
+
             const existingNode = nodes.find(n => n.id === node.id);
             if (existingNode) {
                 // Actualizar nodo existente
@@ -153,6 +170,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
         const currentRelations = getDiagramState().relations || [];
         
         result.relations.forEach(rel => {
+            if (deletedRelationIds.has(rel.id)) return;
+
             const sourceId = nodeMap.get(rel.sourceId) || rel.sourceId;
             const targetId = nodeMap.get(rel.targetId) || rel.targetId;
             if (sourceId && targetId && sourceId !== targetId) {
