@@ -67,11 +67,23 @@ export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: a
   const [lockedElements, setLockedElements] = useState<Record<string, string>>({});
   const [roomUsers, setRoomUsers] = useState<any[]>([]);
   const [isReadOnly, setIsReadOnly] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const socketRef = useRef<WebSocket | null>(null);
   
   const [searchParams] = useSearchParams();
   const isGuest = searchParams.get('guest') === 'true' || (sala.rol_proyecto && sala.rol_proyecto !== 'anfitrion');
   const codigo = searchParams.get('codigo') || sala.codigo_acceso;
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Auto-fetch profile if logged in but local storage is missing user data
   useEffect(() => {
@@ -91,7 +103,7 @@ export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: a
   }, []);
 
   useEffect(() => {
-    if (sala.isOfflineMode || !navigator.onLine) {
+    if (sala.codigo_acceso === 'local' || !isOnline) {
       console.log('Modo offline detectado: WebSocket omitido.');
       return;
     }
@@ -112,8 +124,30 @@ export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: a
       ws = new WebSocket(wsUrl);
       socketRef.current = ws;
 
-      ws.onopen = () => {
+      ws.onopen = async () => {
         console.log('WebSocket connected');
+        
+        try {
+          const { offlineSyncService } = await import('@/features/gestion_concurrencia/sincronizar_estado_local/services/OfflineSyncService');
+          const allObjects = offlineSyncService.getAll();
+          const objectsPayload: Record<string, any> = {};
+          allObjects.forEach((val, key) => {
+            if (key !== 'DIAGRAMA_LOCAL') {
+              objectsPayload[key] = val;
+            }
+          });
+          
+          if (Object.keys(objectsPayload).length > 0) {
+            ws!.send(JSON.stringify({
+              type: 'sync_offline',
+              objects: objectsPayload,
+              head: 'sync_' + Date.now()
+            }));
+          }
+        } catch (e) {
+          console.error("Error syncing offline objects", e);
+        }
+
         // Pedir al servidor los snapshots de versiones actuales
         ws!.send(JSON.stringify({ type: 'request_snapshots' }));
       };
@@ -224,7 +258,7 @@ export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: a
         ws.close();
       }
     };
-  }, [codigo, isGuest]);
+  }, [codigo, isGuest, isOnline]);
 
   const approveGuest = (guestId: string, approved: boolean, proyectoId: number) => {
     if (socketRef.current?.readyState === WebSocket.OPEN) {

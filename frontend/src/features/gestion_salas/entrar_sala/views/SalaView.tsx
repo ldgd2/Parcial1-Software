@@ -36,12 +36,11 @@ const SalaContent: React.FC<{ sala: SalaInfo }> = ({ sala }) => {
       }
     }
   }, [sala.lienzo_json, loadDiagram]);
-
   const handleSave = useCallback(async () => {
     if (saving || isGuest) return;
     setSaving(true);
     try {
-      if ((sala as any).isOfflineMode) {
+      if ((sala as any).isOfflineMode || !navigator.onLine) {
         const { offlineSyncService } = await import('@/features/gestion_concurrencia/sincronizar_estado_local/services/OfflineSyncService');
         offlineSyncService.saveLocalDiagramState(getDiagramState());
       } else {
@@ -57,7 +56,6 @@ const SalaContent: React.FC<{ sala: SalaInfo }> = ({ sala }) => {
       setSaving(false);
     }
   }, [saving, sala.proyecto_id, getDiagramState, isDirty, (sala as any).isOfflineMode, isGuest]);
-
   const handleSaveRef = React.useRef(handleSave);
   useEffect(() => {
     handleSaveRef.current = handleSave;

@@ -593,6 +593,47 @@ export const DiagramProvider: React.FC<{ children: React.ReactNode }> = ({ child
       createRel('1:N', srcNode.id, interId, '1', type === '0..N:M' ? '0..n' : 'n');
       createRel('1:N', tgtNode.id, interId, '1', type === '0..N:M' ? '0..m' : 'n');
 
+    } else if (type === 'association_class') {
+      const mainRelBase: Relation = {
+        id: uid(), type: 'association', sourceId: srcNode.id, targetId: tgtNode.id,
+        label: '', sourceLabel: '', targetLabel: '', version: 0, hash: ''
+      };
+      
+      generateDeterministicHash({ type: 'relation', data: mainRelBase }).then(mainHash => {
+        const mainRel = { ...mainRelBase, hash: mainHash };
+        setRelations(prev => [...prev, mainRel]);
+        broadcastDiagramEvent({ action: 'addRelation', payload: { relation: mainRel } });
+        
+        const interId = uid();
+        const interNode: ClassNode = {
+          id: interId,
+          type: 'class',
+          x: (srcNode.x + tgtNode.x) / 2,
+          y: (srcNode.y + tgtNode.y) / 2 - 100,
+          width: 220,
+          nombre: `Asociacion_${srcNode.nombre}`,
+          color: '#ed8936',
+          version: 0,
+          hash: '',
+          metodos: [],
+          atributos: []
+        };
+        
+        addNode('class', interNode);
+        
+        const dashedRelBase: Relation = {
+          id: uid(), type: 'association_class', sourceId: interId, targetId: mainRel.id,
+          label: '', sourceLabel: '', targetLabel: '', version: 0, hash: ''
+        };
+        
+        generateDeterministicHash({ type: 'relation', data: dashedRelBase }).then(dashedHash => {
+          const dashedRel = { ...dashedRelBase, hash: dashedHash };
+          setRelations(prev => [...prev, dashedRel]);
+          broadcastDiagramEvent({ action: 'addRelation', payload: { relation: dashedRel } });
+          mark();
+        });
+      });
+
     } else {
       createRel(type, srcNode.id, tgtNode.id, '', '');
     }

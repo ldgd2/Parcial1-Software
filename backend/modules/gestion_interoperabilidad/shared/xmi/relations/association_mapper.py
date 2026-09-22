@@ -30,6 +30,10 @@ class AssociationMapper(RelationBaseMapper):
         if rel_type == 'association_class': return "AssociationClass"
         return "Association"
 
+    def get_xml_tag(self, rel_type):
+        if rel_type == 'association_class': return "UML:AssociationClass"
+        return "UML:Association"
+
     def apply_xml_tags(self, tags, rel, rel_type):
         import xml.etree.ElementTree as ET
         if rel_type == 'directed':
