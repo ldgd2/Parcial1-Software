@@ -73,7 +73,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
     }, []);
 
     // ---- HANDLERS PARA INYECTAR EL RESULTADO AL LIENZO ----
-    const injectResultToDiagram = (result: { nodes: any[], relations: any[], deletedNodes?: string[], deletedRelations?: string[] } | null) => {
+    const injectResultToDiagram = (result: { nodes: any[], relations: any[], deletedNodes?: any[], deletedRelations?: any[] } | null) => {
         if (!result) return;
         
         // Procesar eliminaciones
@@ -255,6 +255,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
                 const currentState = getDiagramState();
                 const contextStr = JSON.stringify(currentState);
                 const result = await generateDiagram(textToSend, contextStr);
+                if (!result) return;
+                
                 injectResultToDiagram(result);
                 
                 const responseText = result.summary || `¡Listo! He procesado ${result.nodes.length} clases y ${result.relations.length} relaciones basado en tu solicitud.`;
