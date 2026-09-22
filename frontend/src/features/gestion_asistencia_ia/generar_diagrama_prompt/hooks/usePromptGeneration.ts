@@ -45,20 +45,38 @@ export const usePromptGeneration = () => {
         recognitionRef.current = recognition;
     };
 
-    const startListening = () => {
+    const startListening = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            stream.getTracks().forEach(track => track.stop());
+        } catch (err) {
+            console.error("Error al acceder al micrófono:", err);
+            setError("No se pudo acceder al micrófono. Por favor, conceda los permisos.");
+            return;
+        }
+
         if (!recognitionRef.current) {
             initSpeechRecognition();
         }
         if (recognitionRef.current) {
             setError(null);
             setIsListening(true);
-            recognitionRef.current.start();
+            try {
+                recognitionRef.current.start();
+            } catch (e) {
+                console.error("Error al iniciar el reconocimiento:", e);
+                setIsListening(false);
+            }
         }
     };
 
     const stopListening = () => {
         if (recognitionRef.current && isListening) {
-            recognitionRef.current.stop();
+            try {
+                recognitionRef.current.stop();
+            } catch (e) {
+                console.error("Error al detener el reconocimiento:", e);
+            }
             setIsListening(false);
         }
     };

@@ -1,0 +1,29 @@
+Ciclo,NRO,CASO DE USO,ESTADO,PRIORIDAD,RIESGO,ACTOR
+Ciclo 1,CU01,Registrar usuario,APROBADO,ALTA,NORMAL,Usuario
+Ciclo 1,CU02,Iniciar sesión,APROBADO,ALTA,NORMAL,Usuario
+Ciclo 1,CU03,Cerrar sesión,APROBADO,NORMAL,NORMAL,Usuario
+Ciclo 1,CU04,Recuperar password,APROBADO,NORMAL,NORMAL,Usuario
+Ciclo 1,CU05,Configurar perfil,APROBADO,NORMAL,NORMAL,Usuario
+Ciclo 1,CU06,Crear proyecto,APROBADO,CRÍTICA,NORMAL,Usuario
+Ciclo 1,CU07,Administrar proyecto,APROBADO,MEDIA,NORMAL,Anfitrión
+Ciclo 1,CU08,Compartir proyecto,APROBADO,ALTA,NORMAL,Anfitrión
+
+Ciclo 2,CU11,Cargar lienzo,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador
+Ciclo 2,CU12,Guardar lienzo,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador
+Ciclo 2,CU13,Unirse a sala,APROBADO,CRÍTICA,NORMAL,Colaborador
+Ciclo 2,CU14,Insertar elemento,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador
+Ciclo 2,CU15,Conectar elemento,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador
+Ciclo 2,CU16,Editar elemento,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador
+Ciclo 2,CU17,Eliminar elemento,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador
+Ciclo 2,CU18,Bloquear elemento,APROBADO,CRÍTICA,ALTO,Anfitrión / Colaborador
+Ciclo 2,CU19,Sincronización en tiempo real,APROBADO,CRÍTICA,ALTO,Anfitrión / Colaborador
+
+Ciclo 3,CU09,Control de versiones (Versioning),APROBADO,CRÍTICA,ALTO,Anfitrión / Colaborador
+Ciclo 3,CU20,Sincronizar estado local (Offline),APROBADO,CRÍTICA,ALTO,Anfitrión / Colaborador
+Ciclo 3,CU21,Digitalizar desde imagen,APROBADO,ALTA,ALTO,Usuario / API IA
+Ciclo 3,CU22,Generar diagrama desde prompt,APROBADO,ALTA,ALTO,Usuario / API IA
+Ciclo 3,CU23,Exportar a GitHub (Código fuente),APROBADO,CRÍTICA,ALTO,Anfitrión / API Github
+Ciclo 3,CU24,Gestionar equipo IA,APROBADO,ALTA,ALTO,Anfitrión / API IA
+Ciclo 3,CU10,Notificar despliegue,APROBADO,ALTA,ALTO,API Deployer / Anfitrión
+Ciclo 3,CU25,Exportar a XML,APROBADO,NORMAL,NORMAL,Anfitrión
+Ciclo 3,CU26,Importar desde XML,APROBADO,NORMAL,NORMAL,Anfitrión
