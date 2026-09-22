@@ -54,7 +54,7 @@ async def _llamar_gemini_equipo(prompt: str) -> dict:
 
     url = (
         f"https://generativelanguage.googleapis.com/v1beta/models/"
-        f"gemini-2.5-flash:generateContent?key={api_key}"
+        f"gemini-3.6-flash:generateContent?key={api_key}"
     )
 
     payload = {

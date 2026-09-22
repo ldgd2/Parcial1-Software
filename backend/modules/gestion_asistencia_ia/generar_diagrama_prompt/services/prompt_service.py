@@ -38,7 +38,7 @@ async def transcribe_audio_with_gemini(base64_audio: str, mime_type: str = "audi
     if not api_key:
         raise HTTPException(status_code=500, detail="API Key de Gemini no configurada")
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={api_key}"
     
     payload = {
         "contents": [{
@@ -76,7 +76,7 @@ async def _llamar_gemini(prompt: str, context: str | None = None) -> dict:
     if not api_key:
         raise HTTPException(status_code=500, detail="API Key de Gemini no configurada")
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={api_key}"
     
     system_instruction = (
         "Eres un experto arquitecto de software UML y modelador de datos.\n"

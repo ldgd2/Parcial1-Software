@@ -11,7 +11,7 @@ async def _llamar_gemini_vision(image_base64: str, prompt: str | None = None) ->
     if not api_key:
         raise HTTPException(status_code=500, detail="API Key de Gemini no configurada")
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={api_key}"
     
     system_instruction = (
         "Eres un experto arquitecto de software UML. El usuario te dará una imagen de un diagrama UML. "
