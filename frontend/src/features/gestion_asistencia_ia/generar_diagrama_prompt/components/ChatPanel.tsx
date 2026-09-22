@@ -88,12 +88,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
                 if (matchingNodes.length > 0) {
                     matchingNodes.forEach(node => {
                         deletedNodeIds.add(node.id);
+                        if (node.nombre) deletedNodeIds.add(node.nombre.toLowerCase());
                         deleteNode(node.id);
                     });
                 } else {
                     // Fallback por si era un ID puro que no estaba en el estado local actual por alguna razón
                     deletedNodeIds.add(idOrName);
                     deleteNode(idOrName);
+                }
+                // Siempre añadir el término original por si acaso
+                if (typeof idOrName === 'string') {
+                    deletedNodeIds.add(idOrName.toLowerCase());
                 }
             });
         }
@@ -125,7 +130,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
         // Insert nodes or Update them
         result.nodes.forEach(node => {
             // Ignorar el nodo si está marcado para ser eliminado
-            if (deletedNodeIds.has(node.id) || deletedNodeIds.has(node.name)) {
+            if (deletedNodeIds.has(node.id) || (node.name && deletedNodeIds.has(node.name.toLowerCase()))) {
                 return;
             }
 
