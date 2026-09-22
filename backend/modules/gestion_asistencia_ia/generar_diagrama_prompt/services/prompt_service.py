@@ -130,7 +130,7 @@ async def _llamar_gemini(prompt: str, context: str | None = None) -> dict:
             
             if response.status_code != 200:
                 print(f"Gemini API Error (HTTP {response.status_code}):", data)
-                raise HTTPException(status_code=502, detail=f"Error comunicándose con Gemini API: {data}")
+                raise HTTPException(status_code=400, detail=f"Error comunicándose con Gemini API: {data}")
                 
             if "error" in data:
                 print("Gemini API Error:", data["error"])
@@ -159,7 +159,7 @@ async def _llamar_gemini(prompt: str, context: str | None = None) -> dict:
             
         except httpx.RequestError as exc:
             print(f"HTTPX Request Error: {exc}")
-            raise HTTPException(status_code=502, detail="Error de red al conectar con Gemini API")
+            raise HTTPException(status_code=400, detail="Error de red al conectar con Gemini API")
         except (KeyError, IndexError, json.JSONDecodeError) as e:
             print("Gemini API Parse Error:", e)
             raise HTTPException(status_code=500, detail=f"Formato de respuesta inválido de IA: {e}")
