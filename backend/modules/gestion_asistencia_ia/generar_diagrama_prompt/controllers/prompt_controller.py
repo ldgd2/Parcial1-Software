@@ -14,7 +14,9 @@ async def generar_diagrama(
     return PromptResponse(
         nodes=resultado.get("nodes", []),
         relations=resultado.get("relations", []),
-        summary=resultado.get("summary", "")
+        summary=resultado.get("summary", ""),
+        deletedNodes=resultado.get("deletedNodes"),
+        deletedRelations=resultado.get("deletedRelations")
     )
 
 @router.post("/transcribe-audio")

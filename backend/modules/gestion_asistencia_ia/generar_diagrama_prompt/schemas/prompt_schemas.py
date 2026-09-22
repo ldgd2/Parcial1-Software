@@ -9,6 +9,8 @@ class PromptResponse(BaseModel):
     nodes: List[Dict[str, Any]]
     relations: List[Dict[str, Any]]
     summary: str | None = None
+    deletedNodes: List[Any] | None = None
+    deletedRelations: List[Any] | None = None
 
 class AudioRequest(BaseModel):
     audio_base64: str
