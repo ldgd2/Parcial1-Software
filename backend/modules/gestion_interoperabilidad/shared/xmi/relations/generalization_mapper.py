@@ -11,5 +11,5 @@ class GeneralizationMapper(RelationBaseMapper):
         return "Generalization"
         
     def apply_xml_attribs(self, attribs, rel):
-        attribs["child"] = f"EAID_{rel.get('sourceId', '')}"
-        attribs["parent"] = f"EAID_{rel.get('targetId', '')}"
+        attribs["subtype"] = f"EAID_{rel.get('sourceId', '')}"
+        attribs["supertype"] = f"EAID_{rel.get('targetId', '')}"

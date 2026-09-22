@@ -9,31 +9,43 @@ router = APIRouter(tags=["WebSockets Salas"])
 
 
 async def _save_delta_to_db(new_objects: dict, head_hash: str, author: str):
-    """Guarda los nuevos GitObjects y el Commit en PostgreSQL."""
+    """Guarda los nuevos GitObjects y el Commit en PostgreSQL usando inserciones masivas."""
     async for db in get_db():
-        for obj_hash, obj_data in new_objects.items():
-            exists = await db.execute(select(GitObject).where(GitObject.hash == obj_hash))
-            if not exists.scalar_one_or_none():
-                db.add(GitObject(
-                    hash=obj_hash,
-                    type=obj_data.get("type"),
-                    content=obj_data.get("data"),
-                ))
+        hashes = list(new_objects.keys())
+        if hashes:
+            # Buscar hashes existentes en una sola consulta
+            existing_result = await db.execute(select(GitObject.hash).where(GitObject.hash.in_(hashes)))
+            existing_hashes = set(existing_result.scalars().all())
 
-        commit_exists = await db.execute(select(Commit).where(Commit.hash == head_hash))
-        if not commit_exists.scalar_one_or_none():
-            # Obtener el commit anterior más reciente para encadenarlo
-            last_commit = await db.execute(
-                select(Commit).order_by(Commit.created_at.desc()).limit(1)
-            )
-            last = last_commit.scalar_one_or_none()
-            db.add(Commit(
-                hash=head_hash,
-                tree_hash=head_hash,
-                parent_hash=last.hash if last else None,
-                author=author,
-                message="Diagram update via WebSocket",
-            ))
+            # Preparar los nuevos objetos a insertar
+            objs_to_add = []
+            for obj_hash, obj_data in new_objects.items():
+                if obj_hash not in existing_hashes:
+                    objs_to_add.append(GitObject(
+                        hash=obj_hash,
+                        type=obj_data.get("type"),
+                        content=obj_data.get("data"),
+                    ))
+            
+            if objs_to_add:
+                db.add_all(objs_to_add)
+
+        # Manejar el commit
+        if head_hash:
+            commit_exists = await db.execute(select(Commit).where(Commit.hash == head_hash))
+            if not commit_exists.scalar_one_or_none():
+                # Obtener el commit anterior más reciente para encadenarlo
+                last_commit = await db.execute(
+                    select(Commit).order_by(Commit.created_at.desc()).limit(1)
+                )
+                last = last_commit.scalar_one_or_none()
+                db.add(Commit(
+                    hash=head_hash,
+                    tree_hash=head_hash,
+                    parent_hash=last.hash if last else None,
+                    author=author,
+                    message="Diagram update via WebSocket",
+                ))
 
         await db.commit()
         break  # Solo una sesión

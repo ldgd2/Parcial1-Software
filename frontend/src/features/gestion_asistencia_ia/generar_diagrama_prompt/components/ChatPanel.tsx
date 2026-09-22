@@ -4,6 +4,7 @@ import { usePromptGeneration } from '../hooks/usePromptGeneration';
 import { useImageDigitization } from '../../digitalizar_desde_imagen/hooks/useImageDigitization';
 import { generateDeterministicHash } from '../../../gestion_modelado/shared/utils/hashGenerator';
 import { parseUmlAttribute, parseUmlMethod } from '../../../gestion_modelado/shared/utils/umlParser';
+import { ImageViewer } from '../../../shared/components/ImageViewer/ImageViewer';
 import './ChatPanel.css';
 import type { NodeType } from '../../../gestion_modelado/shared/types/types';
 import { transcribeAudioAPI } from '../services/promptService';
@@ -29,6 +30,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
     const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
     const [selectedImagePreview, setSelectedImagePreview] = useState<string | null>(null);
     const [voiceVolume, setVoiceVolume] = useState<number>(0);
+    const [viewerImage, setViewerImage] = useState<string | null>(null);
+    const [isDragOver, setIsDragOver] = useState(false);
     
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -325,6 +328,16 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
     };
 
     // ---- IMAGEN ----
+    const processImageFile = (file: File) => {
+        setSelectedImageFile(file);
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            setSelectedImagePreview(e.target?.result as string);
+        };
+        reader.readAsDataURL(file);
+    };
+
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || e.target.files.length === 0) return;
         const file = e.target.files[0];
@@ -334,13 +347,46 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
             return;
         }
 
-        setSelectedImageFile(file);
+        processImageFile(file);
+    };
+
+    const handlePaste = (e: React.ClipboardEvent) => {
+        if (e.clipboardData.files && e.clipboardData.files.length > 0) {
+            const file = e.clipboardData.files[0];
+            if (file.type.startsWith('image/')) {
+                e.preventDefault();
+                processImageFile(file);
+            }
+        }
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.dataTransfer.types.includes('Files')) {
+            setIsDragOver(true);
+        }
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragOver(false);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragOver(false);
         
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            setSelectedImagePreview(e.target?.result as string);
-        };
-        reader.readAsDataURL(file);
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            const file = e.dataTransfer.files[0];
+            if (file.type.startsWith('image/')) {
+                processImageFile(file);
+            } else {
+                alert('Solo se permiten archivos de imagen.');
+            }
+        }
     };
 
     const removeSelectedImage = () => {
@@ -371,7 +417,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
                     <div key={msg.id} className={`chat-message chat-message--${msg.role} ${msg.isError ? 'chat-message--error' : ''}`}>
                         <div className="chat-message__bubble">
                             {msg.imageUrl && (
-                                <img src={msg.imageUrl} alt="Adjunto" style={{ maxWidth: '100%', borderRadius: '4px', marginBottom: '8px', display: 'block' }} />
+                                <img 
+                                    src={msg.imageUrl} 
+                                    alt="Adjunto" 
+                                    style={{ maxWidth: '100%', borderRadius: '4px', marginBottom: '8px', display: 'block', cursor: 'pointer' }} 
+                                    onClick={() => setViewerImage(msg.imageUrl!)}
+                                />
                             )}
                             {msg.text}
                         </div>
@@ -390,7 +441,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
                 <div ref={messagesEndRef} />
             </div>
 
-            <div className="chat-panel__input-area">
+            <div 
+                className={`chat-panel__input-area ${isDragOver ? 'drag-over' : ''}`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+            >
                 {selectedImagePreview && (
                     <div className="chat-panel__image-preview-wrapper">
                         <img src={selectedImagePreview} alt="Preview" className="chat-panel__image-preview" />
@@ -415,10 +471,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
                     </div>
                 ) : (
                     <textarea
-                        placeholder={selectedImageFile ? "Añade un comentario a la imagen..." : "Describe un requerimiento, o adjunta una imagen..."}
+                        placeholder={selectedImageFile ? "Añade un comentario a la imagen..." : "Pega (Ctrl+V), arrastra una imagen, o escribe un requerimiento..."}
                         value={prompt}
                         onChange={(e) => setPrompt(e.target.value)}
                         onKeyDown={handleKeyDown}
+                        onPaste={handlePaste}
                         disabled={isLoading}
                         rows={2}
                     />
@@ -455,6 +512,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
                     )}
                 </div>
             </div>
+
+            {viewerImage && (
+                <ImageViewer imageUrl={viewerImage} onClose={() => setViewerImage(null)} />
+            )}
         </div>
     );
 };

@@ -138,11 +138,19 @@ export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: a
           });
           
           if (Object.keys(objectsPayload).length > 0) {
-            ws!.send(JSON.stringify({
-              type: 'sync_offline',
-              objects: objectsPayload,
-              head: 'sync_' + Date.now()
-            }));
+            const keys = Object.keys(objectsPayload);
+            const chunkSize = 50;
+            for (let i = 0; i < keys.length; i += chunkSize) {
+              const chunkKeys = keys.slice(i, i + chunkSize);
+              const chunkPayload: Record<string, any> = {};
+              chunkKeys.forEach(k => chunkPayload[k] = objectsPayload[k]);
+              
+              ws!.send(JSON.stringify({
+                type: 'sync_offline',
+                objects: chunkPayload,
+                head: 'sync_' + Date.now() + '_' + i
+              }));
+            }
           }
         } catch (e) {
           console.error("Error syncing offline objects", e);

@@ -20,6 +20,11 @@ export class AssociationMapper implements IRelationMapper {
     }
 
     fromXml(element: Element, idMap: Record<string, string>): Relation | null {
+        const tagName = element.tagName;
+        if (tagName !== "UML:Association" && tagName !== "UML:AssociationClass") {
+             // Let it pass if it's somehow called
+        }
+        
         const ends = element.getElementsByTagName("UML:AssociationEnd");
         if (ends.length >= 2) {
             const srcEnd = ends[0];

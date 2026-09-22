@@ -393,7 +393,7 @@ export const ClassNode: React.FC<Props> = ({ node, onDragStart, onNodeClick, isC
           ))
         ) : (
           // Normal attributes / Table Columns
-          node.atributos.map(attr => (
+          (node.atributos || []).map(attr => (
             <div key={attr.id} className="class-node__row">
               {isSelected ? (
               <>
@@ -463,7 +463,7 @@ export const ClassNode: React.FC<Props> = ({ node, onDragStart, onNodeClick, isC
           </div>
         ))
         )}
-        {!isEnum && node.atributos.length === 0 && (
+        {!isEnum && (node.atributos || []).length === 0 && (
           <div className="class-node__empty">— sin atributos —</div>
         )}
         {isEnum && isSelected && (
@@ -487,7 +487,7 @@ export const ClassNode: React.FC<Props> = ({ node, onDragStart, onNodeClick, isC
             <button className="class-node__add-btn" onClick={(e) => { e.stopPropagation(); addMetodo(node.id); }}>+</button>
           )}
         </div>
-        {node.metodos.map(met => (
+        {(node.metodos || []).map(met => (
           <div key={met.id} className="class-node__row">
             {isSelected ? (
               <>
@@ -551,7 +551,7 @@ export const ClassNode: React.FC<Props> = ({ node, onDragStart, onNodeClick, isC
             )}
           </div>
         ))}
-        {node.metodos.length === 0 && (
+        {(node.metodos || []).length === 0 && (
           <div className="class-node__empty">— sin métodos —</div>
         )}
       </div>
