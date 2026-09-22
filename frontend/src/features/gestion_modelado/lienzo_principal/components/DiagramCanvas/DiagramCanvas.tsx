@@ -12,7 +12,7 @@ interface Props {
 }
 
 export const DiagramCanvas: React.FC<Props> = ({ onCanvasClick }) => {
-  const { nodes, addNode, updateNode, deleteNode, moveNode, selectedIds, setSelectedIds, connectingSource, activeTool, setActiveTool, startConnect, finishConnect, cancelConnect } = useDiagram();
+  const { nodes, addNode, updateNode, deleteNode, deleteRelation, moveNode, selectedIds, setSelectedIds, connectingSource, activeTool, setActiveTool, startConnect, finishConnect, cancelConnect } = useDiagram();
   const canvasRef = useRef<HTMLDivElement>(null);
 
   // Pan & zoom
@@ -105,8 +105,25 @@ export const DiagramCanvas: React.FC<Props> = ({ onCanvasClick }) => {
     if (canvas) {
       canvas.addEventListener('wheel', handleWheel, { passive: false });
     }
-    return () => { if (canvas) canvas.removeEventListener('wheel', handleWheel); };
-  }, [handleWheel]);
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Delete' && selectedIds.length > 0) {
+        if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
+        selectedIds.forEach(id => {
+          deleteNode(id);
+          deleteRelation(id);
+        });
+        setSelectedIds([]);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => { 
+      if (canvas) canvas.removeEventListener('wheel', handleWheel); 
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleWheel, selectedIds, deleteNode, deleteRelation, setSelectedIds]);
 
   const startNodeDrag = useCallback((id: string, e: React.MouseEvent, _nodeX: number, _nodeY: number) => {
     if (connectingSource) return; // en modo conexión no arrastrar

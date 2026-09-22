@@ -121,14 +121,15 @@ class RelationBaseMapper:
             src_lbl = ends_uml[0].attrib.get('multiplicity') or get_mult(ends_uml[0])
             tgt_lbl = ends_uml[1].attrib.get('multiplicity') or get_mult(ends_uml[1])
         
-        # Tagged Values fallback
-        if not src and not tgt:
-            for tag in elem.iter():
-                if tag.tag.endswith('TaggedValue'):
-                    if tag.attrib.get('tag') == 'ea_sourceID': src = tag.attrib.get('value')
-                    if tag.attrib.get('tag') == 'ea_targetID': tgt = tag.attrib.get('value')
-                    if tag.attrib.get('tag') == 'lb': src_lbl = tag.attrib.get('value')
-                    if tag.attrib.get('tag') == 'rb': tgt_lbl = tag.attrib.get('value')
+        # Tagged Values fallback (always check EA tags for safety)
+        for tag in elem.iter():
+            if tag.tag.endswith('TaggedValue'):
+                if tag.attrib.get('tag') == 'ea_sourceID': src = src or tag.attrib.get('value')
+                if tag.attrib.get('tag') == 'ea_targetID': tgt = tgt or tag.attrib.get('value')
+                if tag.attrib.get('tag') == 'lb': src_lbl = src_lbl or tag.attrib.get('value')
+                if tag.attrib.get('tag') == 'rb': tgt_lbl = tgt_lbl or tag.attrib.get('value')
+                if tag.attrib.get('tag') == 'mt': name = name or tag.attrib.get('value')
+                if tag.attrib.get('tag') == 'rt': name = name or tag.attrib.get('value')
         
         if src and tgt:
             src = src.replace('EAID_', '')
@@ -183,6 +184,7 @@ class RelationBaseMapper:
         
         attribs = {
             "xmi.id": f"EAID_{rel_id}",
+            "name": str(rel.get('label', '')),
             "visibility": "public",
             "isRoot": "false", "isLeaf": "false", "isAbstract": "false"
         }
@@ -205,6 +207,13 @@ class RelationBaseMapper:
         ET.SubElement(tags, "UML:TaggedValue", attrib={"tag": "lineStyle", "value": "0"})
         ET.SubElement(tags, "UML:TaggedValue", attrib={"tag": "ea_sourceID", "value": str(rel.get('sourceId', ''))})
         ET.SubElement(tags, "UML:TaggedValue", attrib={"tag": "ea_targetID", "value": str(rel.get('targetId', ''))})
+        
+        src_lbl = str(rel.get('sourceLabel') or '').replace(';', ',')
+        tgt_lbl = str(rel.get('targetLabel') or '').replace(';', ',')
+        ET.SubElement(tags, "UML:TaggedValue", attrib={"tag": "lb", "value": src_lbl})
+        ET.SubElement(tags, "UML:TaggedValue", attrib={"tag": "rb", "value": tgt_lbl})
+        ET.SubElement(tags, "UML:TaggedValue", attrib={"tag": "rt", "value": str(rel.get('label', ''))})
+        
         ET.SubElement(tags, "UML:TaggedValue", attrib={"tag": "virtualInheritance", "value": "0"})
         
         self.apply_xml_connections(elem, rel, rel_type)

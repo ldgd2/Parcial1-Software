@@ -100,6 +100,7 @@ const SalaContent: React.FC<{ sala: SalaInfo }> = ({ sala }) => {
           <ChecklistPanel
             proyectoId={sala.proyecto_id}
             isHost={isHost}
+            isChatOpen={isChatOpen}
             onOpenGestor={() => setIsGestorOpen(true)}
           />
         )}

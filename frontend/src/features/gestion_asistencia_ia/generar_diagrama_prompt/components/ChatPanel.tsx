@@ -11,6 +11,7 @@ interface Message {
     id: string;
     role: 'user' | 'assistant' | 'system';
     text: string;
+    imageUrl?: string;
     isError?: boolean;
 }
 
@@ -183,11 +184,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
         setPrompt('');
         
         let userMessageText = textToSend;
+        let imageUrl: string | undefined;
+
         if (selectedImageFile) {
-            userMessageText = `[Imagen adjuntada] ${textToSend}`.trim();
+            userMessageText = textToSend || 'Digitalizar imagen';
+            imageUrl = selectedImagePreview || undefined;
         }
         
-        setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'user', text: userMessageText }]);
+        setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'user', text: userMessageText, imageUrl }]);
         
         try {
             if (selectedImageFile) {
@@ -308,9 +312,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
 
             mediaRecorder.start();
             setIsListening(true);
-        } catch (err) {
+        } catch (err: any) {
             console.error("Error accediendo al micrófono:", err);
-            alert("No se pudo acceder al micrófono para grabar.");
+            if (err.name === 'NotFoundError' || err.message.includes('not found')) {
+                alert("No se detectó un micrófono en tu dispositivo. Asegúrate de tener uno conectado.");
+            } else if (err.name === 'NotAllowedError' || err.message.includes('denied')) {
+                alert("Permiso denegado. Debes permitir el acceso al micrófono en tu navegador.");
+            } else {
+                alert(`No se pudo acceder al micrófono: ${err.message || 'Error desconocido'}`);
+            }
         }
     };
 
@@ -360,6 +370,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
                 {messages.map(msg => (
                     <div key={msg.id} className={`chat-message chat-message--${msg.role} ${msg.isError ? 'chat-message--error' : ''}`}>
                         <div className="chat-message__bubble">
+                            {msg.imageUrl && (
+                                <img src={msg.imageUrl} alt="Adjunto" style={{ maxWidth: '100%', borderRadius: '4px', marginBottom: '8px', display: 'block' }} />
+                            )}
                             {msg.text}
                         </div>
                     </div>

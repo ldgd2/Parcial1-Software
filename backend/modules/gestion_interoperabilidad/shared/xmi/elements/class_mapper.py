@@ -210,7 +210,7 @@ class ClassMapper:
             for i_attr, attr in enumerate(cls.get('atributos', [])):
                 attr_elem = ET.SubElement(feature, "UML:Attribute", attrib={
                     "name": str(attr.get('nombre', '')),
-                    "visibility": "public" if attr.get('visibilidad') == '+' else "private",
+                    "visibility": "public" if attr.get('visibilidad') == '+' else ("protected" if attr.get('visibilidad') == '#' else "private"),
                     "ownerScope": "instance",
                     "targetScope": "instance",
                     "changeable": "none"
@@ -238,7 +238,7 @@ class ClassMapper:
             for i_met, met in enumerate(cls.get('metodos', [])):
                 op_elem = ET.SubElement(feature, "UML:Operation", attrib={
                     "name": str(met.get('nombre', '')),
-                    "visibility": "public" if met.get('visibilidad') == '+' else "private",
+                    "visibility": "public" if met.get('visibilidad') == '+' else ("protected" if met.get('visibilidad') == '#' else "private"),
                     "ownerScope": "instance",
                     "isQuery": "false",
                     "concurrency": "sequential"

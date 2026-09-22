@@ -6,10 +6,11 @@ import './ChecklistPanel.css';
 interface Props {
   proyectoId: number;
   isHost?: boolean;
+  isChatOpen?: boolean;
   onOpenGestor?: () => void;
 }
 
-export const ChecklistPanel: React.FC<Props> = ({ proyectoId, isHost, onOpenGestor }) => {
+export const ChecklistPanel: React.FC<Props> = ({ proyectoId, isHost, isChatOpen, onOpenGestor }) => {
   const { tareas, loading, open, setOpen, toggleTarea, completadas, porcentaje } =
     useChecklistPanel(proyectoId);
 
@@ -17,7 +18,7 @@ export const ChecklistPanel: React.FC<Props> = ({ proyectoId, isHost, onOpenGest
   const tareasDesarrollo = tareas.filter((t: TareaIA) => t.tipo === 'desarrollo');
 
   return (
-    <div className={`checklist-panel ${open ? 'checklist-panel--open' : ''}`}>
+    <div className={`checklist-panel ${open ? 'checklist-panel--open' : ''} ${isChatOpen ? 'checklist-panel--shifted' : ''}`}>
       <button
         id="btn-toggle-checklist"
         className="checklist-panel__trigger"

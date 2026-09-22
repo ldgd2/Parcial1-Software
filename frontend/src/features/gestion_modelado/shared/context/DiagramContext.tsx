@@ -314,6 +314,16 @@ export const DiagramProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const deleteNode = useCallback((id: string, isRemote = false) => {
     setNodes(prev => prev.filter(n => n.id !== id));
+    
+    setRelations(prev => {
+      const remaining = prev.filter(r => r.sourceId !== id && r.targetId !== id);
+      const removed = prev.filter(r => r.sourceId === id || r.targetId === id);
+      if (!isRemote) {
+        removed.forEach(r => broadcastDiagramEvent({ action: 'deleteRelation', payload: { id: r.id } }));
+      }
+      return remaining;
+    });
+
     if (!isRemote) {
       setSelectedIds(sel => sel.filter(s => s !== id));
       broadcastDiagramEvent({ action: 'deleteNode', payload: { id } });
