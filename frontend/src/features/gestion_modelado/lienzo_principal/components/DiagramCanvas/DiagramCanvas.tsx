@@ -107,8 +107,8 @@ export const DiagramCanvas: React.FC<Props> = ({ onCanvasClick }) => {
     }
     
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Delete' && selectedIds.length > 0) {
-        if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.length > 0) {
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement).tagName)) return;
         selectedIds.forEach(id => {
           deleteNode(id);
           deleteRelation(id);

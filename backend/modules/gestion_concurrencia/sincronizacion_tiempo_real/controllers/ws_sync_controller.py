@@ -34,6 +34,11 @@ async def _save_delta_to_db(new_objects: dict, head_hash: str, author: str):
         if head_hash:
             commit_exists = await db.execute(select(Commit).where(Commit.hash == head_hash))
             if not commit_exists.scalar_one_or_none():
+                # Ensure the tree object exists
+                tree_exists = await db.execute(select(GitObject.hash).where(GitObject.hash == head_hash))
+                if not tree_exists.scalar_one_or_none():
+                    db.add(GitObject(hash=head_hash, type="tree", content={"source": "sync_offline"}))
+                    
                 # Obtener el commit anterior más reciente para encadenarlo
                 last_commit = await db.execute(
                     select(Commit).order_by(Commit.created_at.desc()).limit(1)
