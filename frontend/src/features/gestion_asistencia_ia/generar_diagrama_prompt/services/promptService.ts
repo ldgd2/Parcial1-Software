@@ -19,7 +19,12 @@ export const generarDiagramaPorPrompt = async (prompt: string, context: string |
     });
 
     if (!response.ok) {
-        throw new Error('Error al generar el diagrama');
+        let errorMessage = 'Error al generar el diagrama';
+        try {
+            const errData = await response.json();
+            errorMessage = errData.detail || errorMessage;
+        } catch (e) {}
+        throw new Error(errorMessage);
     }
 
     return await response.json();
