@@ -10,5 +10,5 @@ async def digitalizar_imagen(
     request: DigitalizarRequest,
     current_user: dict = Depends(get_current_user)
 ):
-    resultado = await digitalizar_diagrama_desde_imagen(request.image_base64)
+    resultado = await digitalizar_diagrama_desde_imagen(request.image_base64, request.prompt)
     return DigitalizarResponse(nodes=resultado.get("nodes", []), relations=resultado.get("relations", []))

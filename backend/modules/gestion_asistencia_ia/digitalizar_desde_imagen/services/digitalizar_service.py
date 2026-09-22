@@ -3,10 +3,10 @@ import httpx
 from fastapi import HTTPException
 from backend.core.config import settings
 
-async def digitalizar_diagrama_desde_imagen(image_base64: str) -> dict:
-    return await _llamar_gemini_vision(image_base64)
+async def digitalizar_diagrama_desde_imagen(image_base64: str, prompt: str | None = None) -> dict:
+    return await _llamar_gemini_vision(image_base64, prompt)
 
-async def _llamar_gemini_vision(image_base64: str, context: str | None = None) -> dict:
+async def _llamar_gemini_vision(image_base64: str, prompt: str | None = None) -> dict:
     api_key = settings.IMAGE_OPEROUTE_API or settings.GEMINI_API
     if not api_key:
         raise HTTPException(status_code=500, detail="API Key de Gemini no configurada")
@@ -35,10 +35,14 @@ async def _llamar_gemini_vision(image_base64: str, context: str | None = None) -
     if "," in image_base64:
         image_base64 = image_base64.split(",")[1]
 
+    text_prompt = "Digitaliza este diagrama UML."
+    if prompt:
+        text_prompt += f" Considera además el siguiente comentario o requerimiento del usuario: {prompt}"
+
     payload = {
         "contents": [{
             "parts": [
-                {"text": "Digitaliza este diagrama UML."},
+                {"text": text_prompt},
                 {"inlineData": {"mimeType": "image/jpeg", "data": image_base64}}
             ]
         }],

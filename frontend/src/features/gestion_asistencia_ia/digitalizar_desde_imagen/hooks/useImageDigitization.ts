@@ -6,7 +6,7 @@ export const useImageDigitization = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const digitizeImage = async (file: File): Promise<DigitalizarResponse | null> => {
+    const digitizeImage = async (file: File, prompt?: string): Promise<DigitalizarResponse | null> => {
         setIsLoading(true);
         setError(null);
         
@@ -16,7 +16,7 @@ export const useImageDigitization = () => {
             reader.onload = async () => {
                 const base64String = reader.result as string;
                 try {
-                    const data = await digitalizarImagen(base64String);
+                    const data = await digitalizarImagen(base64String, prompt);
                     resolve(data);
                 } catch (err: any) {
                     setError(err.message || "Error al digitalizar la imagen");

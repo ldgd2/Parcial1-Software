@@ -25,11 +25,20 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
     ]);
     const [prompt, setPrompt] = useState('');
     const [isListening, setIsListening] = useState(false);
+    const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+    const [selectedImagePreview, setSelectedImagePreview] = useState<string | null>(null);
+    const [voiceVolume, setVoiceVolume] = useState<number>(0);
     
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<BlobPart[]>([]);
+    
+    // Equalizer refs
+    const audioContextRef = useRef<AudioContext | null>(null);
+    const analyserRef = useRef<AnalyserNode | null>(null);
+    const animationFrameRef = useRef<number>(0);
+    const streamRef = useRef<MediaStream | null>(null);
     
     const { addNode, updateNode, addRelation, nodes, getDiagramState } = useDiagram();
     
@@ -51,6 +60,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
             messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
         }
     }, [messages, isLoading]);
+
+    useEffect(() => {
+        return () => {
+            if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+            if (audioContextRef.current) audioContextRef.current.close();
+        };
+    }, []);
 
     // ---- HANDLERS PARA INYECTAR EL RESULTADO AL LIENZO ----
     const injectResultToDiagram = (result: { nodes: any[], relations: any[] } | null) => {
@@ -120,7 +136,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
             }
         });
 
-        // Insert relations (evitando duplicaciones idénticas de tipo y label)
+        
         const currentRelations = getDiagramState().relations || [];
         
         result.relations.forEach(rel => {
@@ -159,41 +175,84 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
         });
     };
 
-    // ---- PROMPT (TEXTO / VOZ) ----
-    const handleSendPrompt = async () => {
-        if (!prompt.trim() || isLoading) return;
+    // ---- PROMPT (TEXTO / VOZ / IMAGEN) ----
+    const handleSendPrompt = async (forcedText?: string) => {
+        const textToSend = (forcedText || prompt).trim();
+        if ((!textToSend && !selectedImageFile) || isLoading) return;
         
-        const userText = prompt.trim();
         setPrompt('');
         
-        setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'user', text: userText }]);
+        let userMessageText = textToSend;
+        if (selectedImageFile) {
+            userMessageText = `[Imagen adjuntada] ${textToSend}`.trim();
+        }
+        
+        setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'user', text: userMessageText }]);
         
         try {
-            const currentState = getDiagramState();
-            const contextStr = JSON.stringify(currentState);
-            const result = await generateDiagram(userText, contextStr);
-            if (!result) throw new Error("No se pudo generar el diagrama.");
-            injectResultToDiagram(result);
-            
-            const responseText = result.summary || `¡Listo! He procesado ${result.nodes.length} clases y ${result.relations.length} relaciones basado en tu solicitud.`;
-            setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', text: responseText }]);
+            if (selectedImageFile) {
+                const result = await digitizeImage(selectedImageFile, textToSend);
+                if (!result) throw new Error("No se pudo digitalizar la imagen.");
+                injectResultToDiagram(result);
+                setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', text: `¡Digitalización completa! Añadí ${result.nodes.length} elementos y ${result.relations.length} relaciones al diagrama.` }]);
+                setSelectedImageFile(null);
+                setSelectedImagePreview(null);
+            } else {
+                const currentState = getDiagramState();
+                const contextStr = JSON.stringify(currentState);
+                const result = await generateDiagram(textToSend, contextStr);
+                if (!result) throw new Error("No se pudo generar el diagrama.");
+                injectResultToDiagram(result);
+                
+                const responseText = result.summary || `¡Listo! He procesado ${result.nodes.length} clases y ${result.relations.length} relaciones basado en tu solicitud.`;
+                setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', text: responseText }]);
+            }
         } catch (err: any) {
             setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', text: `Ocurrió un error: ${err.message || 'Intenta de nuevo más tarde.'}`, isError: true }]);
         }
     };
 
     // ---- VOZ CON MEDIARECORDER Y GEMINI ----
-    const toggleVoice = async () => {
+    const updateEqualizer = () => {
+        if (!analyserRef.current) return;
+        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+        analyserRef.current.getByteFrequencyData(dataArray);
+        
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+            sum += dataArray[i];
+        }
+        const average = sum / dataArray.length;
+        setVoiceVolume(average);
+        
+        animationFrameRef.current = requestAnimationFrame(updateEqualizer);
+    };
+
+    const toggleVoice = async (action: 'start' | 'cancel' | 'send' = 'start') => {
         if (isListening) {
-            // Detener grabación
+       
             if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+              
+                (mediaRecorderRef.current as any).action = action;
                 mediaRecorderRef.current.stop();
             }
+            if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
             return;
         }
         
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            streamRef.current = stream;
+            
+            // Setup Equalizer
+            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            audioContextRef.current = audioContext;
+            const analyser = audioContext.createAnalyser();
+            analyser.fftSize = 64;
+            analyserRef.current = analyser;
+            const source = audioContext.createMediaStreamSource(stream);
+            source.connect(analyser);
+            updateEqualizer();
             
             // Usamos webm como formato nativo de MediaRecorder
             const mediaRecorder = new MediaRecorder(stream);
@@ -207,11 +266,22 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
             };
 
             mediaRecorder.onstop = async () => {
+                const actionTaken = (mediaRecorder as any).action;
                 setIsListening(false);
+                setVoiceVolume(0);
+                if (audioContextRef.current) audioContextRef.current.close();
+                
                 const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
                 
                 // Detener los tracks del micrófono
-                stream.getTracks().forEach(track => track.stop());
+                if (streamRef.current) {
+                    streamRef.current.getTracks().forEach(track => track.stop());
+                }
+
+                if (actionTaken === 'cancel') {
+                    // No hacemos nada, solo se canceló
+                    return;
+                }
 
                 // Convert blob to base64
                 const reader = new FileReader();
@@ -224,11 +294,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
                         
                         const text = await transcribeAudioAPI(base64data, 'audio/webm');
                         
-                        // Quitar el mensaje temporal y actualizar el prompt
+                        // Quitar el mensaje temporal
                         setMessages(prev => prev.filter(m => m.id !== tempId));
                         
                         if (text) {
-                            setPrompt(prev => prev + (prev ? ' ' : '') + text);
+                            handleSendPrompt(text); // Envío directo a IA
                         }
                     } catch (error: any) {
                         setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', text: `Error al transcribir: ${error.message}`, isError: true }]);
@@ -245,7 +315,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
     };
 
     // ---- IMAGEN ----
-    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || e.target.files.length === 0) return;
         const file = e.target.files[0];
         
@@ -254,16 +324,18 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
             return;
         }
 
-        setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'user', text: `[Imagen adjuntada: ${file.name}]` }]);
+        setSelectedImageFile(file);
         
-        try {
-            const result = await digitizeImage(file);
-            if (!result) throw new Error("No se pudo digitalizar la imagen.");
-            injectResultToDiagram(result);
-            setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', text: `¡Digitalización completa! Añadí ${result.nodes.length} elementos al diagrama.` }]);
-        } catch (err: any) {
-            setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', text: `Error al procesar la imagen: ${err.message || 'Intenta de nuevo.'}`, isError: true }]);
-        }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            setSelectedImagePreview(e.target?.result as string);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const removeSelectedImage = () => {
+        setSelectedImageFile(null);
+        setSelectedImagePreview(null);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -306,14 +378,38 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
             </div>
 
             <div className="chat-panel__input-area">
-                <textarea
-                    placeholder="Describe un requerimiento, o adjunta una imagen UML..."
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    disabled={isLoading}
-                    rows={2}
-                />
+                {selectedImagePreview && (
+                    <div className="chat-panel__image-preview-wrapper">
+                        <img src={selectedImagePreview} alt="Preview" className="chat-panel__image-preview" />
+                        <button className="chat-panel__image-remove-btn" onClick={removeSelectedImage} title="Quitar imagen">
+                            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </div>
+                )}
+                
+                {isListening ? (
+                    <div className="chat-panel__voice-modal">
+                        <div className="voice-equalizer">
+                            {[1, 2, 3, 4, 5].map((i) => (
+                                <div 
+                                    key={i} 
+                                    className="equalizer-bar" 
+                                    style={{ height: `${Math.max(10, voiceVolume * (Math.random() * 0.8 + 0.2))}px` }} 
+                                />
+                            ))}
+                        </div>
+                        <span className="voice-status">Escuchando...</span>
+                    </div>
+                ) : (
+                    <textarea
+                        placeholder={selectedImageFile ? "Añade un comentario a la imagen..." : "Describe un requerimiento, o adjunta una imagen..."}
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        disabled={isLoading}
+                        rows={2}
+                    />
+                )}
                 
                 <div className="chat-panel__controls">
                     <input 
@@ -323,19 +419,27 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
                         accept="image/*"
                         onChange={handleFileSelect}
                     />
-                    <button className="chat-panel__action-btn" onClick={() => fileInputRef.current?.click()} disabled={isLoading} title="Adjuntar Imagen UML">
-                        <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                    </button>
+                    {!isListening && (
+                        <button className="chat-panel__action-btn" onClick={() => fileInputRef.current?.click()} disabled={isLoading} title="Adjuntar Imagen UML">
+                            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                        </button>
+                    )}
                     
-                    <button className={`chat-panel__action-btn ${isListening ? 'listening' : ''}`} onClick={toggleVoice} disabled={isLoading} title="Dictar por Voz">
+                    <button className={`chat-panel__action-btn ${isListening ? 'listening' : ''}`} onClick={() => toggleVoice(isListening ? 'cancel' : 'start')} disabled={isLoading} title={isListening ? "Detener y Cancelar" : "Dictar por Voz"}>
                         <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
                     </button>
                     
                     <div style={{ flex: 1 }}></div>
 
-                    <button className="chat-panel__send-btn" onClick={handleSendPrompt} disabled={!prompt.trim() || isLoading} title="Enviar">
-                        <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                    </button>
+                    {isListening ? (
+                        <button className="chat-panel__send-btn" onClick={() => toggleVoice('send')} title="Enviar Audio a IA">
+                            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                        </button>
+                    ) : (
+                        <button className="chat-panel__send-btn" onClick={() => handleSendPrompt()} disabled={(!prompt.trim() && !selectedImageFile) || isLoading} title="Enviar">
+                            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
