@@ -117,11 +117,20 @@ async def solicitar_constraints_ia(nodos: list, relaciones: list) -> str:
     
     Genera únicamente sentencias SQL seguras en PostgreSQL.
     Asume que todas las tablas terminan en 's' y su PK principal es de tipo UUID ('id').
-    Para cada relación de Foreign Key (FK):
-    1. Asegúrate de añadir primero la columna si no existe: `ALTER TABLE ... ADD COLUMN IF NOT EXISTS ... UUID;`
-    2. Luego añade la constraint dentro de un bloque seguro:
-       `DO $$ BEGIN ALTER TABLE ... ADD CONSTRAINT ... FOREIGN KEY (...) REFERENCES ...; EXCEPTION WHEN OTHERS THEN NULL; END $$;`
-    No incluyas formato Markdown, explicaciones, ni etiquetas de código. SOLO el SQL válido.
+    
+    REGLA CRÍTICA 1: NUNCA uses "ADD CONSTRAINT IF NOT EXISTS". PostgreSQL NO soporta esa sintaxis y causará un error fatal (syntax error at or near EXISTS).
+    
+    REGLA CRÍTICA 2: Para cada relación (Foreign Key), usa estrictamente este bloque seguro:
+    
+    ALTER TABLE nombre_tabla ADD COLUMN IF NOT EXISTS nombre_columna UUID;
+    DO $$ 
+    BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_tu_nombre_unico') THEN
+            ALTER TABLE nombre_tabla ADD CONSTRAINT fk_tu_nombre_unico FOREIGN KEY (nombre_columna) REFERENCES tabla_destino (id);
+        END IF;
+    END $$;
+    
+    No incluyas formato Markdown, explicaciones, ni etiquetas de código. SOLO el código SQL válido.
     """
     
     headers = {

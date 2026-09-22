@@ -9,39 +9,31 @@ def subir_codigo_a_github(carpeta_temporal: str, url_repo: str, token: str):
         if not os.path.exists(carpeta_temporal):
             raise Exception("La carpeta temporal con el código generado no existe.")
             
-        # Inyectamos el token en la URL de forma segura para autenticación HTTPS
-        # url_repo suele ser "https://github.com/usuario/repo.git"
         url_con_token = url_repo.replace("https://", f"https://x-access-token:{token}@")
         
-        # Nos aseguramos de estar en la carpeta correcta
-        os.chdir(carpeta_temporal)
+        # Comandos de Git usando cwd en lugar de os.chdir para evitar problemas de concurrencia
+        subprocess.run(["git", "init"], cwd=carpeta_temporal, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.name", "IA Assistant"], cwd=carpeta_temporal, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "ia@assistant.local"], cwd=carpeta_temporal, check=True, capture_output=True)
         
-        # Comandos de Git
-        subprocess.run(["git", "init"], check=True, capture_output=True)
-        # Configurar un usuario temporal para el commit (Git a veces se queja si no hay config)
-        subprocess.run(["git", "config", "user.name", "IA Assistant"], check=True, capture_output=True)
-        subprocess.run(["git", "config", "user.email", "ia@assistant.local"], check=True, capture_output=True)
+        subprocess.run(["git", "add", "."], cwd=carpeta_temporal, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "Commit inicial: Backend generado por IA"], cwd=carpeta_temporal, check=True, capture_output=True)
         
-        subprocess.run(["git", "add", "."], check=True, capture_output=True)
-        subprocess.run(["git", "commit", "-m", "Commit inicial: Backend generado por IA"], check=True, capture_output=True)
+        subprocess.run(["git", "branch", "-M", "main"], cwd=carpeta_temporal, check=True, capture_output=True)
         
-        # Renombramos la rama principal a main (por si se inicializó como master)
-        subprocess.run(["git", "branch", "-M", "main"], check=True, capture_output=True)
-        
-        # Hacemos push al repositorio con el token inyectado
-        push_process = subprocess.run(["git", "push", "-u", url_con_token, "main"], check=True, capture_output=True, text=True)
+        push_process = subprocess.run(["git", "push", "-u", url_con_token, "main"], cwd=carpeta_temporal, check=True, capture_output=True, text=True)
         
     except subprocess.CalledProcessError as e:
         error_msg = e.stderr if e.stderr else str(e)
-        # Limpiar token del error por seguridad si es que se imprime
         error_msg_safe = error_msg.replace(token, "***TOKEN***")
+        print(f"Git Push Error: {error_msg_safe}")
         raise HTTPException(status_code=500, detail=f"Error en Git: {error_msg_safe}")
     except Exception as e:
+        print(f"General Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al subir código: {str(e)}")
     finally:
         # Destruir la carpeta temporal para liberar espacio
         if os.path.exists(carpeta_temporal):
-            os.chdir("..") # Salimos para poder borrarla
             shutil.rmtree(carpeta_temporal, ignore_errors=True)
 
 async def actualizar_codigo_en_github(carpeta_temporal: str, url_repo: str, token: str):
@@ -68,18 +60,15 @@ async def actualizar_codigo_en_github(carpeta_temporal: str, url_repo: str, toke
         git_dir_dst = os.path.join(carpeta_temporal, ".git")
         shutil.move(git_dir_src, git_dir_dst)
         
-        # Nos movemos a la nueva carpeta (que ahora es un repo git con cambios sin registrar)
-        os.chdir(carpeta_temporal)
-        
-        # 3. Configurar Git
-        subprocess.run(["git", "config", "user.name", "IA Assistant"], check=True, capture_output=True)
-        subprocess.run(["git", "config", "user.email", "ia@assistant.local"], check=True, capture_output=True)
+        # 3. Configurar Git usando cwd=carpeta_temporal
+        subprocess.run(["git", "config", "user.name", "IA Assistant"], cwd=carpeta_temporal, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "ia@assistant.local"], cwd=carpeta_temporal, check=True, capture_output=True)
         
         # 4. Añadir archivos al stage para calcular el diff
-        subprocess.run(["git", "add", "."], check=True, capture_output=True)
+        subprocess.run(["git", "add", "."], cwd=carpeta_temporal, check=True, capture_output=True)
         
         # 5. Obtener el diff (staged)
-        diff_process = subprocess.run(["git", "diff", "--staged"], check=True, capture_output=True, text=True)
+        diff_process = subprocess.run(["git", "diff", "--staged"], cwd=carpeta_temporal, check=True, capture_output=True, text=True)
         diff_content = diff_process.stdout
         
         if not diff_content.strip():
@@ -90,20 +79,21 @@ async def actualizar_codigo_en_github(carpeta_temporal: str, url_repo: str, toke
         mensaje_commit = await generar_mensaje_commit_ia(diff_content)
         
         # 7. Commit y Push
-        subprocess.run(["git", "commit", "-m", mensaje_commit], check=True, capture_output=True)
-        push_process = subprocess.run(["git", "push", "origin", "main"], check=True, capture_output=True, text=True)
+        subprocess.run(["git", "commit", "-m", mensaje_commit], cwd=carpeta_temporal, check=True, capture_output=True)
+        push_process = subprocess.run(["git", "push", "origin", "main"], cwd=carpeta_temporal, check=True, capture_output=True, text=True)
         
         return mensaje_commit
         
     except subprocess.CalledProcessError as e:
         error_msg = e.stderr if e.stderr else str(e)
         error_msg_safe = error_msg.replace(token, "***TOKEN***")
+        print(f"Git Update Error: {error_msg_safe}")
         raise HTTPException(status_code=500, detail=f"Error en Git al actualizar: {error_msg_safe}")
     except Exception as e:
+        print(f"General Update Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al actualizar código: {str(e)}")
     finally:
         # Destruir carpetas
-        os.chdir("..") # Salir por si acaso
         if os.path.exists(carpeta_temporal):
             shutil.rmtree(carpeta_temporal, ignore_errors=True)
         if os.path.exists(carpeta_clon):

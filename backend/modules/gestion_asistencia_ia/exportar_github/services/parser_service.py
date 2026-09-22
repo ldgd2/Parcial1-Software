@@ -665,11 +665,11 @@ def generar_documentacion_md(diagram_json: dict, url_base: str, nombre_repo: str
     if descripcion_proyecto:
         md += f"**Propósito del Proyecto:** {descripcion_proyecto}\n\n"
     md += f"Servicio activo y desplegado en: **{url_base}**\n\n"
-    md += f"## 📚 Swagger UI (Pruebas Gráficas en Vivo)\n"
+    md += f"## Swagger UI (Pruebas Gráficas en Vivo)\n"
     md += f"Puedes ejecutar y probar todas las peticiones interactivamente ingresando a:\n"
-    md += f"👉 **[{url_base}/help]({url_base}/help)**\n\n"
+    md += f"**[{url_base}/help]({url_base}/help)**\n\n"
     md += "---\n\n"
-    md += "## 🚀 Guía Completa de Endpoints y Ejemplos de Petición\n\n"
+    md += "## Guía Completa de Endpoints y Ejemplos de Petición\n\n"
     
     for nodo in nodos:
         if nodo.get("type") in ["class", "interface"]:
@@ -685,11 +685,20 @@ def generar_documentacion_md(diagram_json: dict, url_base: str, nombre_repo: str
             json_patch_example_lines = []
             
             if atributos:
+                md += "#### Modelo de Datos (Atributos)\n"
+                md += "| Atributo | Tipo de Dato | Requerido |\n"
+                md += "|---|---|---|\n"
+                
                 for a in atributos:
                     n = sanitize_identifier(a.get("nombre", ""))
                     t = map_java_type(a.get("tipo", ""))
+                    is_req = "No" if "null" in str(a.get("tipo", "")).lower() else "Sí"
+                    md += f"| `{n}` | `{t}` | {is_req} |\n"
+                    
                     ex_val = obtener_ejemplo_atributo_json(n, t)
                     json_example_lines.append(f'  "{n}": {ex_val}')
+                
+                md += "\n"
                 
                 if len(atributos) > 0:
                     first_attr = sanitize_identifier(atributos[0].get("nombre", ""))
@@ -701,7 +710,7 @@ def generar_documentacion_md(diagram_json: dict, url_base: str, nombre_repo: str
             
             md += "**Estructura de Datos JSON Body para POST/PUT (Petición):**\n```json\n" + body_json_full + "\n```\n\n"
             
-            md += "#### 🛠️ Operaciones CRUD Estándar:\n\n"
+            md += "#### Operaciones CRUD Estándar:\n\n"
             
             # GET ALL
             md += f"1. **`GET {base_endpoint}`** — Listar todos los registros\n"
