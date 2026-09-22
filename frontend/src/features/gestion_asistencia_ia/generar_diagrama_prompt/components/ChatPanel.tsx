@@ -4,7 +4,7 @@ import { usePromptGeneration } from '../hooks/usePromptGeneration';
 import { useImageDigitization } from '../../digitalizar_desde_imagen/hooks/useImageDigitization';
 import { generateDeterministicHash } from '../../../gestion_modelado/shared/utils/hashGenerator';
 import { parseUmlAttribute, parseUmlMethod } from '../../../gestion_modelado/shared/utils/umlParser';
-import { ImageViewer } from '../../../shared/components/ImageViewer/ImageViewer';
+import { ImageViewer } from '@/shared/components/ImageViewer/ImageViewer';
 import './ChatPanel.css';
 import type { NodeType } from '../../../gestion_modelado/shared/types/types';
 import { transcribeAudioAPI } from '../services/promptService';
