@@ -82,10 +82,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
 
         if (result.deletedNodes && result.deletedNodes.length > 0) {
             result.deletedNodes.forEach(idOrName => {
-                const nodeToDelete = nodes.find(n => n.id === idOrName || n.nombre.toLowerCase() === idOrName.toLowerCase());
-                const finalId = nodeToDelete ? nodeToDelete.id : idOrName;
-                deletedNodeIds.add(finalId);
-                deleteNode(finalId);
+                // Encontrar todos los nodos que coincidan con el ID o el nombre
+                const matchingNodes = nodes.filter(n => n.id === idOrName || n.nombre.toLowerCase() === idOrName.toLowerCase());
+                
+                if (matchingNodes.length > 0) {
+                    matchingNodes.forEach(node => {
+                        deletedNodeIds.add(node.id);
+                        deleteNode(node.id);
+                    });
+                } else {
+                    // Fallback por si era un ID puro que no estaba en el estado local actual por alguna razón
+                    deletedNodeIds.add(idOrName);
+                    deleteNode(idOrName);
+                }
             });
         }
         
