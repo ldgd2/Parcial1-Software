@@ -68,17 +68,25 @@ export const RegisterView: React.FC = () => {
     setIsLoading(true);
     setErrorMsg('');
     try {
-      const data = await apiFetch('/usuarios/registro', {
+      await apiFetch('/usuarios/registro', {
         method: 'POST',
         body: JSON.stringify({ nombre, email, password, codigo_otp: code }),
       });
-      // Si el backend devuelve un token al registrar, guardarlo para poder llamar habilidades
-      if (data?.access_token) {
-        TokenService.setToken(data.access_token);
+      try {
+        const loginData = await apiFetch('/usuarios/login', {
+          method: 'POST',
+          body: JSON.stringify({ email, password }),
+        });
+        if (loginData?.access_token) {
+          TokenService.setToken(loginData.access_token);
+        }
+      } catch {
+        // Continuar a selección de habilidades incluso si el auto-login falla
       }
       setStep(3);
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : 'Error desconocido');
+    } finally {
       setIsLoading(false);
     }
   };
@@ -93,7 +101,11 @@ export const RegisterView: React.FC = () => {
       // silencioso: las habilidades son opcionales, no bloquear el registro
     } finally {
       setIsLoading(false);
-      navigate('/login');
+      if (TokenService.getToken()) {
+        navigate('/dashboard');
+      } else {
+        navigate('/login');
+      }
     }
   };
 
