@@ -21,7 +21,7 @@ printf "\n[1/4] Instalando dependencias del sistema...\n"
 case "$OS_NAME" in
     Linux*)
         sudo apt-get update
-        sudo apt-get install -y python3 python3-venv python3-pip nodejs npm postgresql postgresql-contrib
+        sudo apt-get install -y python3 python3-venv python3-pip nodejs npm postgresql postgresql-contrib nginx
         sudo systemctl start postgresql 2>/dev/null || sudo service postgresql start 2>/dev/null || true
         ;;
     Darwin*)

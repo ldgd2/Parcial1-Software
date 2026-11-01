@@ -151,8 +151,17 @@ server {{
 
         console.print("[cyan]Haciendo build del Frontend...[/cyan]")
         subprocess.run("npm run build", cwd=os.path.join(BASE_DIR, "frontend"), shell=True)
+        # Asegurar NGINX instalado y directorios requeridos
+        if subprocess.run("which nginx", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0:
+            console.print("[cyan]Instalando NGINX...[/cyan]")
+            os.system("sudo apt-get update && sudo apt-get install -y nginx")
+
+        os.system("sudo mkdir -p /var/www /etc/nginx/sites-available /etc/nginx/sites-enabled")
         os.system(f"sudo rm -rf /var/www/diagramador-frontend")
         os.system(f"sudo cp -r {os.path.join(BASE_DIR, 'frontend', 'dist')} /var/www/diagramador-frontend")
+
+        console.print("[cyan]Inicializando esquema de base de datos...[/cyan]")
+        os.system(f"{BASE_DIR}/backend/venv/bin/python -c \"import asyncio; import backend.main; from backend.core.database import init_db; asyncio.run(init_db())\" 2>/dev/null || true")
         
         console.print("[cyan]Aplicando configuraciones NGINX y Systemd...[/cyan]")
         os.system(f"sudo cp {SERVICE_DIR}/*.service /etc/systemd/system/")
@@ -166,7 +175,7 @@ server {{
         else:
             os.system("sudo ln -sf /etc/nginx/sites-available/diagramador-ip /etc/nginx/sites-enabled/")
             
-        os.system("sudo nginx -t && sudo systemctl reload nginx")
+        os.system("sudo nginx -t && sudo systemctl enable --now nginx && sudo systemctl reload nginx")
         console.print("[bold green]✔ Todo Creado e Iniciado Correctamente![/bold green]")
     else:
         console.print("[bold green]✔ Mock de creación (Windows).[/bold green]")
@@ -184,6 +193,7 @@ def reiniciar_todo():
             console.print("[yellow]No se encontró .env.production, se compilará con las variables por defecto.[/yellow]")
             
         subprocess.run("npm run build", cwd=os.path.join(BASE_DIR, "frontend"), shell=True)
+        os.system("sudo mkdir -p /var/www")
         os.system(f"sudo rm -rf /var/www/diagramador-frontend")
         os.system(f"sudo cp -r {os.path.join(BASE_DIR, 'frontend', 'dist')} /var/www/diagramador-frontend")
         
@@ -216,7 +226,7 @@ def eliminar_todo():
             console.print("[cyan]Eliminando configuraciones NGINX...[/cyan]")
             os.system("sudo rm -f /etc/nginx/sites-enabled/diagramador-dominio-front /etc/nginx/sites-enabled/diagramador-dominio-back /etc/nginx/sites-enabled/diagramador-ip")
             os.system("sudo rm -f /etc/nginx/sites-available/diagramador-dominio-front /etc/nginx/sites-available/diagramador-dominio-back /etc/nginx/sites-available/diagramador-ip")
-            os.system("sudo nginx -t && sudo systemctl reload nginx")
+            os.system("sudo nginx -t && sudo systemctl enable --now nginx && sudo systemctl reload nginx")
             
         # Limpieza local
         if os.name != 'nt':
@@ -235,8 +245,11 @@ def ver_estado():
     if os.name != 'nt':
         console.print("\n[bold cyan]--- ESTADO BACKEND ---[/bold cyan]")
         os.system("sudo systemctl status backend-app --no-pager")
-        console.print("\n[bold cyan]--- ESTADO FRONTEND ---[/bold cyan]")
-        os.system("sudo systemctl status frontend-app --no-pager")
+        console.print("\n[bold cyan]--- ESTADO FRONTEND (Estático NGINX) ---[/bold cyan]")
+        if os.path.exists("/var/www/diagramador-frontend"):
+            console.print("[green]Archivos compilados disponibles en /var/www/diagramador-frontend[/green]")
+        else:
+            console.print("[red]Directorio /var/www/diagramador-frontend no encontrado[/red]")
         console.print("\n[bold cyan]--- ESTADO NGINX ---[/bold cyan]")
         os.system("sudo systemctl status nginx --no-pager")
     else:
@@ -248,7 +261,7 @@ def menu_logs():
     while True:
         console.print("\n[magenta]--- VER LOGS ---[/magenta]")
         console.print("[1] Ver log del Backend")
-        console.print("[2] Ver log del Frontend")
+        console.print("[2] Ver log de Nginx (Accesos Frontend)")
         console.print("[3] Ver log de Nginx (Errores)")
         console.print("[0] Volver")
         op = Prompt.ask("Selecciona", default="1")
@@ -256,7 +269,7 @@ def menu_logs():
         if op == "1" and os.name != 'nt':
             os.system("sudo journalctl -u backend-app -f")
         elif op == "2" and os.name != 'nt':
-            os.system("sudo journalctl -u frontend-app -f")
+            os.system("sudo tail -f /var/log/nginx/access.log")
         elif op == "3" and os.name != 'nt':
             os.system("sudo tail -f /var/log/nginx/error.log")
         elif op == "0":

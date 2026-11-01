@@ -9,9 +9,10 @@ def menu_db():
         console.print("[1] Migraciones")
         console.print("[2] Seeders")
         console.print("[3] Test de Conexión (Ping)")
+        console.print("[4] Inicializar Tablas (init_db)")
         console.print("[0] Volver")
         
-        opcion = Prompt.ask("\nSelecciona una opción", choices=["1", "2", "3", "0"], default="0")
+        opcion = Prompt.ask("\nSelecciona una opción", choices=["1", "2", "3", "4", "0"], default="0")
         
         if opcion == "1":
             menu_migrations()
@@ -28,6 +29,28 @@ def menu_db():
                     except Exception as e:
                         console.print(f"\n[bold red]Error al conectar:[/bold red] {e}")
                 asyncio.run(ping())
+            Prompt.ask("\nPresiona Enter para continuar")
+        elif opcion == "4":
+            with console.status("[bold cyan]Inicializando tablas en la base de datos..."):
+                import asyncio
+                import backend.main
+                from backend.core.database import init_db
+                from alembic.config import Config
+                from alembic import command
+                
+                async def inicializar():
+                    try:
+                        await init_db()
+                        console.print("\n[bold green]¡Tablas creadas exitosamente con Base.metadata.create_all![/bold green]")
+                        try:
+                            alembic_cfg = Config("alembic.ini")
+                            command.stamp(alembic_cfg, "head")
+                            console.print("[bold green]¡Alembic sincronizado (stamp head)![/bold green]")
+                        except Exception as e_alembic:
+                            console.print(f"[yellow]Aviso Alembic stamp: {e_alembic}[/yellow]")
+                    except Exception as e:
+                        console.print(f"\n[bold red]Error al inicializar tablas:[/bold red] {e}")
+                asyncio.run(inicializar())
             Prompt.ask("\nPresiona Enter para continuar")
         elif opcion == "0":
             break

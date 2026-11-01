@@ -25,9 +25,10 @@ def menu_migrations():
         console.print("[1] Crear nueva migración (Make)")
         console.print("[2] Aplicar migraciones (Up)")
         console.print("[3] Revertir última migración (Down)")
+        console.print("[4] Sellar versión en Head (Stamp Head)")
         console.print("[0] Volver")
         
-        opcion = Prompt.ask("\nSelecciona una opción", choices=["1", "2", "3", "0"], default="0")
+        opcion = Prompt.ask("\nSelecciona una opción", choices=["1", "2", "3", "4", "0"], default="0")
         
         if opcion == "1":
             mensaje = Prompt.ask("Ingresa un mensaje para la migración")
@@ -44,6 +45,11 @@ def menu_migrations():
         elif opcion == "3":
             with console.status("[bold cyan]Revertiendo migración..."):
                 ejecutar_comando_alembic(["downgrade", "-1"])
+            Prompt.ask("\nPresiona Enter para continuar")
+
+        elif opcion == "4":
+            with console.status("[bold cyan]Sellando versión en Head..."):
+                ejecutar_comando_alembic(["stamp", "head"])
             Prompt.ask("\nPresiona Enter para continuar")
             
         elif opcion == "0":
