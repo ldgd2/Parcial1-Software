@@ -335,30 +335,54 @@
   color: #e9edef;
 }
 
-/* Indicador de carga / typing */
-.whatsapp-bubble__loading {
-  display: flex;
+/* Indicador de 4 puntos en forma de olas */
+.whatsapp-typing-row {
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
-  color: #8696a0;
-  font-style: italic;
-  font-size: 13px;
+  padding: 6px 8px 4px 6px;
+}
+
+.whatsapp-typing-wave {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 18px;
 }
 
 .whatsapp-typing-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
+  width: 7px;
+  height: 7px;
   background-color: #25D366;
-  animation: whatsappTyping 1.4s infinite ease-in-out both;
+  border-radius: 50%;
+  display: inline-block;
+  animation: typingDotWave 1.3s infinite ease-in-out both;
 }
 
-.whatsapp-typing-dot:nth-child(1) { animation-delay: -0.32s; }
-.whatsapp-typing-dot:nth-child(2) { animation-delay: -0.16s; }
+.whatsapp-typing-dot:nth-child(1) {
+  animation-delay: -0.45s;
+}
 
-@keyframes whatsappTyping {
-  0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
-  40% { transform: scale(1); opacity: 1; }
+.whatsapp-typing-dot:nth-child(2) {
+  animation-delay: -0.30s;
+}
+
+.whatsapp-typing-dot:nth-child(3) {
+  animation-delay: -0.15s;
+}
+
+.whatsapp-typing-dot:nth-child(4) {
+  animation-delay: 0s;
+}
+
+@keyframes typingDotWave {
+  0%, 80%, 100% {
+    transform: translateY(0);
+    opacity: 0.3;
+  }
+  40% {
+    transform: translateY(-6px);
+    opacity: 1;
+  }
 }
 
 /* Input Bar */

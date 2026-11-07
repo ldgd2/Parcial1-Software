@@ -115,9 +115,8 @@ REL_TYPE: Dict[str, str] = {
 JUNK_CLASS_NAMES = {
     "diagrama", "eliminadas", "eliminada", "borradas", "borrada",
     "clases", "clase", "node", "nodo", "tabla", "tablas", "elementos", "elemento",
-    "notification", "notifications", "notificaciones", "tasks", "task", "assignments",
-    "students", "courses", "grades", "teachers", "instructor", "duplicada", "duplicadas",
-    "se", "del", "al", "los", "las", "un", "una", "modelo", "sistema", "universidad"
+    "tasks", "task", "assignments", "duplicada", "duplicadas",
+    "se", "del", "al", "los", "las", "un", "una"
 }
 
 STOP_WORDS = {
@@ -126,10 +125,9 @@ STOP_WORDS = {
 
 NATURAL_LANGUAGE_WORDS = {
     "se", "es", "son", "del", "al", "este", "esta", "estos", "estas", "todo",
-    "todos", "toda", "todas", "clases", "diagrama", "modelo", "sistema",
+    "todos", "toda", "todas", "clases", "diagrama", "modelo",
     "eliminadas", "eliminados", "borradas", "borrados", "corregido", "corregida",
-    "consolidado", "consolidada", "duplicada", "duplicadas", "organizado", "actualizado",
-    "universidad", "universitario", "academico", "estudiantes", "docentes", "cursos"
+    "consolidado", "consolidada", "duplicada", "duplicadas", "organizado", "actualizado"
 }
 
 
@@ -138,11 +136,30 @@ def es_lenguaje_natural(text: str) -> bool:
     match_count = sum(1 for t in tokens if t in STOP_WORDS or t in NATURAL_LANGUAGE_WORDS)
     return match_count >= 2
 
-COMMON_JUNK_TO_PURGE = [
-    "Node_x", "Node_1", "Node_2", "Node_3", "Node_4", "Node_5", "Node_6", "Diagrama", "eliminadas", "borradas",
-    "Student", "Students", "Grade", "Grades", "Course", "Courses", "Instructor", "Assignment", "Assignments",
-    "Task", "Tasks", "Submission", "Review", "Feedback", "Notification", "Notifications", "duplicada"
-]
+
+def limpiar_lista_eliminados(raw_list: List[Any]) -> List[str]:
+    """Filtra y devuelve únicamente nombres reales de clases eliminadas, purgando dummy IDs o cadenas espurias."""
+    clean: List[str] = []
+    seen = set()
+    for item in raw_list:
+        if not item:
+            continue
+        name = str(item).strip()
+        lower = name.lower()
+        if (
+            not lower
+            or lower in seen
+            or lower in JUNK_CLASS_NAMES
+            or re.match(r"^node_\w+$", lower)
+            or re.match(r"^c_\w+$", lower)
+            or lower.startswith("eliminad")
+            or lower.startswith("borrad")
+            or lower == "diagrama"
+        ):
+            continue
+        seen.add(lower)
+        clean.append(name)
+    return clean
 
 
 def sanitizar_resumen(summary: str) -> str:
@@ -155,7 +172,7 @@ def sanitizar_resumen(summary: str) -> str:
         or "hyper-dsl" in cleaned.lower()
         or "dsl" in cleaned.lower()
     ):
-        return "Se ha refactorizado y organizado el diagrama del sistema universitario, conectando coherentemente las entidades académicas (Docente, Estudiante, Materia, Curso, Inscripción, Tarea, Entrega, Calificación) y eliminando clases temporales u obsoletas."
+        return "Diagrama estructurado y actualizado con éxito según las instrucciones."
     return cleaned
 NODE_TYPES_MAP: Dict[str, str] = {
     "class": "class",
@@ -679,22 +696,46 @@ def parse_dsl_relation(item: Any) -> Dict[str, Any]:
     }
 
 
-# Relaciones semánticas prioritarias del dominio universitario para resolución de clases huérfanas
-ACADEMIC_DOMAIN_RELATIONS = {
-    "curso": [("Docente", "association", "1..*"), ("Materia", "association", "1..*")],
-    "materia": [("Carrera", "aggregation", "1..*")],
-    "carrera": [("Facultad", "aggregation", "1..*")],
-    "facultad": [("Docente", "aggregation", "1..*")],
-    "inscripcion": [("Estudiante", "association", "1..*"), ("Curso", "association", "1..*")],
-    "tarea": [("Curso", "composition", "1..*")],
-    "entrega": [("Tarea", "composition", "1..*"), ("Estudiante", "association", "1..*")],
-    "calificacion": [("Inscripcion", "association", "1:1"), ("Entrega", "association", "1:1")],
-    "revision": [("Docente", "association", "1..*"), ("Entrega", "composition", "1..*")],
-    "comentario": [("Revision", "composition", "1..*")],
-    "notificacion": [("Usuario", "association", "1..*")],
-    "docente": [("Usuario", "inheritance", ""), ("Curso", "association", "1..*")],
-    "estudiante": [("Usuario", "inheritance", ""), ("Inscripcion", "association", "1..*")],
-}
+def extraer_entidades_de_texto(text: str) -> List[Dict[str, Any]]:
+    """
+    Extrae entidades reales mencionadas en el texto explicativo de la IA
+    (ej: "La nueva entidad 'Parcial'...", "**Semestre**") cuando la IA responde en prosa.
+    Utiliza únicamente los filtros gramaticales sin listas arbitrarias ni censura de dominio.
+    """
+    if not text:
+        return []
+
+    patterns = [
+        r"(?:entidad|clase|tabla)\s+['\"‘“]([A-Z][a-zA-Z0-9_]+)['\"’”]",
+        r"['\"‘“]([A-Z][a-zA-Z0-9_]+)['\"’”]\s+(?:representa|conecta|hereda|gestiona|almacena|registra)",
+        r"\*\*([A-Z][a-zA-Z0-9_]+)\*\*"
+    ]
+
+    found_names = set()
+    nodes: List[Dict[str, Any]] = []
+
+    for pat in patterns:
+        for m in re.finditer(pat, text):
+            raw = m.group(1).strip()
+            if not raw or len(raw) < 3:
+                continue
+            canon = raw[0].upper() + raw[1:]
+            lower = canon.lower()
+            if (
+                lower not in found_names
+                and lower not in JUNK_CLASS_NAMES
+                and not re.match(r"^node_\w+$", lower)
+                and not es_lenguaje_natural(canon)
+            ):
+                found_names.add(lower)
+                nodes.append({
+                    "id": canon,
+                    "name": canon,
+                    "type": "class",
+                    "attributes": ["+id:int", "+nombre:string", "+estado:string"],
+                    "methods": [".procesar():bool"]
+                })
+    return nodes
 
 
 def extraer_o_reparar_json(text: str) -> Optional[Dict[str, Any]]:
@@ -741,6 +782,26 @@ def extraer_o_reparar_json(text: str) -> Optional[Dict[str, Any]]:
                     return parsed
             except Exception:
                 pass
+
+        # Extracción granular de nodos si el JSON general no se pudo reconstruir
+        extracted_nodes: List[Dict[str, Any]] = []
+        node_pattern = re.compile(r'\{\s*"name"\s*:\s*"([^"]+)"[^}]*\}', re.DOTALL)
+        for m in node_pattern.finditer(cleaned):
+            chunk = m.group(0)
+            try:
+                import json
+                n_obj = json.loads(chunk)
+                if isinstance(n_obj, dict) and n_obj.get("name"):
+                    extracted_nodes.append(n_obj)
+            except Exception:
+                pass
+
+        if extracted_nodes:
+            return {
+                "summary": summary,
+                "nodes": extracted_nodes,
+                "relations": []
+            }
 
         if summary:
             return {"summary": summary, "nodes": [], "relations": []}
@@ -904,49 +965,31 @@ def garantizar_conectividad_relacional(nodes: List[Dict[str, Any]], relations: L
         n_name = str(node["name"])
         n_lower = n_name.lower()
         if n_id.lower() not in connected_ids and n_lower not in connected_ids:
-            # 1. Búsqueda por reglas semánticas de dominio (p. ej. Curso -> Docente/Materia)
-            matched_partner = None
-            rel_type = "association"
-            label = "1..*"
-
-            if n_lower in ACADEMIC_DOMAIN_RELATIONS:
-                for target_domain, target_type, target_label in ACADEMIC_DOMAIN_RELATIONS[n_lower]:
-                    if target_domain.lower() in node_names_lower:
-                        matched_partner = node_names_lower[target_domain.lower()]
-                        rel_type = target_type
-                        label = target_label
-                        break
-
-            # 2. Búsqueda por Foreign Key en atributos
+            # 1. Búsqueda por Foreign Key en atributos (ej: *materia_id:FK -> conecta con Materia)
             fk_target = None
-            if not matched_partner:
-                for a in node.get("attributes", []):
-                    a_lower = str(a).lower()
-                    for other_n in node_names:
-                        if other_n.lower() == n_name.lower():
-                            continue
-                        if other_n.lower() in a_lower:
-                            fk_target = other_n
-                            break
-                    if fk_target:
+            for a in node.get("attributes", []):
+                a_lower = str(a).lower()
+                for other_n in node_names:
+                    if other_n.lower() == n_name.lower():
+                        continue
+                    if other_n.lower() in a_lower:
+                        fk_target = other_n
                         break
+                if fk_target:
+                    break
 
-            target_to_connect = matched_partner or fk_target or (node_names[0] if node_names[0].lower() != n_lower else (node_names[1] if len(node_names) > 1 else None))
+            target_to_connect = fk_target or (node_names[0] if node_names[0].lower() != n_lower else (node_names[1] if len(node_names) > 1 else None))
             if target_to_connect:
-                if rel_type == "inheritance":
-                    src = n_name
-                    dst = target_to_connect
-                else:
-                    src = target_to_connect
-                    dst = n_id
+                src = target_to_connect
+                dst = n_id
 
                 new_rel = {
                     "id": f"rel_{src}_{dst}_{abs(hash(n_id)) % 10000}",
                     "sourceId": src,
                     "targetId": dst,
-                    "type": rel_type if matched_partner else "association",
-                    "label": label if matched_partner else "1..*",
-                    "sourceLabel": "" if rel_type == "inheritance" else "1"
+                    "type": "association",
+                    "label": "1..*",
+                    "sourceLabel": "1"
                 }
                 updated_relations.append(new_rel)
                 connected_ids.add(n_id.lower())
@@ -981,7 +1024,7 @@ def normalize_ai_output(data: Any, context: Optional[str] = None) -> Dict[str, A
 
         # Formato estándar de 2 líneas (Línea 1: Resumen, Línea 2: Hyper-DSL)
         lines = [l.strip() for l in cleaned.splitlines() if l.strip()]
-        summary = "Diagrama universitario actualizado con éxito."
+        summary = "Diagrama actualizado con éxito."
         raw_dsl = ""
 
         if len(lines) >= 2:
@@ -1003,7 +1046,7 @@ def normalize_ai_output(data: Any, context: Optional[str] = None) -> Dict[str, A
                 summary = line
 
         hyper = parse_hyper_dsl(raw_dsl, context)
-        all_deleted = list(dict.fromkeys(hyper["deletedNodes"] + COMMON_JUNK_TO_PURGE))
+        all_deleted = limpiar_lista_eliminados(hyper.get("deletedNodes") or [])
         clean_nodes = [
             n for n in hyper["nodes"]
             if n.get("name")
@@ -1016,6 +1059,11 @@ def normalize_ai_output(data: Any, context: Optional[str] = None) -> Dict[str, A
             and n["name"] not in all_deleted
         ]
         conns = garantizar_conectividad_relacional(clean_nodes, hyper["relations"])
+        if not clean_nodes and (cleaned or summary):
+            extracted = extraer_entidades_de_texto(f"{cleaned} {summary}")
+            if extracted:
+                clean_nodes = extracted
+                conns = garantizar_conectividad_relacional(clean_nodes, [])
         return {
             "summary": sanitizar_resumen(summary),
             "nodes": clean_nodes,
@@ -1030,7 +1078,7 @@ def normalize_ai_output(data: Any, context: Optional[str] = None) -> Dict[str, A
             "summary": "Formato no reconocido",
             "nodes": [],
             "relations": [],
-            "deletedNodes": COMMON_JUNK_TO_PURGE,
+            "deletedNodes": [],
             "deletedRelations": [],
             "tasks": []
         }
@@ -1038,7 +1086,7 @@ def normalize_ai_output(data: Any, context: Optional[str] = None) -> Dict[str, A
     raw_dsl = data.get("dsl") or data.get("hyper")
     if raw_dsl and isinstance(raw_dsl, str):
         hyper = parse_hyper_dsl(raw_dsl, context)
-        all_deleted = list(dict.fromkeys(hyper["deletedNodes"] + COMMON_JUNK_TO_PURGE))
+        all_deleted = limpiar_lista_eliminados(hyper.get("deletedNodes") or [])
         clean_nodes = [
             n for n in hyper["nodes"]
             if n.get("name")
@@ -1051,6 +1099,11 @@ def normalize_ai_output(data: Any, context: Optional[str] = None) -> Dict[str, A
             and n["name"] not in all_deleted
         ]
         conns = garantizar_conectividad_relacional(clean_nodes, hyper["relations"])
+        if not clean_nodes and (cleaned or summary):
+            extracted = extraer_entidades_de_texto(f"{cleaned} {summary}")
+            if extracted:
+                clean_nodes = extracted
+                conns = garantizar_conectividad_relacional(clean_nodes, [])
         return {
             "summary": sanitizar_resumen(str(data.get("summary") or data.get("s") or "")),
             "nodes": clean_nodes,
@@ -1101,7 +1154,7 @@ def normalize_ai_output(data: Any, context: Optional[str] = None) -> Dict[str, A
     deleted_nodes = data.get("deletedNodes") or data.get("dn") or data.get("deleted") or data.get("eliminados") or []
     if not isinstance(deleted_nodes, list):
         deleted_nodes = []
-    all_deleted = list(dict.fromkeys([str(x) for x in deleted_nodes if x] + COMMON_JUNK_TO_PURGE))
+    all_deleted = limpiar_lista_eliminados(deleted_nodes)
 
     clean_nodes = [
         n for n in nodes
@@ -1116,6 +1169,12 @@ def normalize_ai_output(data: Any, context: Optional[str] = None) -> Dict[str, A
     ]
 
     relations = garantizar_conectividad_relacional(clean_nodes, relations)
+
+    if not clean_nodes and summary:
+        extracted = extraer_entidades_de_texto(summary)
+        if extracted:
+            clean_nodes = extracted
+            relations = garantizar_conectividad_relacional(clean_nodes, relations)
 
     deleted_relations = data.get("deletedRelations") or data.get("dr") or data.get("deleted_relations") or []
     tasks = data.get("tasks") or data.get("t") or []

@@ -55,32 +55,53 @@ async def actualizar_codigo_en_github(carpeta_temporal: str, url_repo: str, toke
         # 1. Clonar el repositorio existente
         subprocess.run(["git", "clone", url_con_token, carpeta_clon], check=True, capture_output=True)
         
-        # 2. Mover la carpeta .git del clon a la nueva carpeta generada
-        git_dir_src = os.path.join(carpeta_clon, ".git")
-        git_dir_dst = os.path.join(carpeta_temporal, ".git")
-        shutil.move(git_dir_src, git_dir_dst)
+        # 2. Manejo de persistencia de migraciones SQL:
+        # Preserva migraciones previas (V1, V2...) y versiona la nueva secuencialmente
+        import re
+        mig_dir_clon = os.path.join(carpeta_clon, "backend", "src", "main", "resources", "db", "migration")
+        mig_dir_temp = os.path.join(carpeta_temporal, "backend", "src", "main", "resources", "db", "migration")
+
+        if os.path.isdir(mig_dir_clon) and os.path.isdir(mig_dir_temp):
+            existing_migs = [f for f in os.listdir(mig_dir_clon) if f.endswith(".sql") and f.startswith("V")]
+            if existing_migs:
+                versions = []
+                for m in existing_migs:
+                    match = re.match(r"^V(\d+)__", m)
+                    if match:
+                        versions.append(int(match.group(1)))
+                next_version = (max(versions) + 1) if versions else 2
+
+                temp_v1 = os.path.join(mig_dir_temp, "V1__Esquema_Inicial.sql")
+                if os.path.exists(temp_v1):
+                    next_mig_name = f"V{next_version}__Actualizacion_Diagrama.sql"
+                    next_mig_path = os.path.join(mig_dir_temp, next_mig_name)
+                    os.rename(temp_v1, next_mig_path)
+
+        # 3. Copiar archivos nuevos SOBRE el clon manteniendo archivos nativos y configuraciones
+        # Esto previene pérdida de carpetas nativas (android, ios, windows, web) y configs locales
+        shutil.copytree(carpeta_temporal, carpeta_clon, dirs_exist_ok=True)
         
-        # 3. Configurar Git usando cwd=carpeta_temporal
-        subprocess.run(["git", "config", "user.name", "IA Assistant"], cwd=carpeta_temporal, check=True, capture_output=True)
-        subprocess.run(["git", "config", "user.email", "ia@assistant.local"], cwd=carpeta_temporal, check=True, capture_output=True)
+        # 4. Configurar Git usando cwd=carpeta_clon
+        subprocess.run(["git", "config", "user.name", "IA Assistant"], cwd=carpeta_clon, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "ia@assistant.local"], cwd=carpeta_clon, check=True, capture_output=True)
         
-        # 4. Añadir archivos al stage para calcular el diff
-        subprocess.run(["git", "add", "."], cwd=carpeta_temporal, check=True, capture_output=True)
+        # 5. Añadir archivos al stage para calcular el diff
+        subprocess.run(["git", "add", "."], cwd=carpeta_clon, check=True, capture_output=True)
         
-        # 5. Obtener el diff (staged)
-        diff_process = subprocess.run(["git", "diff", "--staged"], cwd=carpeta_temporal, check=True, capture_output=True, text=True)
+        # 6. Obtener el diff (staged)
+        diff_process = subprocess.run(["git", "diff", "--staged"], cwd=carpeta_clon, check=True, capture_output=True, text=True)
         diff_content = diff_process.stdout
         
         if not diff_content.strip():
             # Si no hay cambios, no hacemos nada
             return "No se detectaron cambios en el diagrama para subir a GitHub."
             
-        # 6. Generar mensaje con IA
+        # 7. Generar mensaje con IA
         mensaje_commit = await generar_mensaje_commit_ia(diff_content)
         
-        # 7. Commit y Push
-        subprocess.run(["git", "commit", "-m", mensaje_commit], cwd=carpeta_temporal, check=True, capture_output=True)
-        push_process = subprocess.run(["git", "push", "origin", "main"], cwd=carpeta_temporal, check=True, capture_output=True, text=True)
+        # 8. Commit y Push desde el clon
+        subprocess.run(["git", "commit", "-m", mensaje_commit], cwd=carpeta_clon, check=True, capture_output=True)
+        push_process = subprocess.run(["git", "push", "origin", "main"], cwd=carpeta_clon, check=True, capture_output=True, text=True)
         
         return mensaje_commit
         

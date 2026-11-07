@@ -1,10 +1,22 @@
 from typing import Optional, Any
 from .llm_client import consultar_llm, transcribir_audio
-from .dsl_normalizer import normalize_ai_output
+from .dsl_normalizer import normalize_ai_output, extraer_entidades_de_texto, garantizar_conectividad_relacional
+from .prompt_compressor import HybridPromptCompressor
 
 
 def deduplicar_resultado(resultado: dict) -> dict:
-    """Elimina relaciones idénticas (mismo tipo y label) entre el mismo par de nodos."""
+    """Elimina clases duplicadas por nombre y relaciones idénticas entre el mismo par de nodos."""
+    nodes = resultado.get("nodes", [])
+    seen_node_names = set()
+    unique_nodes = []
+    for n in nodes:
+        name = str(n.get("name") or "").strip()
+        lower = name.lower()
+        if lower and lower not in seen_node_names:
+            seen_node_names.add(lower)
+            unique_nodes.append(n)
+    resultado["nodes"] = unique_nodes
+
     relations = resultado.get("relations", [])
     seen_relations = set()
     unique_relations = []
@@ -18,7 +30,7 @@ def deduplicar_resultado(resultado: dict) -> dict:
         if not s_id or not t_id:
             continue
 
-        pair_nodes = tuple(sorted([str(s_id), str(t_id)]))
+        pair_nodes = tuple(sorted([str(s_id).lower(), str(t_id).lower()]))
         rel_signature = (pair_nodes, rel_type, label)
 
         if rel_signature not in seen_relations:
@@ -44,7 +56,9 @@ async def generar_diagrama_desde_prompt(
     1. Integra memoria persistente comprimida si se proporciona proyecto_id y sesión de BD.
     2. Invoca el cliente LLM universal con el prompt de sistema estándar.
     3. Normaliza el resultado a través de dsl_normalizer (garantía relacional, sin huérfanas).
-    4. Persiste el nuevo estado cognitivo ahorrando tokens.
+    4. Si el modelo devuelve solo prosa o array de nodos vacío, ejecuta fallback automático a Gemini
+       y/o sintetizador de entidades de dominio para garantizar que el lienzo NUNCA quede vacío.
+    5. Persiste el nuevo estado cognitivo ahorrando tokens.
     """
     effective_context = context or ""
 
@@ -58,8 +72,12 @@ async def generar_diagrama_desde_prompt(
         except Exception as ctx_err:
             print(f"[ContextoPersistente] Advertencia al compilar memoria: {ctx_err}")
 
+    compressor = HybridPromptCompressor()
+    compressed_prompt = compressor.compress(prompt) if not image_base64 else prompt
+    prompt_to_send = compressed_prompt if compressed_prompt and len(compressed_prompt) >= 4 else prompt
+
     raw_response, used_provider = await consultar_llm(
-        prompt=prompt,
+        prompt=prompt_to_send,
         context=effective_context if effective_context else None,
         image_base64=image_base64,
         image_mime_type=image_mime_type,
@@ -69,6 +87,39 @@ async def generar_diagrama_desde_prompt(
 
     resultado = normalize_ai_output(raw_response, context=effective_context)
     resultado["provider_used"] = used_provider
+
+    # Rescate nivel 1: Si el proveedor no generó clases, recurrir inmediatamente a Gemini
+    if (not resultado.get("nodes") or len(resultado["nodes"]) == 0) and used_provider != "gemini":
+        try:
+            from .llm_client import _consultar_gemini
+            fb_raw = await _consultar_gemini(prompt_to_send, context=effective_context, api_key=api_key)
+            fb_res = normalize_ai_output(fb_raw, context=effective_context)
+            if fb_res.get("nodes") and len(fb_res["nodes"]) > 0:
+                resultado = fb_res
+                resultado["provider_used"] = "gemini (fallback)"
+        except Exception as fb_err:
+            print(f"[PromptService] Fallback automático a Gemini falló: {fb_err}")
+
+    # Rescate nivel 2: Si aún no hay clases, probar OpenRouter
+    if (not resultado.get("nodes") or len(resultado["nodes"]) == 0) and used_provider != "openrouter":
+        try:
+            from .llm_client import _consultar_openrouter
+            fb_raw = await _consultar_openrouter(prompt_to_send, context=effective_context, api_key=api_key)
+            fb_res = normalize_ai_output(fb_raw, context=effective_context)
+            if fb_res.get("nodes") and len(fb_res["nodes"]) > 0:
+                resultado = fb_res
+                resultado["provider_used"] = "openrouter (fallback)"
+        except Exception as fb_err2:
+            print(f"[PromptService] Fallback automático a OpenRouter falló: {fb_err2}")
+
+    # Rescate nivel 3: Si la respuesta fue en prosa y describe entidades, extraerlas limpiamente
+    if not resultado.get("nodes") or len(resultado["nodes"]) == 0:
+        extracted = extraer_entidades_de_texto(f"{resultado.get('summary') or ''} {raw_response}")
+        if extracted:
+            resultado["nodes"] = extracted
+            resultado["relations"] = garantizar_conectividad_relacional(extracted, resultado.get("relations") or [])
+            if not resultado.get("summary"):
+                resultado["summary"] = "Entidades extraídas y conectadas coherentemente."
 
     if db is not None and proyecto_id is not None and proyecto_id > 0:
         try:

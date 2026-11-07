@@ -9,7 +9,7 @@ import { parseUmlAttribute, parseUmlMethod } from '@/features/gestion_modelado/s
 import { repartirRolesEquipo } from '@/features/gestion_asistencia_ia/repartir_roles';
 import { repartirTareasEquipo, crearTareaManual } from '@/features/gestion_asistencia_ia/repartir_tareas';
 import type { ChatMessage, QuotedMessage, AiProvider, RoomUserMention, ParallelAiTask } from '../types/chatTypes';
-import type { NodeType, RelationType } from '@/features/gestion_modelado/shared/types/types';
+import type { NodeType } from '@/features/gestion_modelado/shared/types/types';
 
 interface UseWhatsAppChatProps {
   codigoAcceso?: string;
@@ -40,9 +40,7 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
     }
   });
 
-  const [provider, setProviderState] = useState<AiProvider>(() => {
-    return (localStorage.getItem('ai_chat_provider') as AiProvider) || 'gemini';
-  });
+  const [provider, setProviderState] = useState<AiProvider>('gemini');
 
   const [geminiKey, setGeminiKeyState] = useState<string>(() => {
     return localStorage.getItem('custom_gemini_key') || '';
@@ -60,18 +58,15 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
   const [inFlightTasks, setInFlightTasks] = useState<ParallelAiTask[]>([]);
   const parallelCounterRef = useRef<number>(0);
 
-  // Sincronizar proveedor por defecto desde .env si no fue guardado localmente
+  // Sincronizar automáticamente el proveedor activo desde .env en el backend
   useEffect(() => {
-    if (!localStorage.getItem('ai_chat_provider')) {
-      fetchAiPromptConfig()
-        .then(cfg => {
-          if (cfg?.default_provider) {
-            setProviderState(cfg.default_provider);
-            localStorage.setItem('ai_chat_provider', cfg.default_provider);
-          }
-        })
-        .catch(() => {});
-    }
+    fetchAiPromptConfig()
+      .then(cfg => {
+        if (cfg?.default_provider) {
+          setProviderState(cfg.default_provider);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   // Guardar historial en localStorage
@@ -316,52 +311,34 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
       });
     }
 
-    // 5. Garantía de conexión transversal entre el modelo universitario y entidades existentes
-    const CANONICAL_DOMAIN_RELATIONS: Array<{
-      source: string;
-      target: string;
-      type: RelationType;
-      label: string;
-      sourceLabel: string;
-    }> = [
-      { source: 'Docente', target: 'Usuario', type: 'inheritance', label: '', sourceLabel: '' },
-      { source: 'Estudiante', target: 'Usuario', type: 'inheritance', label: '', sourceLabel: '' },
-      { source: 'Facultad', target: 'Carrera', type: 'aggregation', label: '1..*', sourceLabel: '1' },
-      { source: 'Carrera', target: 'Materia', type: 'aggregation', label: '1..*', sourceLabel: '1' },
-      { source: 'Docente', target: 'Curso', type: 'association', label: '1..*', sourceLabel: '1' },
-      { source: 'Materia', target: 'Curso', type: 'association', label: '1..*', sourceLabel: '1' },
-      { source: 'Curso', target: 'Inscripcion', type: 'association', label: '1..*', sourceLabel: '1' },
-      { source: 'Estudiante', target: 'Inscripcion', type: 'association', label: '1..*', sourceLabel: '1' },
-      { source: 'Curso', target: 'Tarea', type: 'composition', label: '1..*', sourceLabel: '1' },
-      { source: 'Tarea', target: 'Entrega', type: 'composition', label: '1..*', sourceLabel: '1' },
-      { source: 'Estudiante', target: 'Entrega', type: 'association', label: '1..*', sourceLabel: '1' },
-      { source: 'Inscripcion', target: 'Calificacion', type: 'association', label: '1:1', sourceLabel: '1' },
-      { source: 'Entrega', target: 'Revision', type: 'composition', label: '1..*', sourceLabel: '1' },
-      { source: 'Docente', target: 'Revision', type: 'association', label: '1..*', sourceLabel: '1' },
-      { source: 'Revision', target: 'Comentario', type: 'composition', label: '1..*', sourceLabel: '1' },
-      { source: 'Usuario', target: 'Notificacion', type: 'association', label: '1..*', sourceLabel: '1' },
-    ];
-
-    CANONICAL_DOMAIN_RELATIONS.forEach(rule => {
-      const sId = nodeMap.get(rule.source) || nodeMap.get(rule.source.toLowerCase());
-      const tId = nodeMap.get(rule.target) || nodeMap.get(rule.target.toLowerCase());
-      if (sId && tId && sId !== tId) {
-        const alreadyExists = (relations || []).some(
-          r => (r.sourceId === sId && r.targetId === tId) || (r.sourceId === tId && r.targetId === sId)
-        );
-        if (!alreadyExists) {
-          addRelation({
-            id: `rel_${rule.source.toLowerCase()}_${rule.target.toLowerCase()}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-            sourceId: sId,
-            targetId: tId,
-            type: rule.type,
-            label: rule.label,
-            sourceLabel: rule.sourceLabel,
-            version: 0,
-            hash: `rel_hash_${Date.now()}`
-          });
+    // 5. Conexión relacional dinámica basada en claves foráneas en atributos (*entidad_id:FK)
+    safeNodes.forEach(node => {
+      const actualId = nodeMap.get(node.name) || nodeMap.get(node.name.toLowerCase()) || node.id;
+      const rawAttrs = Array.isArray((node as any).attributes) ? (node as any).attributes : [];
+      rawAttrs.forEach((attrStr: string) => {
+        const fkMatch = String(attrStr).match(/\*?(\w+?)_?(?:id|Id)\s*:\s*FK/i);
+        if (fkMatch && fkMatch[1]) {
+          const targetName = fkMatch[1];
+          const targetId = nodeMap.get(targetName) || nodeMap.get(targetName.toLowerCase());
+          if (targetId && targetId !== actualId) {
+            const alreadyExists = (relations || []).some(
+              r => (r.sourceId === targetId && r.targetId === actualId) || (r.sourceId === actualId && r.targetId === targetId)
+            );
+            if (!alreadyExists) {
+              addRelation({
+                id: `rel_fk_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                sourceId: targetId,
+                targetId: actualId,
+                type: 'association',
+                label: '1..*',
+                sourceLabel: '1',
+                version: 0,
+                hash: `rel_hash_${Date.now()}`
+              });
+            }
+          }
         }
-      }
+      });
     });
   }, [nodes, relations, addNode, updateNode, addRelation, deleteNode, deleteRelation]);
 
@@ -395,22 +372,14 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
 
     setInFlightTasks(prev => [...prev, newTask]);
 
-    const providerLabel = activeProvider === 'gemini' 
-      ? 'Google Gemini' 
-      : activeProvider === 'openrouter' 
-        ? 'OpenRouter' 
-        : 'Kimi Moonshot';
-
     // Mensaje preliminar de la IA tipo respuesta de WhatsApp
     const aiMessageId = `ai_reply_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const pendingAiMessage: ChatMessage = {
       id: aiMessageId,
       senderId: 'bot_diag',
-      senderName: `@diag (${activeProvider.toUpperCase()})`,
+      senderName: '@diag',
       senderColor: '#25D366',
-      text: command
-        ? `Ejecutando comando /${command} con ${providerLabel}...`
-        : `Procesando requerimiento en paralelo con ${providerLabel}...`,
+      text: '',
       timestamp: Date.now(),
       replyTo: {
         id: userPromptMessage.id,
@@ -707,12 +676,12 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
         effectivePrompt = `[COMANDO /${command}]\n${userPrompt || 'Ejecutar comando sobre el diagrama actual.'}`;
       } else {
         if (isFixRequest) {
-          effectivePrompt = `REFACTORIZACIÓN INTEGRAL DEL MODELO UNIVERSITARIO:\n` +
+          effectivePrompt = `REFACTORIZACIÓN Y LIMPIEZA DE DIAGRAMA:\n` +
             `${effectivePrompt}\n\n` +
             `DIRECTRICES ARQUITECTÓNICAS:\n` +
-            `- Consolida todo en un único modelo universitario conectado (Docente, Estudiante, Materia, Curso, Inscripción, Tarea, Entrega, Calificación, Revisión, Comentario, Notificación).\n` +
-            `- Purga obligatoriamente en 'deletedNodes' toda clase obsoleta o en inglés (Node_x, Node_2, Node_3, Notification, Student, Grade, Course, etc.).\n` +
-            `- Cero clases huérfanas: todas las entidades deben tener relaciones lógicas (asociación, composición, herencia) con cardinalidades explícitas.`;
+            `- Reorganiza y normaliza las entidades del modelo respetando diseño orientado a objetos y patrones relacionales del dominio solicitado.\n` +
+            `- Purga en 'deletedNodes' únicamente nombres exactos de entidades obsoletas o duplicadas que deban eliminarse.\n` +
+            `- Cero clases huérfanas: todas las entidades deben tener relaciones lógicas (asociación, agregación, composición, herencia) con cardinalidades explícitas.`;
         }
       }
 
@@ -819,10 +788,10 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
 
       setInFlightTasks(prev => prev.filter(t => t.taskId !== taskId));
     } catch (err: any) {
-      const errorMsg = err?.message || 'Error al procesar la solicitud con la IA seleccionada.';
+      const errorMsg = err?.message || 'Error al procesar la solicitud.';
       const failedAiMessage: ChatMessage = {
         ...pendingAiMessage,
-        text: `Error al procesar con ${activeProvider.toUpperCase()}: ${errorMsg}`,
+        text: `Error al procesar la solicitud: ${errorMsg}`,
         aiStatus: 'error',
         timestamp: Date.now()
       };

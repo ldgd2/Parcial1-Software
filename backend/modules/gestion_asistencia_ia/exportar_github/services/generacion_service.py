@@ -86,6 +86,20 @@ Thumbs.db
     with open(os.path.join(temp_dir, ".gitignore"), "w", encoding="utf-8") as f:
         f.write(gitignore_content)
 
+    setup_mobile_bat = """@echo off
+echo ========================================================
+echo   Configuracion y arranque del cliente Flutter
+echo ========================================================
+cd frontend
+flutter pub get
+echo.
+echo Para compilar y ejecutar en tu dispositivo o emulador:
+echo   flutter run
+pause
+"""
+    with open(os.path.join(temp_dir, "setup_mobile.bat"), "w", encoding="utf-8") as f:
+        f.write(setup_mobile_bat)
+
 
 async def generar_spring_boot(
     diagram_json: dict,

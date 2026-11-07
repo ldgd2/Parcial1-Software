@@ -90,22 +90,19 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({
             <span className="whatsapp-bubble__sender" style={{ color: message.senderColor }}>
               {message.senderName}
             </span>
-            {isAi && message.provider && (
-              <span className="whatsapp-bubble__provider-tag">
-                {message.provider.toUpperCase()}
-              </span>
-            )}
           </div>
         )}
 
         {/* Contenido del mensaje */}
         <div className="whatsapp-bubble__text">
           {message.aiStatus === 'pending' ? (
-            <div className="whatsapp-bubble__loading">
-              <span className="whatsapp-typing-dot" />
-              <span className="whatsapp-typing-dot" />
-              <span className="whatsapp-typing-dot" />
-              <span style={{ marginLeft: 6 }}>{message.text}</span>
+            <div className="whatsapp-typing-row">
+              <div className="whatsapp-typing-wave">
+                <span className="whatsapp-typing-dot" />
+                <span className="whatsapp-typing-dot" />
+                <span className="whatsapp-typing-dot" />
+                <span className="whatsapp-typing-dot" />
+              </div>
             </div>
           ) : (
             renderFormattedText(message.text)

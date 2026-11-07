@@ -1,10 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useWhatsAppChat } from '../../hooks/useWhatsAppChat';
 import { ChatBubble } from './ChatBubble';
 import { ChatInputBar } from './ChatInputBar';
-import { ProviderModal } from './ProviderModal';
 import { getUserIdentity } from '@/features/gestion_concurrencia/sincronizacion_tiempo_real/context/RealTimeSyncContext';
-import { IconClose, IconSettings, IconUsers } from './ChatIcons';
+import { IconClose, IconUsers } from './ChatIcons';
 import {
   useContextoPersistente,
   ContextMemoryBadge,
@@ -29,14 +28,7 @@ export const WhatsAppChatPanel: React.FC<WhatsAppChatPanelProps> = ({
 }) => {
   const {
     messages,
-    provider,
-    setProvider,
     geminiKey,
-    setGeminiKey,
-    openrouterKey,
-    setOpenrouterKey,
-    kimiKey,
-    setKimiKey,
     replyingTo,
     setReplyingTo,
     sendMessage,
@@ -52,7 +44,6 @@ export const WhatsAppChatPanel: React.FC<WhatsAppChatPanelProps> = ({
     reiniciarMemoria
   } = useContextoPersistente({ proyectoId });
 
-  const [isProviderModalOpen, setIsProviderModalOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const currentIdentity = getUserIdentity();
 
@@ -94,17 +85,6 @@ export const WhatsAppChatPanel: React.FC<WhatsAppChatPanelProps> = ({
             onClick={() => setIsContextModalOpen(true)}
           />
 
-          {/* Selector de proveedor de IA */}
-          <button
-            type="button"
-            className="whatsapp-provider-badge"
-            onClick={() => setIsProviderModalOpen(true)}
-            title="Configurar motor de IA (Gemini, OpenRouter o Kimi)"
-          >
-            <span>{provider === 'gemini' ? 'Gemini' : provider === 'openrouter' ? 'OpenRouter' : 'Kimi'}</span>
-            <IconSettings size={13} />
-          </button>
-
           {/* Cerrar panel */}
           <button
             type="button"
@@ -137,20 +117,6 @@ export const WhatsAppChatPanel: React.FC<WhatsAppChatPanelProps> = ({
         onCancelReply={() => setReplyingTo(null)}
         mentionableUsers={mentionable}
         geminiKey={geminiKey}
-      />
-
-      {/* Modal de configuración de proveedores */}
-      <ProviderModal
-        isOpen={isProviderModalOpen}
-        onClose={() => setIsProviderModalOpen(false)}
-        activeProvider={provider}
-        onSelectProvider={setProvider}
-        geminiKey={geminiKey}
-        onSaveGeminiKey={setGeminiKey}
-        openrouterKey={openrouterKey}
-        onSaveOpenrouterKey={setOpenrouterKey}
-        kimiKey={kimiKey}
-        onSaveKimiKey={setKimiKey}
       />
 
       {/* Modal de Memoria Persistente de la IA */}

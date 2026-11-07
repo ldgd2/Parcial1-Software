@@ -99,6 +99,19 @@ $$ language 'plpgsql';\n\n'''
             sql += f"FOR EACH ROW\n"
             sql += f"EXECUTE FUNCTION update_updated_at_column();\n\n"
 
+            # Asegurar persistencia de columnas nuevas en tablas preexistentes
+            for attr in atributos:
+                raw_attr_name = attr.get("nombre", "")
+                nombre_attr = clean_sql_identifier(raw_attr_name, default="columna")
+                if nombre_attr in ['created_at', 'createdat', 'updated_at', 'updatedat', 'is_active', 'isactive', 'id']:
+                    continue
+                raw_tipo = attr.get("tipo", "")
+                if not raw_tipo and ':' in str(raw_attr_name):
+                    raw_tipo = str(raw_attr_name).split(':', 1)[1].strip()
+                tipo_sql = mapear_tipo_sql(raw_tipo or "string")
+                sql += f"ALTER TABLE {nombre_tabla} ADD COLUMN IF NOT EXISTS {nombre_attr} {tipo_sql};\n"
+            sql += "\n"
+
     return sql
 
 async def solicitar_constraints_ia(nodos: list, relaciones: list) -> str:

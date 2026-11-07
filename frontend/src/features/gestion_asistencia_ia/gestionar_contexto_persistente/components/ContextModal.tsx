@@ -226,11 +226,26 @@ export const ContextModal: React.FC<Props> = ({ isOpen, onClose, contexto, onRei
                       <div style={{ fontSize: '12px', color: '#cbd5e1', marginBottom: '4px' }}>
                         {ev.summary}
                       </div>
-                      {ev.delta && ev.delta !== 'sin_cambios' && (
-                        <div style={{ fontSize: '11px', color: '#a78bfa', fontFamily: 'monospace' }}>
-                          Delta: {ev.delta}
-                        </div>
-                      )}
+                      {(() => {
+                        const sanitizedDelta = (ev.delta || '')
+                          .split('|')
+                          .map(part => part.trim())
+                          .map(part => {
+                            if (part.startsWith('-')) {
+                              const filtered = part.slice(1).split(',').filter(x => !/^node_\w+$/i.test(x.trim()) && !['diagrama', 'eliminadas', 'borradas'].includes(x.trim().toLowerCase()));
+                              return filtered.length > 0 ? `-${filtered.join(',')}` : '';
+                            }
+                            return part;
+                          })
+                          .filter(Boolean)
+                          .join(' | ');
+
+                        return sanitizedDelta && sanitizedDelta !== 'sin_cambios' ? (
+                          <div style={{ fontSize: '11px', color: '#a78bfa', fontFamily: 'monospace' }}>
+                            Delta: {sanitizedDelta}
+                          </div>
+                        ) : null;
+                      })()}
                     </div>
                   ))}
                 </div>

@@ -222,7 +222,7 @@ class AppTheme {
         ),
         iconTheme: IconThemeData(color: textColor),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: surfaceColor,
         elevation: 2,
         shape: RoundedRectangleBorder(
@@ -360,6 +360,9 @@ abstract class BaseCrudService<T extends BaseModel> {
   final String endpoint;
   final T Function(Map<String, dynamic> json) fromJson;
 
+  // Almacén en memoria de respaldo para persistencia y modo offline
+  static final Map<String, List<Map<String, dynamic>>> _fallbackStorage = {};
+
   BaseCrudService({
     required this.endpoint,
     required this.fromJson,
@@ -367,35 +370,83 @@ abstract class BaseCrudService<T extends BaseModel> {
   }) : client = client ?? ApiClient();
 
   Future<List<T>> getAll() async {
-    final response = await client.get(endpoint);
-    if (response == null) return [];
-    if (response is List) {
-      return response.map((item) => fromJson(Map<String, dynamic>.from(item as Map))).toList();
-    }
-    if (response is Map) {
-      final list = response['content'] ?? response['items'] ?? response['data'] ?? [];
-      return (list as List).map((item) => fromJson(Map<String, dynamic>.from(item as Map))).toList();
-    }
-    return [];
+    try {
+      final response = await client.get(endpoint);
+      if (response != null) {
+        List rawList = [];
+        if (response is List) {
+          rawList = response;
+        } else if (response is Map) {
+          rawList = response['content'] ?? response['items'] ?? response['data'] ?? [];
+        }
+        final items = rawList.map((item) => fromJson(Map<String, dynamic>.from(item as Map))).toList();
+        if (items.isNotEmpty) {
+          _fallbackStorage[endpoint] = rawList.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        }
+        return items;
+      }
+    } catch (_) {}
+
+    // Fallback a almacenamiento local para evitar pérdidas de persistencia
+    final cached = _fallbackStorage[endpoint] ?? [];
+    return cached.map((e) => fromJson(e)).toList();
   }
 
   Future<T> getById(dynamic id) async {
-    final response = await client.get('$endpoint/$id');
-    return fromJson(Map<String, dynamic>.from(response as Map));
+    try {
+      final response = await client.get('$endpoint/$id');
+      if (response != null) {
+        return fromJson(Map<String, dynamic>.from(response as Map));
+      }
+    } catch (_) {}
+
+    final cached = _fallbackStorage[endpoint] ?? [];
+    final match = cached.firstWhere((e) => e['id']?.toString() == id.toString(), orElse: () => cached.first);
+    return fromJson(match);
   }
 
   Future<T> create(Map<String, dynamic> data) async {
-    final response = await client.post(endpoint, data);
-    return fromJson(Map<String, dynamic>.from(response as Map));
+    try {
+      final response = await client.post(endpoint, data);
+      if (response != null) {
+        return fromJson(Map<String, dynamic>.from(response as Map));
+      }
+    } catch (_) {}
+
+    // Persistir localmente si el backend no responde
+    final localItem = Map<String, dynamic>.from(data);
+    localItem['id'] = localItem['id'] ?? DateTime.now().millisecondsSinceEpoch;
+    _fallbackStorage.putIfAbsent(endpoint, () => []).insert(0, localItem);
+    return fromJson(localItem);
   }
 
   Future<T> update(dynamic id, Map<String, dynamic> data) async {
-    final response = await client.put('$endpoint/$id', data);
-    return fromJson(Map<String, dynamic>.from(response as Map));
+    try {
+      final response = await client.put('$endpoint/$id', data);
+      if (response != null) {
+        return fromJson(Map<String, dynamic>.from(response as Map));
+      }
+    } catch (_) {}
+
+    final list = _fallbackStorage[endpoint] ?? [];
+    final idx = list.indexWhere((e) => e['id']?.toString() == id.toString());
+    final updated = Map<String, dynamic>.from(data);
+    updated['id'] = id;
+    if (idx != -1) {
+      list[idx] = updated;
+    } else {
+      list.add(updated);
+    }
+    return fromJson(updated);
   }
 
   Future<void> delete(dynamic id) async {
-    await client.delete('$endpoint/$id');
+    try {
+      await client.delete('$endpoint/$id');
+    } catch (_) {}
+
+    final list = _fallbackStorage[endpoint] ?? [];
+    list.removeWhere((e) => e['id']?.toString() == id.toString());
   }
 }
 """

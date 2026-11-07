@@ -1,6 +1,9 @@
 import re
 import time
 from typing import List, Dict, Any, Tuple
+from backend.modules.gestion_asistencia_ia.generar_diagrama_prompt.services.prompt_compressor import HybridPromptCompressor
+
+_prompt_compressor = HybridPromptCompressor()
 
 
 DOMINIOS_KEYWORDS = {
@@ -38,27 +41,34 @@ def detectar_dominio(texto: str, dominio_actual: str = "Sistema de Software") ->
 
 def comprimir_instruccion(prompt: str) -> str:
     """
-    Condensa la instrucción del usuario eliminando cortesías y relleno,
-    conservando la semántica principal (máximo 80 caracteres).
+    Condensa la instrucción del usuario utilizando raíces morfológicas y operadores universales
+    (FIX, EDIT, ADD, DEL, LINK, CLS, TBL, etc.) eliminando relleno y artículos.
     """
-    cleaned = prompt.strip()
-    cleaned = re.sub(r"@diag\s*", "", cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r"^(?:por\s+favor|podr[ií]as|puedes|necesito\s+que|quiero\s+que|haz\s+que)\s*", "", cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r"\s+", " ", cleaned).strip()
-    if len(cleaned) > 85:
-        return cleaned[:82] + "..."
-    return cleaned
+    if not prompt:
+        return ""
+    compressed = _prompt_compressor.compress(prompt)
+    if len(compressed) > 120:
+        return compressed[:117] + "..."
+    return compressed
 
 
 def generar_delta_compacto(added: List[str], updated: List[str], deleted: List[str]) -> str:
-    """Genera una firma de delta ultra-compacta (+Clase, -Clase, ~Clase)."""
+    """Genera una firma de delta ultra-compacta (+Clase, -Clase, ~Clase) omitiendo identificadores dummy o sintéticos."""
+    JUNK = {
+        "node_x", "node_1", "node_2", "node_3", "node_4", "node_5", "node_6",
+        "diagrama", "eliminadas", "borradas", "clases", "nodo", "tabla"
+    }
+    clean_added = [a for a in added if a and not re.match(r"^node_\w+$", str(a).lower()) and str(a).lower() not in JUNK]
+    clean_updated = [u for u in updated if u and not re.match(r"^node_\w+$", str(u).lower()) and str(u).lower() not in JUNK]
+    clean_deleted = [d for d in deleted if d and not re.match(r"^node_\w+$", str(d).lower()) and str(d).lower() not in JUNK]
+
     parts: List[str] = []
-    if added:
-        parts.append("+" + ",".join(added[:5]))
-    if updated:
-        parts.append("~" + ",".join(updated[:5]))
-    if deleted:
-        parts.append("-" + ",".join(deleted[:5]))
+    if clean_added:
+        parts.append("+" + ",".join(clean_added[:5]))
+    if clean_updated:
+        parts.append("~" + ",".join(clean_updated[:5]))
+    if clean_deleted:
+        parts.append("-" + ",".join(clean_deleted[:5]))
     return " | ".join(parts) if parts else "sin_cambios"
 
 
