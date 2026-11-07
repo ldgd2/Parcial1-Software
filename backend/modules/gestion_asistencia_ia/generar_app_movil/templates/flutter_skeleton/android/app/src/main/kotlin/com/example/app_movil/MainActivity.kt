@@ -1,5 +1,6 @@
-package com.example.prueba999
+package com.example.app_movil
 
 import io.flutter.embedding.android.FlutterActivity
 
 class MainActivity : FlutterActivity()
+

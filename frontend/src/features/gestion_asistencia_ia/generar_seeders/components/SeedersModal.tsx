@@ -1,11 +1,12 @@
 import React, { useEffect } from 'react';
 import { useGenerarSeeders } from '../hooks/useGenerarSeeders';
+import type { ClassNode, Relation } from '@/features/gestion_modelado/shared/types/types';
 
 interface SeedersModalProps {
   isOpen: boolean;
   onClose: () => void;
-  nodes: any[];
-  relations: any[];
+  nodes: ClassNode[];
+  relations: Relation[];
   proyectoId?: number;
 }
 

@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "prueba999" "\0"
+            VALUE "FileDescription", "app_movil" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "prueba999" "\0"
+            VALUE "InternalName", "app_movil" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "prueba999.exe" "\0"
-            VALUE "ProductName", "prueba999" "\0"
+            VALUE "OriginalFilename", "app_movil.exe" "\0"
+            VALUE "ProductName", "app_movil" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
@@ -119,3 +119,4 @@ END
 
 /////////////////////////////////////////////////////////////////////////////
 #endif    // not APSTUDIO_INVOKED
+

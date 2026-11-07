@@ -1,8 +1,10 @@
+import type { ClassNode, Relation } from '@/features/gestion_modelado/shared/types/types';
+
 export interface GenerarSeedersRequest {
   proyecto_id?: number;
   diagram_json?: {
-    nodes: any[];
-    relations: any[];
+    nodes: ClassNode[];
+    relations: Relation[];
   };
   cantidad_por_tabla?: number;
   formato?: 'sql' | 'java_runner' | 'json';
@@ -17,4 +19,3 @@ export interface GenerarSeedersResponse {
   sql_script: string;
   java_code?: string | null;
 }
-

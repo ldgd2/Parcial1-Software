@@ -622,8 +622,13 @@ def generar_archivos_java(diagram_json: dict, temp_dir: str):
                 
                 metodos_sanitizados.append(nuevo_m)
 
+            nombre_tabla = nombre_clase.lower()
+            if not nombre_tabla.endswith("s"):
+                nombre_tabla = f"{nombre_tabla}s"
+
             clase_data = {
                 "nombre": nombre_clase,
+                "nombre_tabla": nombre_tabla,
                 "atributos": atributos_sanitizados,
                 "metodos": metodos_sanitizados
             }

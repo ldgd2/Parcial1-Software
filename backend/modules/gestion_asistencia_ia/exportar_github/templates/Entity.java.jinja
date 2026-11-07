@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 @EqualsAndHashCode(callSuper = true)
 @NoArgsConstructor
 @Entity
-@Table(name = "{{ clase.nombre | lower }}s")
+@Table(name = "{{ clase.nombre_tabla | default(clase.nombre | lower + 's') }}")
 public class {{ clase.nombre }} extends BaseEntity {
 
     {% for attr in clase.atributos %}

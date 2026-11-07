@@ -139,7 +139,7 @@ async def generar_spring_boot(
         from backend.modules.gestion_asistencia_ia.generar_seeders.services.seeders_service import generar_script_seeders
         nodos = diagram_json.get("nodes", [])
         relaciones = diagram_json.get("edges", []) or diagram_json.get("relations", [])
-        seeders_res = generar_script_seeders(nodos, relaciones, cantidad_por_tabla=10)
+        seeders_res = generar_script_seeders(nodos, relaciones, cantidad_por_tabla=10, formato="java_runner")
         
         mig_dir = os.path.join(backend_dir, "src", "main", "resources", "db", "migration")
         os.makedirs(mig_dir, exist_ok=True)
@@ -150,6 +150,13 @@ async def generar_spring_boot(
         data_sql_path = os.path.join(backend_dir, "src", "main", "resources", "data.sql")
         with open(data_sql_path, "w", encoding="utf-8") as f:
             f.write(seeders_res.sql_script)
+
+        if seeders_res.java_code:
+            config_dir = os.path.join(backend_dir, "src", "main", "java", "com", "proyecto", "config")
+            os.makedirs(config_dir, exist_ok=True)
+            runner_path = os.path.join(config_dir, "DatabaseSeedRunner.java")
+            with open(runner_path, "w", encoding="utf-8") as f:
+                f.write(seeders_res.java_code)
     except Exception as seed_err:
         print(f"[GeneracionService] Advertencia al generar seeders de prueba: {seed_err}")
 

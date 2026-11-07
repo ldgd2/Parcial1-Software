@@ -1,10 +1,11 @@
 import { useState, useCallback } from 'react';
 import { seedersService } from '../services/seedersService';
 import type { GenerarSeedersResponse } from '../types';
+import type { ClassNode, Relation } from '@/features/gestion_modelado/shared/types/types';
 
 interface UseGenerarSeedersProps {
-  nodes: any[];
-  relations: any[];
+  nodes: ClassNode[];
+  relations: Relation[];
   proyectoId?: number;
 }
 
@@ -28,8 +29,9 @@ export function useGenerarSeeders({ nodes, relations, proyectoId }: UseGenerarSe
         formato
       });
       setResultado(data);
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Error al generar seeders');
+    } catch (err: unknown) {
+      const mensaje = err instanceof Error ? err.message : 'Error al generar seeders';
+      setErrorMessage(mensaje);
     } finally {
       setLoading(false);
     }
@@ -47,7 +49,7 @@ export function useGenerarSeeders({ nodes, relations, proyectoId }: UseGenerarSe
   const descargarArchivo = useCallback(() => {
     if (!resultado) return;
     const contenido = formato === 'sql' ? resultado.sql_script : (resultado.java_code || resultado.sql_script);
-    const nombreArchivo = formato === 'sql' ? 'V2__seed_data.sql' : 'DatabaseSeedRunner.java';
+    const nombreArchivo = formato === 'sql' ? 'V2__Carga_Seeders_Prueba.sql' : 'DatabaseSeedRunner.java';
     const blob = new Blob([contenido], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -73,4 +75,3 @@ export function useGenerarSeeders({ nodes, relations, proyectoId }: UseGenerarSe
     descargarArchivo
   };
 }
-
