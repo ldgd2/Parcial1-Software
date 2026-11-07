@@ -57,14 +57,16 @@ const DiagramContext = createContext<DiagramContextType | null>(null);
 
 async function computeClassHash(node: ClassNode): Promise<string> {
   const payload = {
-    nombre: node.nombre,
-    color: node.color,
-    atributos: node.atributos.map(a => ({
+    nombre: node.nombre || '',
+    color: node.color || '',
+    atributos: (node.atributos || []).map(a => ({
       id: a.id, visibilidad: a.visibilidad, nombre: a.nombre, tipo: a.tipo, version: a.version
     })),
-    metodos: node.metodos.map(m => ({
+    metodos: (node.metodos || []).map(m => ({
       id: m.id, visibilidad: m.visibilidad, nombre: m.nombre, parametros: m.parametros, retorno: m.retorno, version: m.version
     })),
+    responsable: node.responsable || '',
+    responsabilidades: node.responsabilidades || []
   };
   return generateDeterministicHash(payload);
 }
@@ -74,7 +76,7 @@ async function computeClassHash(node: ClassNode): Promise<string> {
 // pasarlo a setNodes. Así React nunca recibe una Promesa como valor de estado.
 
 async function bumpVersion(node: ClassNode, isOffline: boolean): Promise<ClassNode> {
-  const newVersion = node.version + 1;
+  const newVersion = (node.version || 0) + 1;
   const updated = { ...node, version: newVersion };
   const newHash = await computeClassHash(updated);
   return {
@@ -89,13 +91,13 @@ async function bumpVersion(node: ClassNode, isOffline: boolean): Promise<ClassNo
 async function saveToofflineSyncService(node: ClassNode): Promise<Record<string, any>> {
   const objects: Record<string, any> = {};
 
-  for (const attr of node.atributos) {
+  for (const attr of (node.atributos || [])) {
     const obj = { type: 'attribute', data: attr };
     const h = await generateDeterministicHash(obj);
     objects[h] = obj;
     offlineSyncService.putObject(h, obj as any);
   }
-  for (const met of node.metodos) {
+  for (const met of (node.metodos || [])) {
     const obj = { type: 'method', data: met };
     const h = await generateDeterministicHash(obj);
     objects[h] = obj;
@@ -112,6 +114,8 @@ async function saveToofflineSyncService(node: ClassNode): Promise<Record<string,
 
 export const DiagramProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [nodes, setNodes] = useState<ClassNode[]>([]);
+  const nodesRef = useRef<ClassNode[]>(nodes);
+  nodesRef.current = nodes;
   const [relations, setRelations] = useState<Relation[]>([]);
   const [correcciones, setCorrecciones] = useState<Record<string, Correccion[]>>({});
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -250,6 +254,8 @@ export const DiagramProvider: React.FC<{ children: React.ReactNode }> = ({ child
       metodos: baseMets,
       valores: type === 'enum' ? ['VALOR_1', 'VALOR_2'] : undefined,
       contenido: type === 'note' ? 'Escribir nota...' : undefined,
+      responsable: '',
+      responsabilidades: []
     };
 
     // Calcular hash async y luego actualizar estado de forma segura
@@ -289,28 +295,48 @@ export const DiagramProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [broadcastDiagramEvent, mark]);
 
   const updateNode = useCallback((id: string, partial: Partial<ClassNode>, isRemote = false) => {
+    let updatedNode: ClassNode | null = null;
     setNodes(prev => {
       const current = prev.find(n => n.id === id);
       if (!current) return prev;
-      return prev.map(n => n.id === id ? { ...current, ...partial } : n);
+      updatedNode = { ...current, ...partial };
+      const next = prev.map(n => n.id === id ? updatedNode! : n);
+      nodesRef.current = next;
+      return next;
     });
 
-    const current = nodes.find(n => n.id === id);
-    if (!current) return;
-    const updated = { ...current, ...partial };
+    if (!updatedNode) {
+      const fallback = nodesRef.current.find(n => n.id === id);
+      if (fallback) {
+        updatedNode = { ...fallback, ...partial };
+      }
+    }
+    if (!updatedNode) return;
 
-    bumpVersion(updated, isOffline).then(bumped => {
-      setNodes(latest => latest.map(n => n.id === id ? bumped : n));
+    const snapshotToHash = { ...updatedNode };
+
+    computeClassHash(snapshotToHash).then(newHash => {
+      setNodes(latest => latest.map(n => {
+        if (n.id !== id) return n;
+        return {
+          ...n,
+          version: (n.version || 0) + 1,
+          hash: newHash,
+          isOfflineDirty: isOffline ? true : n.isOfflineDirty,
+        };
+      }));
       if (!isRemote && !isOffline) {
-        saveToofflineSyncService(bumped).then(objects => {
-          broadcastDiagramDelta(bumped.hash, objects);
+        saveToofflineSyncService({ ...snapshotToHash, hash: newHash }).then(objects => {
+          broadcastDiagramDelta(newHash, objects);
         });
       }
+    }).catch(err => {
+      console.error('[VCS] Error bumping version on updateNode:', err);
     });
 
     if (!isRemote) broadcastDiagramEvent({ action: 'updateNode', payload: { id, partial } });
     mark();
-  }, [nodes, mark, broadcastDiagramEvent, broadcastDiagramDelta, isOffline]);
+  }, [mark, broadcastDiagramEvent, broadcastDiagramDelta, isOffline]);
 
   const deleteNode = useCallback((id: string, isRemote = false) => {
     setNodes(prev => prev.filter(n => n.id !== id));

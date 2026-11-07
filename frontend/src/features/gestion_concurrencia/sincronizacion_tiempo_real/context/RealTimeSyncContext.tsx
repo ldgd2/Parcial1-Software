@@ -56,6 +56,7 @@ interface RealTimeSyncContextType {
   requestRoomUsers: () => void;
   kickUser: (guestId: string) => void;
   changeUserRole: (guestId: string, role: string) => void;
+  sendChatMessage: (message: any) => void;
   isReadOnly: boolean;
 }
 
@@ -156,8 +157,9 @@ export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: a
           console.error("Error syncing offline objects", e);
         }
 
-        // Pedir al servidor los snapshots de versiones actuales
+        // Pedir al servidor los snapshots de versiones actuales e historial de chat
         ws!.send(JSON.stringify({ type: 'request_snapshots' }));
+        ws!.send(JSON.stringify({ type: 'request_chat_history' }));
       };
 
       ws.onmessage = (event) => {
@@ -244,6 +246,12 @@ export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: a
               break;
             case 'diagram_event':
               window.dispatchEvent(new CustomEvent('remote_diagram_event', { detail: data.payload }));
+              break;
+            case 'chat_message':
+              window.dispatchEvent(new CustomEvent('remote_chat_message', { detail: data.message }));
+              break;
+            case 'chat_history':
+              window.dispatchEvent(new CustomEvent('remote_chat_history', { detail: data.messages }));
               break;
           }
         } catch (e) {
@@ -383,6 +391,15 @@ export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: a
     }
   };
 
+  const sendChatMessage = (message: any) => {
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({
+        type: 'chat_message',
+        message
+      }));
+    }
+  };
+
   return (
     <RealTimeSyncContext.Provider value={{
       socket: socketRef.current,
@@ -392,7 +409,16 @@ export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: a
       lockElement,
       refreshLock,
       unlockElement,
-      approveGuest, broadcastDiagramEvent, broadcastDiagramDelta, roomUsers, requestRoomUsers, kickUser, changeUserRole, isReadOnly }}>
+      approveGuest,
+      broadcastDiagramEvent,
+      broadcastDiagramDelta,
+      roomUsers,
+      requestRoomUsers,
+      kickUser,
+      changeUserRole,
+      sendChatMessage,
+      isReadOnly
+    }}>
       {children}
     </RealTimeSyncContext.Provider>
   );

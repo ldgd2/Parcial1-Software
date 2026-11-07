@@ -42,7 +42,17 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({ isOpen, onCl
     const handleSubmit = async () => {
         if (!selectedFile) return;
         
-        const result = await digitizeImage(selectedFile);
+        const activeProvider = localStorage.getItem('ai_chat_provider') || undefined;
+        let activeKey: string | undefined = undefined;
+        if (activeProvider === 'gemini') {
+            activeKey = localStorage.getItem('custom_gemini_key') || undefined;
+        } else if (activeProvider === 'openrouter') {
+            activeKey = localStorage.getItem('custom_openrouter_key') || undefined;
+        } else if (activeProvider === 'kimi') {
+            activeKey = localStorage.getItem('custom_kimi_key') || undefined;
+        }
+
+        const result = await digitizeImage(selectedFile, undefined, activeProvider, activeKey);
         
         if (result) {
             // Add nodes to diagram

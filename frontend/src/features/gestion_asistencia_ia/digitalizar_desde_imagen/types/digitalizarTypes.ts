@@ -3,4 +3,5 @@ import type { PromptNode, PromptRelation } from '../../generar_diagrama_prompt/t
 export interface DigitalizarResponse {
     nodes: PromptNode[];
     relations: PromptRelation[];
+    provider_used?: string;
 }

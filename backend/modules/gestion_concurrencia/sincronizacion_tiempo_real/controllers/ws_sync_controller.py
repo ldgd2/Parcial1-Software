@@ -228,6 +228,29 @@ async def websocket_endpoint(
                             exclude=websocket
                         )
 
+                # ── Chat grupal tipo WhatsApp ─────────────────────────────
+                elif msg_type == "chat_message":
+                    chat_msg = message.get("message")
+                    if chat_msg and codigo_acceso in manager.salas:
+                        history = manager.salas[codigo_acceso].setdefault("chat_history", [])
+                        msg_id = chat_msg.get("id")
+                        updated = False
+                        if msg_id:
+                            for idx, existing in enumerate(history):
+                                if existing.get("id") == msg_id:
+                                    history[idx] = chat_msg
+                                    updated = True
+                                    break
+                        if not updated:
+                            history.append(chat_msg)
+                        if len(history) > 200:
+                            history.pop(0)
+                    await manager.broadcast_to_sala(message, codigo_acceso, exclude=websocket)
+
+                elif msg_type == "request_chat_history":
+                    history = manager.salas.get(codigo_acceso, {}).get("chat_history", [])
+                    await manager.send_personal_message({"type": "chat_history", "messages": history}, websocket)
+
                 # ── Delta del diagrama: guardar en BD y propagar ──────────
                 elif msg_type in ("sync_offline", "diagram_delta"):
                     new_objects = message.get("objects", {})
@@ -311,6 +334,29 @@ async def websocket_endpoint(
                             codigo_acceso,
                             exclude=websocket
                         )
+
+                # ── Chat grupal tipo WhatsApp ─────────────────────────────
+                elif msg_type == "chat_message":
+                    chat_msg = message.get("message")
+                    if chat_msg and codigo_acceso in manager.salas:
+                        history = manager.salas[codigo_acceso].setdefault("chat_history", [])
+                        msg_id = chat_msg.get("id")
+                        updated = False
+                        if msg_id:
+                            for idx, existing in enumerate(history):
+                                if existing.get("id") == msg_id:
+                                    history[idx] = chat_msg
+                                    updated = True
+                                    break
+                        if not updated:
+                            history.append(chat_msg)
+                        if len(history) > 200:
+                            history.pop(0)
+                    await manager.broadcast_to_sala(message, codigo_acceso, exclude=websocket)
+
+                elif msg_type == "request_chat_history":
+                    history = manager.salas.get(codigo_acceso, {}).get("chat_history", [])
+                    await manager.send_personal_message({"type": "chat_history", "messages": history}, websocket)
 
                 # ── Delta del guest: guardar en BD y propagar ─────────────
                 elif msg_type in ("sync_offline", "diagram_delta"):

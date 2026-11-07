@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useDiagram } from '@/features/gestion_modelado/shared/context/DiagramContext';
-import { useRealTimeSync } from '@/features/gestion_concurrencia/sincronizacion_tiempo_real/context/RealTimeSyncContext';
+import { useRealTimeSync, getUserIdentity } from '@/features/gestion_concurrencia/sincronizacion_tiempo_real/context/RealTimeSyncContext';
 import { X, ChevronRight, ChevronLeft, MessageSquarePlus, CheckCircle2, Lock } from 'lucide-react';
 import './PropertiesPanel.css';
 
@@ -37,6 +37,7 @@ export const PropertiesPanel: React.FC = () => {
   const [isMinimized, setIsMinimized] = useState(false);
   const [newCorr, setNewCorr] = useState('');
   const [userName, setUserName] = useState(getCurrentUser());
+  const [newHabilidad, setNewHabilidad] = useState('');
 
   const handleFocus = (subId: string) => {
     if (lockElement && selectedId) lockElement(`${selectedId}:${subId}`);
@@ -89,6 +90,23 @@ export const PropertiesPanel: React.FC = () => {
     if (!newCorr.trim()) return;
     addCorreccion(selectedId, newCorr.trim(), userName);
     setNewCorr('');
+  };
+
+  const handleAddHabilidad = (customTag?: string) => {
+    if (!selectedNode) return;
+    const tagToAdd = customTag || newHabilidad;
+    if (!tagToAdd.trim()) return;
+    const current = selectedNode.responsabilidades || [];
+    const newItems = tagToAdd
+      .split(',')
+      .map(s => s.trim())
+      .filter(s => s.length > 0 && !current.includes(s));
+    if (newItems.length > 0) {
+      updateNode(selectedNode.id, { responsabilidades: [...current, ...newItems] });
+    }
+    if (!customTag) {
+      setNewHabilidad('');
+    }
   };
 
   return (
@@ -162,6 +180,163 @@ export const PropertiesPanel: React.FC = () => {
                       disabled={isLocked('contenido')}
                     />
                   </div>
+                )}
+
+                {/* Asignación de Responsable y Habilidades / Responsabilidades */}
+                {selectedNode.type !== 'note' && (
+                  <>
+                    <div className="property-group">
+                      <label>Responsable de Clase</label>
+                      <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
+                        <input
+                          type="text"
+                          value={selectedNode.responsable || ''}
+                          onChange={(e) => updateNode(selectedNode.id, { responsable: e.target.value })}
+                          placeholder="ej. Juan, Dev1..."
+                          style={{ flex: 1 }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const currentId = getUserIdentity();
+                            const myName = userName || currentId.nickname || 'Colaborador';
+                            updateNode(selectedNode.id, { responsable: myName });
+                          }}
+                          title="Asignarme a mí como responsable"
+                          style={{
+                            background: 'var(--primary)',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '4px',
+                            padding: '0 8px',
+                            fontSize: '11px',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          Asignarme
+                        </button>
+                      </div>
+                      {/* Colaboradores de la sala para asignación rápida */}
+                      {realTimeSync?.roomUsers && realTimeSync.roomUsers.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '4px' }}>
+                          {realTimeSync.roomUsers.map((u: any, idx: number) => {
+                            const uName = u.nickname || u.nombre || `Colab ${idx + 1}`;
+                            const isCurrentResp = selectedNode.responsable === uName;
+                            return (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => updateNode(selectedNode.id, { responsable: uName })}
+                                style={{
+                                  background: isCurrentResp ? 'var(--primary)' : 'rgba(255,255,255,0.06)',
+                                  border: '1px solid ' + (isCurrentResp ? 'var(--primary)' : 'var(--border-color)'),
+                                  color: isCurrentResp ? '#fff' : 'var(--text-secondary)',
+                                  borderRadius: '10px',
+                                  padding: '1px 7px',
+                                  fontSize: '10px',
+                                  cursor: 'pointer',
+                                  fontWeight: isCurrentResp ? 700 : 400
+                                }}
+                              >
+                                {uName}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="property-group">
+                      <label>Habilidades / Responsabilidades</label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '6px' }}>
+                        {(selectedNode.responsabilidades || []).map((resp, idx) => (
+                          <span
+                            key={idx}
+                            style={{
+                              background: 'rgba(255,255,255,0.08)',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: '12px',
+                              padding: '2px 8px',
+                              fontSize: '11px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            {resp}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = (selectedNode.responsabilidades || []).filter((_, i) => i !== idx);
+                                updateNode(selectedNode.id, { responsabilidades: updated });
+                              }}
+                              style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: 0, fontSize: '12px', lineHeight: 1 }}
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
+                        <input
+                          type="text"
+                          value={newHabilidad}
+                          onChange={(e) => setNewHabilidad(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddHabilidad();
+                            }
+                          }}
+                          placeholder="backend, auth, validación..."
+                          style={{ flex: 1 }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleAddHabilidad()}
+                          disabled={!newHabilidad.trim()}
+                          style={{
+                            background: 'var(--surface-color)',
+                            border: '1px solid var(--border-color)',
+                            color: 'var(--text-primary)',
+                            borderRadius: '4px',
+                            padding: '0 10px',
+                            cursor: 'pointer',
+                            fontWeight: 700
+                          }}
+                        >
+                          +
+                        </button>
+                      </div>
+                      {/* Sugerencias rápidas */}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                        {['Backend', 'Frontend', 'Database', 'Seguridad', 'API'].map(sug => {
+                          const already = (selectedNode.responsabilidades || []).includes(sug);
+                          return (
+                            <button
+                              key={sug}
+                              type="button"
+                              onClick={() => handleAddHabilidad(sug)}
+                              disabled={already}
+                              style={{
+                                background: already ? 'transparent' : 'rgba(37,211,102,0.1)',
+                                border: '1px dashed ' + (already ? 'var(--border-color)' : '#25D366'),
+                                color: already ? 'var(--text-secondary)' : '#25D366',
+                                borderRadius: '10px',
+                                padding: '1px 6px',
+                                fontSize: '10px',
+                                cursor: already ? 'default' : 'pointer'
+                              }}
+                            >
+                              + {sug}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
                 )}
               </>
             )}

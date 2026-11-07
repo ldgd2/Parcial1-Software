@@ -63,6 +63,10 @@ export interface ClassNode {
   version: number;
   hash: string;
   
+  // Responsable y Responsabilidades / Habilidades de la clase
+  responsable?: string;
+  responsabilidades?: string[];
+
   // Opcionales según el tipo (CU8)
   valores?: string[]; // Para enum
   contenido?: string; // Para nota

@@ -4,7 +4,7 @@ export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 export const HOST_API_URL = import.meta.env.VITE_HOST_API_URL || 'https://host.example.com';
 export const WS_URL = API_URL.replace(/^http/, 'ws');
 
-export const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
+export const apiFetch = async <T = any>(endpoint: string, options: RequestInit = {}): Promise<T> => {
   const token = TokenService.getToken();
   
   const headers = {

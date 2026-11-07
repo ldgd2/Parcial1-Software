@@ -57,6 +57,10 @@ class TareaIA(Base):
 
     # 'diagrama' = tarea dentro del diagramador | 'desarrollo' = tarea externa
     tipo = Column(String, nullable=False, default="diagrama")
+
+    # Área de la tarea (ej: 'backend', 'frontend', 'modelado', 'base_de_datos', 'testing', 'general')
+    area = Column(String, nullable=True, default="general")
+
     titulo = Column(String, nullable=False)
     descripcion = Column(Text, nullable=True)
     completada = Column(Boolean, nullable=False, default=False)

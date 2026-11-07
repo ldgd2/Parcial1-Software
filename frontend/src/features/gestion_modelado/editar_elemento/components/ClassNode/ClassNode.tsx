@@ -11,11 +11,21 @@ interface Props {
   onNodeClick?: (e: React.MouseEvent) => void;   // CU9: clic en modo conexión
   isConnectingMode?: boolean;                      // CU9: el canvas está en modo conexión
   isConnectingSource?: boolean;                    // CU9: este nodo es el origen seleccionado
+  commentCount?: number;
+  onOpenComments?: (nodeId: string, nodeName: string, type: 'node') => void;
 }
 
 const VISIBILIDADES = ['+', '-', '#'] as const;
 
-export const ClassNode: React.FC<Props> = ({ node, onDragStart, onNodeClick, isConnectingMode = false, isConnectingSource = false }) => {
+export const ClassNode: React.FC<Props> = ({
+  node,
+  onDragStart,
+  onNodeClick,
+  isConnectingMode = false,
+  isConnectingSource = false,
+  commentCount = 0,
+  onOpenComments
+}) => {
   const {
     selectedIds, setSelectedIds, updateNode, deleteNode,
     addAtributo, updateAtributo, deleteAtributo,
@@ -340,6 +350,36 @@ export const ClassNode: React.FC<Props> = ({ node, onDragStart, onNodeClick, isC
         ) : (
           <div className="class-node__title">{node.nombre}</div>
         )}
+        <button
+          type="button"
+          className="class-node__comment-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenComments?.(node.id, node.nombre, 'node');
+          }}
+          title="Ver comentarios técnicos"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: commentCount > 0 ? '#38bdf8' : '#94a3b8',
+            cursor: 'pointer',
+            padding: '2px 4px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '2px',
+            marginLeft: 'auto',
+            marginRight: isSelected ? '4px' : '0px'
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+          {commentCount > 0 && (
+            <span style={{ fontSize: '9px', fontWeight: 'bold', backgroundColor: '#0284c7', color: '#fff', borderRadius: '9999px', padding: '0 4px', lineHeight: '14px' }}>
+              {commentCount}
+            </span>
+          )}
+        </button>
         {isSelected && (
           <button
             className="class-node__delete"
@@ -557,6 +597,26 @@ export const ClassNode: React.FC<Props> = ({ node, onDragStart, onNodeClick, isC
       </div>
       )}
       </>
+      )}
+
+      {/* Responsable y Habilidades / Responsabilidades */}
+      {(Boolean(node.responsable) || (Array.isArray(node.responsabilidades) && node.responsabilidades.length > 0)) && (
+        <div className="class-node__assignment-footer">
+          {node.responsable && (
+            <span className="class-node__resp-badge" title={`Responsable: ${node.responsable}`}>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: 3 }}>
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+              {node.responsable}
+            </span>
+          )}
+          {(node.responsabilidades || []).map((h, i) => (
+            <span key={i} className="class-node__skill-pill">
+              {h}
+            </span>
+          ))}
+        </div>
       )}
     </div>
   );

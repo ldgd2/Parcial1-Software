@@ -5,6 +5,9 @@ import { useRealTimeSync } from '@/features/gestion_concurrencia/sincronizacion_
 import { PermisosModal } from '../PermisosModal/PermisosModal';
 import { SettingsModal } from '@/features/gestion_proyectos/administrar_proyecto/components/SettingsModal/SettingsModal';
 import { ExportModal } from '@/features/gestion_asistencia_ia/exportar_github/components/ExportModal/ExportModal';
+import { FlutterPreviewModal } from '@/features/gestion_asistencia_ia/generar_app_movil';
+import { ErrorDetectionModal } from '@/features/gestion_interoperabilidad/detectar_errores_xml';
+import { SeedersModal } from '@/features/gestion_asistencia_ia/generar_seeders';
 import { TokenService } from '@/shared/lib/TokenService';
 import { API_URL } from '@/shared/lib/api';
 import type { SalaInfo } from '@/features/gestion_modelado/shared/types/types';
@@ -27,13 +30,16 @@ interface MenuItem {
 
 export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat }) => {
   const navigate = useNavigate();
-  const { addNode, nodes, loadDiagram, getDiagramState } = useDiagram();
+  const { addNode, nodes, relations, loadDiagram, getDiagramState } = useDiagram();
   const { pendingGuests } = useRealTimeSync();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [showShare, setShowShare] = useState(false);
   const [showPermisos, setShowPermisos] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showFlutterModal, setShowFlutterModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [showSeedersModal, setShowSeedersModal] = useState(false);
   const [copiado, setCopiado] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   
@@ -230,6 +236,7 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
         { label: 'Importar JSON', action: () => jsonFileInputRef.current?.click() },
         { separator: true, action: () => {} },
         { label: 'Importar desde EA (XML)', action: () => fileInputRef.current?.click() },
+        { label: 'Detectar Errores BD (XML/Lienzo)', action: () => { setShowErrorModal(true); setOpenMenu(null); } },
         { label: 'Exportar a EA (XML)', action: exportarEA },
         { label: 'Volver al Dashboard', action: () => navigate('/dashboard'), separator: true },
       ]
@@ -257,6 +264,8 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
       label: 'HERRAMIENTAS',
       items: [
         { label: 'Asistente IA (Chat)', action: () => { onOpenChat(); setOpenMenu(null); } },
+        { label: 'Detectar Errores Lógicos en BD', action: () => { setShowErrorModal(true); setOpenMenu(null); } },
+        { label: 'Generar Seeders (Pruebas BD)', action: () => { setShowSeedersModal(true); setOpenMenu(null); } },
         { label: 'Permisos de Acceso', action: () => { setShowPermisos(true); setOpenMenu(null); } },
         { label: 'Configuración de Cuenta & DB', action: () => { navigate('/me/config'); setOpenMenu(null); } },
         { separator: true, action: () => {} },
@@ -264,7 +273,8 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
           label: githubUsername ? `GitHub: Conectado (@${githubUsername})` : (isLoadingStatus ? 'Cargando GitHub...' : 'Vincular con GitHub'), 
           action: () => { navigate('/me/config?tab=github'); setOpenMenu(null); } 
         },
-        { label: 'Generar / Desplegar Backend', action: () => { openExportModal(); setOpenMenu(null); } },
+        { label: 'Generar App Móvil (Flutter)', action: () => { setShowFlutterModal(true); setOpenMenu(null); } },
+        { label: 'Exportar Fullstack (Backend + Flutter)', action: () => { openExportModal(); setOpenMenu(null); } },
       ]
     }
   ];
@@ -445,6 +455,42 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
           diagramState={getDiagramState()}
           onClose={() => setShowExportModal(false)}
           onSuccessNotification={showNotification}
+        />
+      )}
+
+      {showFlutterModal && (
+        <FlutterPreviewModal
+          isOpen={showFlutterModal}
+          onClose={() => setShowFlutterModal(false)}
+          proyectoId={sala.proyecto_id}
+          diagramJson={getDiagramState() as unknown as Record<string, any>}
+        />
+      )}
+
+      {showErrorModal && (
+        <ErrorDetectionModal
+          isOpen={showErrorModal}
+          onClose={() => setShowErrorModal(false)}
+          nodes={nodes}
+          relations={relations}
+          onApplyCorrections={(fixedNodes, fixedRelations) => {
+            loadDiagram({
+              nodes: fixedNodes,
+              relations: fixedRelations,
+              version: Date.now()
+            });
+            showNotification('success', 'Esquema de base de datos reparado exitosamente');
+          }}
+        />
+      )}
+
+      {showSeedersModal && (
+        <SeedersModal
+          isOpen={showSeedersModal}
+          onClose={() => setShowSeedersModal(false)}
+          nodes={nodes}
+          relations={relations}
+          proyectoId={sala.proyecto_id}
         />
       )}
 

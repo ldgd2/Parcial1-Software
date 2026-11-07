@@ -58,3 +58,24 @@ class DiagramRelation(Base):
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class ComentarioElemento(Base):
+    """
+    CU - Comentar Elementos del Diagrama (comentar_elemento).
+    Permite asociar notas de revisión, dudas y discusiones técnicas
+    a elementos individuales (clases, interfaces, notas o relaciones).
+    """
+    __tablename__ = "diagram_element_comments"
+
+    id = Column(String(50), primary_key=True, index=True)
+    proyecto_id = Column(Integer, ForeignKey("proyectos.id", ondelete="CASCADE"), nullable=False, index=True)
+    elemento_id = Column(String(100), nullable=False, index=True)
+    elemento_tipo = Column(String(50), nullable=False, default="node")
+    autor_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    autor_nombre = Column(String(100), nullable=False, default="Colaborador")
+    texto = Column(String, nullable=False)
+    estado = Column(String(20), nullable=False, default="abierto")
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

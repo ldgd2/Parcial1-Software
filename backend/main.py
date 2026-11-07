@@ -15,6 +15,7 @@ import backend.core.permissions.seeder
 # Importar modelos genéricos para que SQLAlchemy los cree
 import backend.modules.gestion_proyectos.versioning.models
 import backend.modules.gestion_modelado.models
+import backend.modules.gestion_asistencia_ia.models
 
 # Importar routers de los casos de uso
 from backend.modules.gestion_usuarios.registrar_usuario.controllers.user_controller import router as register_router
@@ -36,16 +37,23 @@ from backend.modules.gestion_modelado.insertar_elemento.controllers.insertar_con
 from backend.modules.gestion_modelado.conectar_elemento.controllers.conectar_controller import router as conectar_elemento_router
 from backend.modules.gestion_modelado.editar_elemento.controllers.editar_controller import router as editar_elemento_router
 from backend.modules.gestion_modelado.eliminar_elemento.controllers.eliminar_controller import router as eliminar_elemento_router
+from backend.modules.gestion_modelado.comentar_elemento.controllers.comentar_controller import router as comentar_elemento_router
 
 # Interoperabilidad
 from backend.modules.gestion_interoperabilidad.exportar_a_xml.controllers.export_controller import router as export_router
 from backend.modules.gestion_interoperabilidad.importar_desde_xml.controllers.import_controller import router as import_router
+from backend.modules.gestion_interoperabilidad.detectar_errores_xml.controllers.detectar_controller import router as detectar_errores_xml_router
 
 # IA
 from backend.modules.gestion_asistencia_ia.generar_diagrama_prompt.controllers.prompt_controller import router as prompt_ia_router
 from backend.modules.gestion_asistencia_ia.digitalizar_desde_imagen.controllers.digitalizar_controller import router as digitalizar_ia_router
 from backend.modules.gestion_asistencia_ia.exportar_github.controllers.exportar_controller import router as exportar_github_router
 from backend.modules.gestion_asistencia_ia.gestionar_equipo_ia.controllers.equipo_controller import router as equipo_ia_router
+from backend.modules.gestion_asistencia_ia.generar_app_movil.controllers.app_movil_controller import router as app_movil_router
+from backend.modules.gestion_asistencia_ia.repartir_roles.controllers.roles_controller import router as repartir_roles_router
+from backend.modules.gestion_asistencia_ia.repartir_tareas.controllers.tareas_controller import router as repartir_tareas_router
+from backend.modules.gestion_asistencia_ia.gestionar_contexto_persistente.controllers.contexto_controller import router as contexto_ia_router
+from backend.modules.gestion_asistencia_ia.generar_seeders.controllers.seeders_controller import router as seeders_ia_router
 
 
 @asynccontextmanager
@@ -99,16 +107,23 @@ app.include_router(insertar_elemento_router)
 app.include_router(conectar_elemento_router)
 app.include_router(editar_elemento_router)
 app.include_router(eliminar_elemento_router)
+app.include_router(comentar_elemento_router)
 
 # Interoperabilidad
 app.include_router(export_router)
 app.include_router(import_router)
+app.include_router(detectar_errores_xml_router)
 
 # IA
 app.include_router(prompt_ia_router)
 app.include_router(digitalizar_ia_router)
 app.include_router(exportar_github_router)
 app.include_router(equipo_ia_router)
+app.include_router(app_movil_router)
+app.include_router(repartir_roles_router)
+app.include_router(repartir_tareas_router)
+app.include_router(contexto_ia_router)
+app.include_router(seeders_ia_router)
 
 
 @app.get("/")

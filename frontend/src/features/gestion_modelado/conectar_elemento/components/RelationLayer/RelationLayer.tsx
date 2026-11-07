@@ -5,6 +5,7 @@ import './RelationLayer.css';
 
 interface NodePosition {
   id: string;
+  nombre?: string;
   x: number;
   y: number;
   width: number;
@@ -15,6 +16,8 @@ interface Pt { x: number; y: number }
 
 interface Props {
   nodePositions: NodePosition[];
+  commentCounts?: Record<string, number>;
+  onOpenComments?: (id: string, name: string) => void;
 }
 
 // ── Geometría ──────────────────────────────────────────────────────────────
@@ -248,11 +251,21 @@ interface RelationLineProps {
   onDelete: (id: string) => void;
   onUpdateLabel: (id: string, label: string) => void;
   svgEl: SVGSVGElement | null;
+  commentCount?: number;
+  onOpenComments?: (id: string, name: string) => void;
 }
 
 const STEREOTYPE_TYPES = new Set(['delegate', 'calls', 'usage', 'instantiate', 'substitution', 'abstraction', 'trace', 'create', 'send', 'connector']);
 
-const RelationLine: React.FC<RelationLineProps> = ({ relation, positions, onDelete, onUpdateLabel, svgEl }) => {
+const RelationLine: React.FC<RelationLineProps> = ({
+  relation,
+  positions,
+  onDelete,
+  onUpdateLabel,
+  svgEl,
+  commentCount = 0,
+  onOpenComments
+}) => {
   const [hovered, setHovered] = useState(false);
   const [editingLabel, setEditingLabel] = useState(false);
   const [labelValue, setLabelValue] = useState(relation.label || '');
@@ -264,14 +277,50 @@ const RelationLine: React.FC<RelationLineProps> = ({ relation, positions, onDele
 
   const { updateRelation, setSelectedIds, selectedIds, correcciones } = useDiagram();
 
-  const src = positions.get(relation.sourceId);
-  const tgt = positions.get(relation.targetId);
+  const wps: Pt[] = relation.waypoints ?? [];
+
+  // ── Drag de segmento: añade waypoint ──────────────────────────────────
+  const onSegmentMouseDown = useCallback((insertIdx: number, e: React.MouseEvent) => {
+    if (!svgEl) return;
+    e.stopPropagation();
+    e.preventDefault();
+    let moved = false;
+
+    const onMove_ = (_me: MouseEvent) => { moved = true; };
+    const onUp = (me: MouseEvent) => {
+      window.removeEventListener('mousemove', onMove_);
+      window.removeEventListener('mouseup', onUp);
+      if (!moved) return;
+      const p = mouseToSvg(me, svgEl);
+      const newWps = [...wps];
+      newWps.splice(insertIdx, 0, p);
+      updateRelation(relation.id, { waypoints: newWps });
+    };
+    window.addEventListener('mousemove', onMove_);
+    window.addEventListener('mouseup', onUp);
+  }, [svgEl, wps, relation.id, updateRelation]);
+
+  const moveWaypoint = useCallback((idx: number, pt: Pt) => {
+    const newWps = [...wps];
+    newWps[idx] = pt;
+    updateRelation(relation.id, { waypoints: newWps });
+  }, [wps, relation.id, updateRelation]);
+
+  const deleteWaypoint = useCallback((idx: number) => {
+    const newWps = [...wps];
+    newWps.splice(idx, 1);
+    updateRelation(relation.id, { waypoints: newWps });
+  }, [wps, relation.id, updateRelation]);
+
+  const sIdClean = (relation.sourceId || '').trim();
+  const tIdClean = (relation.targetId || '').trim();
+  const src = positions.get(sIdClean) || positions.get(sIdClean.toLowerCase());
+  const tgt = positions.get(tIdClean) || positions.get(tIdClean.toLowerCase());
   if (!src || !tgt) return null;
 
   const isSelected = selectedIds.includes(relation.id);
   const hasOpenCorrections = (correcciones[relation.id] || []).some(c => c.estado === 'abierta');
 
-  const wps: Pt[] = relation.waypoints ?? [];
   const isVirtual = src.width === 0 || tgt.width === 0;
   const style = getLineStyle(relation.type, isVirtual);
   const stroke = hasOpenCorrections ? '#ef4444' : (isSelected ? '#64ffda' : style.stroke);
@@ -326,39 +375,6 @@ const RelationLine: React.FC<RelationLineProps> = ({ relation, positions, onDele
   const mB = points[midIdx]   ?? points[points.length - 1];
   const midX = (mA.x + mB.x) / 2;
   const midY = (mA.y + mB.y) / 2;
-
-  // ── Drag de segmento: añade waypoint ──────────────────────────────────
-  const onSegmentMouseDown = useCallback((insertIdx: number, e: React.MouseEvent) => {
-    if (!svgEl) return;
-    e.stopPropagation();
-    e.preventDefault();
-    let moved = false;
-
-    const onMove_ = (_me: MouseEvent) => { moved = true; };
-    const onUp = (me: MouseEvent) => {
-      window.removeEventListener('mousemove', onMove_);
-      window.removeEventListener('mouseup', onUp);
-      if (!moved) return;
-      const p = mouseToSvg(me, svgEl);
-      const newWps = [...wps];
-      newWps.splice(insertIdx, 0, p);
-      updateRelation(relation.id, { waypoints: newWps });
-    };
-    window.addEventListener('mousemove', onMove_);
-    window.addEventListener('mouseup', onUp);
-  }, [svgEl, wps, relation.id, updateRelation]);
-
-  const moveWaypoint = useCallback((idx: number, pt: Pt) => {
-    const newWps = [...wps];
-    newWps[idx] = pt;
-    updateRelation(relation.id, { waypoints: newWps });
-  }, [wps, relation.id, updateRelation]);
-
-  const deleteWaypoint = useCallback((idx: number) => {
-    const newWps = [...wps];
-    newWps.splice(idx, 1);
-    updateRelation(relation.id, { waypoints: newWps });
-  }, [wps, relation.id, updateRelation]);
 
   const isSelfLoop = relation.sourceId === relation.targetId;
 
@@ -440,6 +456,27 @@ const RelationLine: React.FC<RelationLineProps> = ({ relation, positions, onDele
         </text>
       ))}
 
+      {/* Botón de comentarios de la relación */}
+      {(hovered || isSelected || commentCount > 0) && (
+        <g
+          transform={`translate(${midX + 16}, ${midY - 14})`}
+          style={{ cursor: 'pointer', pointerEvents: 'all' }}
+          onClick={(e) => {
+            e.stopPropagation();
+            const relName = relation.label ? `Relación «${relation.label}»` : `Relación ${relation.type}`;
+            onOpenComments?.(relation.id, relName);
+          }}
+        >
+          <circle r="8" fill={commentCount > 0 ? '#0284c7' : '#1e293b'} stroke="#38bdf8" strokeWidth="1" />
+          <path d="M-3 -2 h6 v3 h-4 l-1.5 1.5 v-1.5 h-0.5 z" fill="#fff" />
+          {commentCount > 0 && (
+            <text x="0" y="2.5" fill="#fff" fontSize="7" fontWeight="bold" textAnchor="middle">
+              {commentCount}
+            </text>
+          )}
+        </g>
+      )}
+
       {/* ── Handles (solo cuando seleccionado) ── */}
       {isSelected && (
         <>
@@ -486,11 +523,23 @@ const RelationLine: React.FC<RelationLineProps> = ({ relation, positions, onDele
 
 // ── RelationLayer ──────────────────────────────────────────────────────────
 
-export const RelationLayer: React.FC<Props> = ({ nodePositions }) => {
+export const RelationLayer: React.FC<Props> = ({ nodePositions, commentCounts, onOpenComments }) => {
   const { relations, deleteRelation, updateRelation } = useDiagram();
   const svgRef = useRef<SVGSVGElement>(null);
 
-  const posMap = new Map<string, NodePosition>(nodePositions.map(p => [p.id, p]));
+  const posMap = new Map<string, NodePosition>();
+  nodePositions.forEach(p => {
+    const cleanId = (p.id || '').trim();
+    const cleanName = (p.nombre || '').trim();
+    if (cleanId) {
+      posMap.set(cleanId, p);
+      posMap.set(cleanId.toLowerCase(), p);
+    }
+    if (cleanName) {
+      posMap.set(cleanName, p);
+      posMap.set(cleanName.toLowerCase(), p);
+    }
+  });
 
   // Registrar relaciones como nodos virtuales para AssociationClass
   relations.forEach(rel => {
@@ -523,6 +572,8 @@ export const RelationLayer: React.FC<Props> = ({ nodePositions }) => {
               onDelete={id => deleteRelation(id)}
               onUpdateLabel={(id, label) => updateRelation(id, { label })}
               svgEl={svgRef.current}
+              commentCount={commentCounts?.[rel.id] || 0}
+              onOpenComments={onOpenComments}
             />
           ))}
         </g>

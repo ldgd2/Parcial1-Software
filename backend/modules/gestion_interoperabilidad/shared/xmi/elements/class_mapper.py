@@ -29,8 +29,10 @@ class ClassMapper:
         for sub_cls in cls._get_all_subclasses():
             inst = sub_cls()
             mapping[inst.get_node_type()] = inst.get_xml_tag().replace('UML:', 'uml:')
-        # Fallbacks
+        # Mapeos explícitos y fallbacks
         mapping['class'] = 'uml:Class'
+        mapping['abstract'] = 'uml:Class'
+        mapping['abstract_class'] = 'uml:Class'
         return mapping
 
     @classmethod
@@ -43,11 +45,11 @@ class ClassMapper:
                     if inst.get_stereotype().lower() == stereotype.lower():
                         return inst
 
-        # 2. Match xmi_type ONLY (for generic mappers that don't enforce a stereotype)
+        # 2. Match xmi_type (check specialized tag match first)
         for sub_cls in cls._get_all_subclasses():
             inst = sub_cls()
             tag = inst.get_xml_tag().replace('UML:', 'uml:')
-            if xmi_type == tag and not hasattr(inst, 'get_stereotype'):
+            if xmi_type.lower() == tag.lower():
                 return inst
 
         return cls()

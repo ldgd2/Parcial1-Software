@@ -23,8 +23,14 @@ class Settings(BaseSettings):
     GMAIL_APP_PASSWORD: str = ""
     
     # Configuración de IA
+    AI_PROVIDER: str = "gemini"  # "gemini" | "openrouter" | "kimi"
     GEMINI_API: str = ""
     OPENROUTE_API: str = ""
+    OPENROUTER_MODEL: str = "google/gemini-2.0-flash-exp:free"
+    OPENROUTER_VISION_MODEL: str = "google/gemini-2.0-flash-exp:free"
+    KIMI_API: str = ""
+    KIMI_MODEL: str = "kimi-k3.1-pro"
+    KIMI_VISION_MODEL: str = "kimi-k3.1-pro"
     IA_MODEL: str = "cohere/north-mini-code:free"
     IMAGE_OPEROUTE_API: str = ""
 

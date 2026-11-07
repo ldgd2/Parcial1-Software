@@ -1,6 +1,9 @@
 from .class_mapper import ClassMapper
 
 class EnumerationMapper(ClassMapper):
+    def get_xml_tag(self):
+        return "UML:Enumeration"
+
     def get_node_type(self):
         return "enum"
         

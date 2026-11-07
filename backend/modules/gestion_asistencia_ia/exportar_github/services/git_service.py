@@ -17,7 +17,7 @@ def subir_codigo_a_github(carpeta_temporal: str, url_repo: str, token: str):
         subprocess.run(["git", "config", "user.email", "ia@assistant.local"], cwd=carpeta_temporal, check=True, capture_output=True)
         
         subprocess.run(["git", "add", "."], cwd=carpeta_temporal, check=True, capture_output=True)
-        subprocess.run(["git", "commit", "-m", "Commit inicial: Backend generado por IA"], cwd=carpeta_temporal, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "Commit inicial: Monorepo con /backend (Spring Boot) y /frontend (Flutter App Móvil)"], cwd=carpeta_temporal, check=True, capture_output=True)
         
         subprocess.run(["git", "branch", "-M", "main"], cwd=carpeta_temporal, check=True, capture_output=True)
         

@@ -298,3 +298,40 @@
 .diagram-canvas--connecting {
   cursor: crosshair !important;
 }
+
+/* ── Responsable y Habilidades Footer ─────────────────────── */
+.class-node__assignment-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.class-node__resp-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--primary);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--primary);
+  border-radius: 10px;
+  padding: 1px 6px;
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.class-node__skill-pill {
+  font-size: 0.6rem;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 1px 5px;
+  letter-spacing: 0.03em;
+}

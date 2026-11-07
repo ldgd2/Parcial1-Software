@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DiagramProvider, useDiagram } from '@/features/gestion_modelado/shared/context/DiagramContext';
-import { RealTimeSyncProvider } from '@/features/gestion_concurrencia/sincronizacion_tiempo_real/context/RealTimeSyncContext';
+import { RealTimeSyncProvider, useRealTimeSync } from '@/features/gestion_concurrencia/sincronizacion_tiempo_real/context/RealTimeSyncContext';
 import { Menustrip } from '@/features/gestion_modelado/lienzo_principal/components/Menustrip/Menustrip';
 import { Toolbar } from '@/features/gestion_modelado/insertar_elemento/components/Toolbar/Toolbar';
 import { DiagramCanvas } from '@/features/gestion_modelado/lienzo_principal/components/DiagramCanvas/DiagramCanvas';
@@ -18,6 +18,7 @@ import './SalaView.css';
 
 const SalaContent: React.FC<{ sala: SalaInfo }> = ({ sala }) => {
   const { loadDiagram, getDiagramState, isDirty } = useDiagram();
+  const { roomUsers } = useRealTimeSync();
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -90,9 +91,15 @@ const SalaContent: React.FC<{ sala: SalaInfo }> = ({ sala }) => {
 
       <div className="sala-view__workspace">
         <Toolbar />
-        <DiagramCanvas onCanvasClick={() => {}} />
+        <DiagramCanvas onCanvasClick={() => {}} proyectoId={sala.proyecto_id} />
         <MultiplayerCursors />
-        <ChatPanel isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+        <ChatPanel
+          isOpen={isChatOpen}
+          onClose={() => setIsChatOpen(false)}
+          codigoAcceso={sala.codigo_acceso}
+          proyectoId={sala.proyecto_id}
+          proyectoNombre={sala.proyecto_nombre}
+        />
         <PropertiesPanel />
         {sala.proyecto_id > 0 && !isGuest && (
           <ChecklistPanel
@@ -114,6 +121,32 @@ const SalaContent: React.FC<{ sala: SalaInfo }> = ({ sala }) => {
         <GestorEquipoIA
           proyectoId={sala.proyecto_id}
           descripcionProyecto={sala.proyecto_nombre}
+          colaboradoresIniciales={(() => {
+            let currentUid = 1;
+            try {
+              const u = JSON.parse(localStorage.getItem('user') || '{}');
+              if (u?.id) currentUid = Number(u.id);
+            } catch {}
+            const list: Array<{ usuario_id: number; nombre: string }> = [];
+            if (roomUsers && roomUsers.length > 0) {
+              roomUsers.forEach((u: { user_id?: number | string; id?: number | string; nickname?: string; nombre?: string }, i: number) => {
+                const raw = String(u.user_id || u.id || '');
+                const digits = raw.replace(/\D/g, '');
+                const uid = digits ? parseInt(digits, 10) : (i + 2);
+                list.push({
+                  usuario_id: uid,
+                  nombre: u.nickname || u.nombre || `Colaborador ${i + 1}`
+                });
+              });
+            }
+            if (!list.some(c => c.usuario_id === currentUid)) {
+              list.unshift({
+                usuario_id: currentUid,
+                nombre: 'Yo (Anfitrión)'
+              });
+            }
+            return list;
+          })()}
         />
       </Modal>
 

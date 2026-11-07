@@ -24,19 +24,17 @@ class RelationBaseMapper:
 
     @classmethod
     def get_export_type_map(cls):
-        mapping = {}
-        for sub_cls in cls._get_all_subclasses():
-            inst = sub_cls()
-            # mapping logic might be complex here, so we will keep a static fallback map too
-            pass
         return {
             'inheritance': 'uml:Generalization',
             'dependency': 'uml:Dependency',
             'realization': 'uml:Dependency',
             'instantiate': 'uml:Dependency',
+            'instantiated_by': 'uml:Dependency',
             'substitution': 'uml:Dependency',
             'trace': 'uml:Dependency',
             'calls': 'uml:Dependency',
+            'called_by': 'uml:Dependency',
+            'call': 'uml:Dependency',
             'template_binding': 'uml:Dependency',
             'delegate': 'uml:Dependency',
             'abstraction': 'uml:Abstraction',
@@ -46,8 +44,22 @@ class RelationBaseMapper:
             'assembly': 'uml:Connector',
             'connector': 'uml:Connector',
             'association': 'uml:Association',
+            'directed': 'uml:Association',
+            'composition': 'uml:Association',
+            'aggregation': 'uml:Association',
+            'aggregation_to_whole': 'uml:Association',
+            'aggregation_to_part': 'uml:Association',
+            'composition_to_whole': 'uml:Association',
+            'composition_to_part': 'uml:Association',
             'create': 'uml:Dependency',
-            'send': 'uml:Dependency'
+            'send': 'uml:Dependency',
+            '1:1': 'uml:Association',
+            '1:N': 'uml:Association',
+            'N:M': 'uml:Association',
+            '0..1:1': 'uml:Association',
+            '0..1:N': 'uml:Association',
+            '0..N:1': 'uml:Association',
+            '0..N:M': 'uml:Association'
         }
 
     @classmethod
@@ -84,8 +96,8 @@ class RelationBaseMapper:
         rel_id = elem.attrib.get('{http://schema.omg.org/spec/XMI/2.1}id') or elem.attrib.get('xmi.id') or str(uuid.uuid4())
         name = elem.attrib.get('name', '')
 
-        src = elem.attrib.get('client') or elem.attrib.get('child')
-        tgt = elem.attrib.get('supplier') or elem.attrib.get('parent')
+        src = elem.attrib.get('client') or elem.attrib.get('child') or elem.attrib.get('subtype')
+        tgt = elem.attrib.get('supplier') or elem.attrib.get('parent') or elem.attrib.get('supertype')
 
         src_lbl = ""
         tgt_lbl = ""

@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from backend.core.database import Base
@@ -16,6 +16,15 @@ class ColaboradorProyecto(Base):
     
     # 'pendiente', 'aprobado', 'rechazado'
     estado = Column(String, nullable=False, default="pendiente")
+
+    # Rol asignado por la arquitectura o IA en este proyecto específico (ej: Backend Architect, Frontend Lead, DBA, QA)
+    rol_ia = Column(String, nullable=True, default=None)
+
+    # Áreas de responsabilidad en este proyecto (ej: ["backend", "api"], ["frontend", "ui"], ["base_de_datos"])
+    areas = Column(JSON, nullable=True, default=None)
+
+    # Lista o detalle de responsabilidades específicas asignadas
+    responsabilidades = Column(JSON, nullable=True, default=None)
     
     # Relaciones
     proyecto = relationship("Proyecto", back_populates="colaboradores")

@@ -11,11 +11,11 @@ interface Props {
 }
 
 export const ChecklistPanel: React.FC<Props> = ({ proyectoId, isHost, isChatOpen, onOpenGestor }) => {
-  const { tareas, loading, open, setOpen, toggleTarea, completadas, porcentaje } =
+  const { tareas, loading, open, setOpen, toggleTarea, completadas, porcentaje, cargar } =
     useChecklistPanel(proyectoId);
 
-  const tareasDiagrama = tareas.filter((t: TareaIA) => t.tipo === 'diagrama');
-  const tareasDesarrollo = tareas.filter((t: TareaIA) => t.tipo === 'desarrollo');
+  const tareasDiagrama = tareas.filter((t: TareaIA) => (t.tipo || '').toLowerCase() === 'diagrama');
+  const tareasDesarrollo = tareas.filter((t: TareaIA) => (t.tipo || '').toLowerCase() !== 'diagrama');
 
   return (
     <div className={`checklist-panel ${open ? 'checklist-panel--open' : ''} ${isChatOpen ? 'checklist-panel--shifted' : ''}`}>
@@ -38,12 +38,26 @@ export const ChecklistPanel: React.FC<Props> = ({ proyectoId, isHost, isChatOpen
         <div className="checklist-panel__drawer">
           <div className="checklist-panel__header">
             <span className="checklist-panel__title">MIS TAREAS</span>
-            <button className="checklist-panel__close" onClick={() => setOpen(false)}>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <button
+                className="checklist-panel__close"
+                onClick={() => cargar()}
+                title="Actualizar tareas"
+                style={{ padding: '4px' }}
+              >
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="23 4 23 10 17 10" />
+                  <polyline points="1 20 1 14 7 14" />
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                </svg>
+              </button>
+              <button className="checklist-panel__close" onClick={() => setOpen(false)} title="Cerrar">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           <div className="checklist-panel__progress-bar-wrap">
@@ -74,8 +88,22 @@ export const ChecklistPanel: React.FC<Props> = ({ proyectoId, isHost, isChatOpen
           )}
 
           {!loading && tareas.length === 0 && (
-            <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-              No tienes tareas asignadas.
+            <div style={{ padding: '1.25rem 1rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+              <p style={{ margin: '0 0 8px 0' }}>No tienes tareas asignadas.</p>
+              <button
+                onClick={() => cargar()}
+                style={{
+                  padding: '4px 10px',
+                  background: 'transparent',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  borderRadius: '4px',
+                  fontSize: '0.75rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Comprobar de nuevo
+              </button>
             </div>
           )}
 
@@ -129,7 +157,25 @@ const TareaItem: React.FC<TareaItemProps> = ({ tarea, onToggle }) => (
       )}
     </div>
     <div className="checklist-item__body">
-      <span className="checklist-item__titulo">{tarea.titulo}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px', flexWrap: 'wrap' }}>
+        {tarea.area && tarea.area !== 'general' && (
+          <span
+            style={{
+              fontSize: '9px',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              padding: '1px 5px',
+              borderRadius: '4px',
+              background: 'rgba(56, 189, 248, 0.15)',
+              color: '#38bdf8',
+              letterSpacing: '0.04em'
+            }}
+          >
+            {tarea.area}
+          </span>
+        )}
+        <span className="checklist-item__titulo">{tarea.titulo}</span>
+      </div>
       {tarea.descripcion && (
         <span className="checklist-item__desc">{tarea.descripcion}</span>
       )}

@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from typing import List
+from typing import List, Optional
 
 from backend.core.database import get_db
-from backend.modules.gestion_usuarios.dependencies import get_current_user
+from backend.modules.gestion_usuarios.dependencies import get_current_user, get_current_user_optional
 from backend.modules.gestion_usuarios.models import Usuario, TareaIA
 from backend.modules.gestion_asistencia_ia.gestionar_equipo_ia.schemas.request import (
     GenerarEquipoRequest,
@@ -28,7 +28,7 @@ from backend.core.websockets.connection_manager import manager
 async def generar_tareas_equipo(
     req: GenerarEquipoRequest,
     db: AsyncSession = Depends(get_db),
-    _: Usuario = Depends(get_current_user),
+    _ = Depends(get_current_user_optional),
 ) -> List[TareaIA]:
     nuevas_tareas = await generar_y_persistir_tareas(req, db)
     
@@ -45,16 +45,24 @@ async def generar_tareas_equipo(
 async def mis_tareas(
     proyecto_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Optional[Usuario] = Depends(get_current_user_optional),
 ) -> List[TareaIA]:
-    return await obtener_tareas_usuario(proyecto_id, current_user.id, db)
+    if not current_user:
+        return await obtener_tareas_proyecto(proyecto_id, db)
+
+    tareas = await obtener_tareas_usuario(proyecto_id, current_user.id, db)
+    if not tareas:
+        return await obtener_tareas_proyecto(proyecto_id, db)
+
+    return tareas
+    return tareas
 
 
 @router.get("/proyecto/{proyecto_id}/todas", response_model=List[TareaIAOut])
 async def todas_las_tareas_proyecto(
     proyecto_id: int,
     db: AsyncSession = Depends(get_db),
-    _: Usuario = Depends(get_current_user),
+    _ = Depends(get_current_user_optional),
 ) -> List[TareaIA]:
     return await obtener_tareas_proyecto(proyecto_id, db)
 
@@ -64,17 +72,21 @@ async def completar_tarea(
     tarea_id: int,
     completada: bool = True,
     db: AsyncSession = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Optional[Usuario] = Depends(get_current_user_optional),
 ) -> TareaIA:
-    return await marcar_tarea(tarea_id, current_user.id, completada, db)
+    uid = current_user.id if current_user else None
+    return await marcar_tarea(tarea_id, uid, completada, db)
 
 
 @router.put("/habilidades", response_model=dict)
 async def actualizar_habilidades(
     body: ActualizarHabilidadesRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Optional[Usuario] = Depends(get_current_user_optional),
 ) -> dict:
+    if not current_user:
+        return {"ok": True, "etiquetas": body.etiquetas}
+
     result = await db.execute(select(Usuario).where(Usuario.id == current_user.id))
     usuario = result.scalar_one_or_none()
     if not usuario:

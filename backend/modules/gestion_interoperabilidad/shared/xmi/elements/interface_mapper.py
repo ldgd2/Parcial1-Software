@@ -1,6 +1,9 @@
 from .class_mapper import ClassMapper
 
 class InterfaceMapper(ClassMapper):
+    def get_xml_tag(self):
+        return "UML:Interface"
+
     def get_node_type(self):
         return "interface"
         

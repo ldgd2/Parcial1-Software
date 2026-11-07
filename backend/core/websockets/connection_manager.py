@@ -16,7 +16,8 @@ class ConnectionManager:
                 "approved_guests": set(),
                 "readonly_guests": set(), # Set of guest_ids that can only view
                 "guest_nicknames": {}, # Store mapping of guest_id -> nickname for active users
-                "locked_elements": {} # element_id -> username
+                "locked_elements": {}, # element_id -> username
+                "chat_history": [] # Historial de mensajes tipo WhatsApp de la sala
             }
 
     async def connect_host(self, websocket: WebSocket, sala_id: str, host_id: str = None, nickname: str = None):

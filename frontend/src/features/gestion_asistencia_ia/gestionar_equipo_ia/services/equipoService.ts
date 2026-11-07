@@ -27,6 +27,7 @@ export interface TareaIA {
   proyecto_id: number;
   usuario_id: number;
   tipo: 'diagrama' | 'desarrollo';
+  area?: string;
   titulo: string;
   descripcion: string | null;
   completada: boolean;
@@ -69,10 +70,17 @@ export async function marcarTarea(tareaId: number, completada: boolean): Promise
 }
 
 export async function actualizarHabilidades(etiquetas: string[]): Promise<void> {
-  const res = await fetch(`${BASE}/habilidades`, {
-    method: 'PUT',
-    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ etiquetas }),
-  });
-  if (!res.ok) throw new Error('Error al actualizar habilidades');
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 6000);
+  try {
+    const res = await fetch(`${BASE}/habilidades`, {
+      method: 'PUT',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ etiquetas }),
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error('Error al actualizar habilidades');
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }

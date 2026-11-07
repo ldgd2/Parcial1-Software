@@ -28,6 +28,14 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         yield session
 
+from sqlalchemy import text
+
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS etiquetas_habilidades JSONB;"))
+        await conn.execute(text("ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS deployment_url VARCHAR;"))
+        await conn.execute(text("ALTER TABLE colaboradores_proyecto ADD COLUMN IF NOT EXISTS rol_ia VARCHAR;"))
+        await conn.execute(text("ALTER TABLE colaboradores_proyecto ADD COLUMN IF NOT EXISTS areas JSONB;"))
+        await conn.execute(text("ALTER TABLE colaboradores_proyecto ADD COLUMN IF NOT EXISTS responsabilidades JSONB;"))
+        await conn.execute(text("ALTER TABLE tareas_ia ADD COLUMN IF NOT EXISTS area VARCHAR DEFAULT 'general';"))

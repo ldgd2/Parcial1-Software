@@ -25,6 +25,12 @@ def upgrade() -> None:
         ADD COLUMN IF NOT EXISTS etiquetas_habilidades JSONB
     """))
 
+    # Agregar columna deployment_url a proyectos
+    conn.execute(text("""
+        ALTER TABLE proyectos
+        ADD COLUMN IF NOT EXISTS deployment_url VARCHAR
+    """))
+
     # Crear tabla tareas_ia solo si no existe ya
     conn.execute(text("""
         CREATE TABLE IF NOT EXISTS tareas_ia (
@@ -43,4 +49,5 @@ def upgrade() -> None:
 def downgrade() -> None:
     conn = op.get_bind()
     conn.execute(text("DROP TABLE IF EXISTS tareas_ia"))
+    conn.execute(text("ALTER TABLE proyectos DROP COLUMN IF EXISTS deployment_url"))
     conn.execute(text("ALTER TABLE usuarios DROP COLUMN IF EXISTS etiquetas_habilidades"))

@@ -1,17 +1,25 @@
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { useDiagram } from '@/features/gestion_modelado/shared/context/DiagramContext';
 import { ClassNode as ClassNodeComponent } from '@/features/gestion_modelado/editar_elemento/components/ClassNode/ClassNode';
 import { RelationLayer } from '@/features/gestion_modelado/conectar_elemento/components/RelationLayer/RelationLayer';
 import { ConnectPicker } from '@/features/gestion_modelado/conectar_elemento/components/ConnectPicker/ConnectPicker';
 import { ContextMenu, type ContextMenuOption } from '@/features/gestion_modelado/lienzo_principal/components/ContextMenu/ContextMenu';
+import { CommentThreadModal, type ComentarioElemento } from '@/features/gestion_modelado/comentar_elemento';
+import {
+  listarTodosComentariosProyecto,
+  crearComentarioElemento,
+  actualizarComentarioElemento,
+  eliminarComentarioElemento
+} from '@/features/gestion_modelado/comentar_elemento/services/comentarService';
 import type { RelationType } from '@/features/gestion_modelado/shared/types/types';
 import './DiagramCanvas.css';
 
 interface Props {
   onCanvasClick: () => void;
+  proyectoId?: number;
 }
 
-export const DiagramCanvas: React.FC<Props> = ({ onCanvasClick }) => {
+export const DiagramCanvas: React.FC<Props> = ({ onCanvasClick, proyectoId }) => {
   const { nodes, addNode, updateNode, deleteNode, deleteRelation, moveNode, selectedIds, setSelectedIds, connectingSource, activeTool, setActiveTool, startConnect, finishConnect, cancelConnect } = useDiagram();
   const canvasRef = useRef<HTMLDivElement>(null);
 
@@ -33,6 +41,35 @@ export const DiagramCanvas: React.FC<Props> = ({ onCanvasClick }) => {
   // Context Menu
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; targetId?: string } | null>(null);
 
+  // Comentarios colaborativos en elementos del diagrama
+  const [activeCommentElement, setActiveCommentElement] = useState<{ id: string; name: string; type: 'node' | 'relation' } | null>(null);
+  const [allComments, setAllComments] = useState<ComentarioElemento[]>([]);
+
+  const refreshComments = useCallback(async () => {
+    if (proyectoId && proyectoId > 0) {
+      try {
+        const list = await listarTodosComentariosProyecto(proyectoId);
+        setAllComments(list);
+      } catch (err) {
+        console.warn('[DiagramCanvas] Error cargando comentarios:', err);
+      }
+    }
+  }, [proyectoId]);
+
+  useEffect(() => {
+    refreshComments();
+  }, [refreshComments]);
+
+  const commentCountsByElement = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const c of allComments) {
+      if (c.estado === 'abierto') {
+        map[c.elemento_id] = (map[c.elemento_id] || 0) + 1;
+      }
+    }
+    return map;
+  }, [allComments]);
+
   // Calcular posiciones de nodos para colisiones y RelationLayer
   const nodePositions = nodes.map(n => {
     let height = 160;
@@ -45,6 +82,7 @@ export const DiagramCanvas: React.FC<Props> = ({ onCanvasClick }) => {
     }
     return {
       id: n.id,
+      nombre: n.nombre,
       x: n.x,
       y: n.y,
       width: n.width || 220,
@@ -360,7 +398,11 @@ export const DiagramCanvas: React.FC<Props> = ({ onCanvasClick }) => {
           transformOrigin: '0 0',
         }}
       >
-        <RelationLayer nodePositions={nodePositions} />
+        <RelationLayer
+          nodePositions={nodePositions}
+          commentCounts={commentCountsByElement}
+          onOpenComments={(id, name) => setActiveCommentElement({ id, name, type: 'relation' })}
+        />
 
         {nodes.map(node => (
           <div key={node.id} onContextMenu={(e) => handleContextMenu(e, node.id)}>
@@ -370,6 +412,8 @@ export const DiagramCanvas: React.FC<Props> = ({ onCanvasClick }) => {
               onNodeClick={(e) => handleNodeClick(node.id, e)}
               isConnectingMode={!!connectingSource}
               isConnectingSource={connectingSource === node.id}
+              commentCount={commentCountsByElement[node.id] || 0}
+              onOpenComments={(id, name, type) => setActiveCommentElement({ id, name, type })}
             />
           </div>
         ))}
@@ -409,6 +453,39 @@ export const DiagramCanvas: React.FC<Props> = ({ onCanvasClick }) => {
           y={ctxMenu.y}
           options={getContextMenuOptions()}
           onClose={() => setCtxMenu(null)}
+        />
+      )}
+
+      {activeCommentElement && (
+        <CommentThreadModal
+          isOpen={!!activeCommentElement}
+          onClose={() => setActiveCommentElement(null)}
+          elementoId={activeCommentElement.id}
+          elementName={activeCommentElement.name}
+          elementoTipo={activeCommentElement.type}
+          comentarios={allComments.filter(c => c.elemento_id === activeCommentElement.id)}
+          onAgregar={async (texto) => {
+            if (!proyectoId) return;
+            const nuevo = await crearComentarioElemento({
+              proyecto_id: proyectoId,
+              elemento_id: activeCommentElement.id,
+              elemento_tipo: activeCommentElement.type,
+              texto,
+              autor_nombre: 'Colaborador'
+            });
+            await refreshComments();
+            return nuevo;
+          }}
+          onCambiarEstado={async (id, nuevoEstado) => {
+            const updated = await actualizarComentarioElemento(id, { estado: nuevoEstado });
+            await refreshComments();
+            return updated;
+          }}
+          onEliminar={async (id) => {
+            const res = await eliminarComentarioElemento(id);
+            await refreshComments();
+            return res;
+          }}
         />
       )}
     </div>

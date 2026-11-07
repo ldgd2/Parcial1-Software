@@ -72,7 +72,7 @@ export const ExportModal: React.FC<Props> = ({
         <div className="export-modal-header">
           <div className="export-modal-title">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 22v-4a48 48 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
-            <h2>Exportar & Desplegar Backend</h2>
+            <h2>Exportar Monorepo (Backend + Flutter)</h2>
           </div>
           <button className="export-modal-close" onClick={onClose}>&times;</button>
         </div>
@@ -118,9 +118,9 @@ export const ExportModal: React.FC<Props> = ({
                 <div className="option-content">
                   <div className="option-title">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-                    <span>GitHub + Auto-Alojamiento</span>
+                    <span>GitHub Monorepo + Auto-Alojamiento</span>
                   </div>
-                  <p>Genera el código Spring Boot, crea el repo en GitHub y despliega automáticamente con Base de Datos PostgreSQL en Gerlextech Host.</p>
+                  <p>Genera el monorepo con <strong>/backend</strong> (Spring Boot) y <strong>/frontend</strong> (App Móvil Flutter), crea el repositorio en GitHub y despliega automáticamente la API en Gerlextech Host.</p>
                 </div>
               </div>
 
@@ -134,9 +134,9 @@ export const ExportModal: React.FC<Props> = ({
                 <div className="option-content">
                   <div className="option-title">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 22v-4a48 48 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/></svg>
-                    <span>Solo Exportar a GitHub</span>
+                    <span>Solo Exportar Monorepo a GitHub</span>
                   </div>
-                  <p>Genera la estructura de código fuente Java/Spring Boot e sube el repositorio únicamente a tu cuenta de GitHub.</p>
+                  <p>Genera la estructura completa con <strong>/backend</strong> (Spring Boot) y <strong>/frontend</strong> (Flutter) y sube el repositorio únicamente a tu cuenta de GitHub.</p>
                 </div>
               </div>
             </div>

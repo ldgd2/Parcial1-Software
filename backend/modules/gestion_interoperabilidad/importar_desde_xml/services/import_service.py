@@ -83,15 +83,16 @@ async def parsear_xmi(xml_content: str) -> dict:
                     break
             
         if xmi_type in class_xmi_types:
-            node_id = elem.attrib.get('{http://schema.omg.org/spec/XMI/2.1}id') or elem.attrib.get('xmi.id')
-            if node_id:
-                node_id_clean = node_id.replace('EAID_', '')
-                if geometries and node_id_clean not in geometries:
-                    continue
-                    
             mapper = ClassMapper.create(xmi_type, stereotype)
             node_dict = mapper.parse(elem, geometries)
             if node_dict:
+                # Si no tenía geometría previa, asignarle posición en grilla escalonada
+                if not geometries or node_dict.get('id', '') not in geometries:
+                    idx = len(nodes)
+                    col = idx % 3
+                    row = idx // 3
+                    node_dict['x'] = 120 + col * 280
+                    node_dict['y'] = 100 + row * 220
                 nodes.append(node_dict)
             
         elif xmi_type in relation_xmi_types:

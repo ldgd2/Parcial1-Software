@@ -1,0 +1,927 @@
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useRealTimeSync, getUserIdentity } from '@/features/gestion_concurrencia/sincronizacion_tiempo_real/context/RealTimeSyncContext';
+import { useDiagram } from '@/features/gestion_modelado/shared/context/DiagramContext';
+import { getUserColor } from '../utils/chatColors';
+import { calculateSafeNodePositions } from '../utils/layoutMerger';
+import { callGenerateDiagramAPI, fetchAiPromptConfig } from '../services/aiChatService';
+import { generateDeterministicHash } from '@/features/gestion_modelado/shared/utils/hashGenerator';
+import { parseUmlAttribute, parseUmlMethod } from '@/features/gestion_modelado/shared/utils/umlParser';
+import { repartirRolesEquipo } from '@/features/gestion_asistencia_ia/repartir_roles';
+import { repartirTareasEquipo, crearTareaManual } from '@/features/gestion_asistencia_ia/repartir_tareas';
+import type { ChatMessage, QuotedMessage, AiProvider, RoomUserMention, ParallelAiTask } from '../types/chatTypes';
+import type { NodeType, RelationType } from '@/features/gestion_modelado/shared/types/types';
+
+interface UseWhatsAppChatProps {
+  codigoAcceso?: string;
+  proyectoId?: number;
+}
+
+export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWhatsAppChatProps) {
+  const { sendChatMessage, roomUsers, cursors } = useRealTimeSync();
+  const { nodes, relations, addNode, updateNode, addRelation, deleteNode, deleteRelation } = useDiagram();
+
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem(`chat_history_${codigoAcceso}`);
+      if (!saved) return [];
+      const parsed: ChatMessage[] = JSON.parse(saved);
+      return parsed.map(m => {
+        if (m.isAi && m.aiStatus === 'pending') {
+          return {
+            ...m,
+            aiStatus: 'error',
+            text: 'Operación cancelada al reiniciar la sesión.'
+          };
+        }
+        return m;
+      });
+    } catch {
+      return [];
+    }
+  });
+
+  const [provider, setProviderState] = useState<AiProvider>(() => {
+    return (localStorage.getItem('ai_chat_provider') as AiProvider) || 'gemini';
+  });
+
+  const [geminiKey, setGeminiKeyState] = useState<string>(() => {
+    return localStorage.getItem('custom_gemini_key') || '';
+  });
+
+  const [openrouterKey, setOpenrouterKeyState] = useState<string>(() => {
+    return localStorage.getItem('custom_openrouter_key') || '';
+  });
+
+  const [kimiKey, setKimiKeyState] = useState<string>(() => {
+    return localStorage.getItem('custom_kimi_key') || '';
+  });
+
+  const [replyingTo, setReplyingTo] = useState<QuotedMessage | null>(null);
+  const [inFlightTasks, setInFlightTasks] = useState<ParallelAiTask[]>([]);
+  const parallelCounterRef = useRef<number>(0);
+
+  // Sincronizar proveedor por defecto desde .env si no fue guardado localmente
+  useEffect(() => {
+    if (!localStorage.getItem('ai_chat_provider')) {
+      fetchAiPromptConfig()
+        .then(cfg => {
+          if (cfg?.default_provider) {
+            setProviderState(cfg.default_provider);
+            localStorage.setItem('ai_chat_provider', cfg.default_provider);
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
+
+  // Guardar historial en localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(`chat_history_${codigoAcceso}`, JSON.stringify(messages.slice(-100)));
+    } catch {}
+  }, [messages, codigoAcceso]);
+
+  // Escuchar mensajes entrantes por WebSocket
+  useEffect(() => {
+    const handleRemoteMessage = (e: Event) => {
+      const customEvent = e as CustomEvent<ChatMessage>;
+      if (!customEvent.detail || !customEvent.detail.id) return;
+      const incoming = customEvent.detail;
+
+      setMessages(prev => {
+        const exists = prev.some(m => m.id === incoming.id);
+        if (exists) {
+          return prev.map(m => m.id === incoming.id ? incoming : m);
+        }
+        return [...prev, incoming];
+      });
+    };
+
+    const handleRemoteHistory = (e: Event) => {
+      const customEvent = e as CustomEvent<ChatMessage[]>;
+      if (!Array.isArray(customEvent.detail)) return;
+      const history = customEvent.detail;
+
+      setMessages(prev => {
+        const idMap = new Map<string, ChatMessage>();
+        prev.forEach(m => idMap.set(m.id, m));
+        history.forEach(m => idMap.set(m.id, m));
+        return Array.from(idMap.values()).sort((a, b) => a.timestamp - b.timestamp);
+      });
+    };
+
+    window.addEventListener('remote_chat_message', handleRemoteMessage);
+    window.addEventListener('remote_chat_history', handleRemoteHistory);
+
+    return () => {
+      window.removeEventListener('remote_chat_message', handleRemoteMessage);
+      window.removeEventListener('remote_chat_history', handleRemoteHistory);
+    };
+  }, []);
+
+  const setProvider = (newProvider: AiProvider) => {
+    setProviderState(newProvider);
+    localStorage.setItem('ai_chat_provider', newProvider);
+  };
+
+  const setGeminiKey = (key: string) => {
+    setGeminiKeyState(key);
+    localStorage.setItem('custom_gemini_key', key);
+  };
+
+  const setOpenrouterKey = (key: string) => {
+    setOpenrouterKeyState(key);
+    localStorage.setItem('custom_openrouter_key', key);
+  };
+
+  const setKimiKey = (key: string) => {
+    setKimiKeyState(key);
+    localStorage.setItem('custom_kimi_key', key);
+  };
+
+  // Inyección segura de elementos al lienzo con resolución de conflictos y mapeo relacional estricto
+  const injectDiagramResult = useCallback(async (result: any, offsetIndex: number, isRefactoring: boolean = false) => {
+    if (!result) return;
+
+    const JUNK_NAMES = new Set([
+      'diagrama', 'eliminadas', 'eliminada', 'borradas', 'borrada', 'clases', 'clase',
+      'node', 'nodo', 'tabla', 'tablas', 'elementos', 'notification', 'notifications',
+      'notificaciones', 'task', 'tasks', 'assignment', 'assignments', 'student', 'students',
+      'grade', 'grades', 'course', 'courses', 'teacher', 'instructor'
+    ]);
+
+    // Purga automática de nodos basura, temporales o duplicados existentes en el lienzo
+    nodes.forEach(n => {
+      const nameLower = (n.nombre || '').toLowerCase().trim();
+      if (
+        JUNK_NAMES.has(nameLower) ||
+        /^node_\w+$/i.test(nameLower) ||
+        nameLower === 'node_x'
+      ) {
+        deleteNode(n.id);
+      }
+    });
+
+    // 1. Procesar eliminaciones si las hay (soporta ID exacto o Nombre de la clase)
+    if (Array.isArray(result.deletedNodes)) {
+      result.deletedNodes.forEach((item: any) => {
+        const rawTarget = typeof item === 'string' ? item.trim() : (item.id || item.name || '').trim();
+        if (!rawTarget) return;
+        const matchingNodes = nodes.filter(n => 
+          n.id === rawTarget || 
+          (n.nombre && n.nombre.toLowerCase().trim() === rawTarget.toLowerCase())
+        );
+        if (matchingNodes.length > 0) {
+          matchingNodes.forEach(tn => deleteNode(tn.id));
+        } else {
+          deleteNode(rawTarget);
+        }
+      });
+    }
+
+    if (Array.isArray(result.deletedRelations)) {
+      result.deletedRelations.forEach((item: any) => {
+        const targetId = typeof item === 'string' ? item : item.id;
+        if (targetId) deleteRelation(targetId);
+      });
+    }
+
+    // 2. Mapa para resolver identificadores (nombres de clases, IDs temporales o de IA) al ID real del lienzo
+    const nodeMap = new Map<string, string>();
+    nodes.forEach(n => {
+      nodeMap.set(n.id, n.id);
+      nodeMap.set(n.id.toLowerCase(), n.id);
+      if (n.nombre) {
+        nodeMap.set(n.nombre.trim(), n.id);
+        nodeMap.set(n.nombre.trim().toLowerCase(), n.id);
+      }
+    });
+
+    // 3. Filtrar nodos basura y calcular posiciones seguras sin colisiones para llamadas paralelas
+    const rawIncomingNodes = (result.nodes || []).filter((n: any) => {
+      const nameLower = String(n?.name || n?.nombre || '').toLowerCase().trim();
+      return nameLower && !JUNK_NAMES.has(nameLower) && !/^node_\w+$/i.test(nameLower) && nameLower !== 'node_x';
+    });
+    const safeNodes = calculateSafeNodePositions(rawIncomingNodes, nodes, offsetIndex, isRefactoring);
+
+    for (const node of safeNodes) {
+      const rawNode = node as any;
+      const rawAttrs = Array.isArray(rawNode.attributes) ? rawNode.attributes : (Array.isArray(rawNode.atributos) ? rawNode.atributos : []);
+      const rawMethods = Array.isArray(rawNode.methods) ? rawNode.methods : (Array.isArray(rawNode.metodos) ? rawNode.metodos : []);
+      const parsedAttrs = rawAttrs.map((attr: any) => parseUmlAttribute(attr));
+      const parsedMethods = rawMethods.map((m: any) => parseUmlMethod(m));
+      const nodeType = (node.type as NodeType) || 'class';
+
+      const existing = nodes.find(n => 
+        n.id === node.id || 
+        (Boolean(n.nombre) && Boolean(node.name) && n.nombre.toLowerCase() === node.name.toLowerCase())
+      );
+
+      const rawResp = rawNode.responsable || rawNode.responsible || (existing ? existing.responsable : undefined);
+      const rawResps = Array.isArray(rawNode.responsabilidades)
+        ? rawNode.responsabilidades
+        : (Array.isArray(rawNode.skills) ? rawNode.skills : (existing ? existing.responsabilidades : []));
+
+      const hash = await generateDeterministicHash({
+        nombre: node.name,
+        type: nodeType,
+        atributos: parsedAttrs,
+        metodos: parsedMethods,
+        responsable: rawResp,
+        responsabilidades: rawResps
+      });
+
+      let actualNodeId = node.id;
+      if (existing) {
+        actualNodeId = existing.id;
+        updateNode(existing.id, {
+          nombre: node.name,
+          type: nodeType,
+          atributos: parsedAttrs,
+          metodos: parsedMethods,
+          responsable: rawResp,
+          responsabilidades: rawResps,
+          hash,
+          version: existing.version + 1
+        });
+      } else {
+        actualNodeId = node.id || `node_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+        addNode(nodeType, {
+          id: actualNodeId,
+          nombre: node.name,
+          type: nodeType,
+          atributos: parsedAttrs,
+          metodos: parsedMethods,
+          responsable: rawResp,
+          responsabilidades: rawResps,
+          x: node.x,
+          y: node.y,
+          width: 220,
+          color: '#1e293b',
+          hash,
+          version: 0
+        });
+      }
+
+      // Registrar mapeos en nodeMap para conectar relaciones
+      if (node.id) {
+        nodeMap.set(String(node.id), actualNodeId);
+        nodeMap.set(String(node.id).toLowerCase(), actualNodeId);
+      }
+      if (node.name) {
+        nodeMap.set(String(node.name), actualNodeId);
+        nodeMap.set(String(node.name).toLowerCase(), actualNodeId);
+      }
+    }
+
+    // 4. Conectar relaciones con resolución garantizada de IDs reales en el lienzo
+    if (Array.isArray(result.relations)) {
+      result.relations.forEach((rel: any) => {
+        const rawSource = String(rel.sourceId || rel.source || rel.origen || rel.from || rel.src || '').trim();
+        const rawTarget = String(rel.targetId || rel.target || rel.destino || rel.to || rel.dst || '').trim();
+        if (!rawSource || !rawTarget) return;
+
+        // Resolver contra nodeMap o búsqueda directa en lienzo por ID o nombre
+        const sourceId = nodeMap.get(rawSource) || 
+                         nodeMap.get(rawSource.toLowerCase()) || 
+                         nodes.find(n => n.id === rawSource || (n.nombre && n.nombre.toLowerCase() === rawSource.toLowerCase()))?.id ||
+                         rawSource;
+
+        const targetId = nodeMap.get(rawTarget) || 
+                         nodeMap.get(rawTarget.toLowerCase()) || 
+                         nodes.find(n => n.id === rawTarget || (n.nombre && n.nombre.toLowerCase() === rawTarget.toLowerCase()))?.id ||
+                         rawTarget;
+
+        if (sourceId && targetId && sourceId !== targetId) {
+          const relType = rel.type || rel.tipo || 'association';
+          const alreadyExists = (relations || []).some(
+            existingRel =>
+              existingRel.id === rel.id ||
+              (existingRel.sourceId === sourceId && existingRel.targetId === targetId && existingRel.type === relType)
+          );
+          if (!alreadyExists) {
+            const isInheritance = relType === 'inheritance';
+            addRelation({
+              id: rel.id || `rel_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+              sourceId,
+              targetId,
+              type: relType,
+              label: rel.targetMultiplicity || rel.label || (isInheritance ? '' : '1..*'),
+              sourceLabel: rel.sourceMultiplicity || rel.sourceLabel || (isInheritance ? '' : '1'),
+              version: 0,
+              hash: `rel_hash_${Date.now()}`
+            });
+          }
+        }
+      });
+    }
+
+    // 5. Garantía de conexión transversal entre el modelo universitario y entidades existentes
+    const CANONICAL_DOMAIN_RELATIONS: Array<{
+      source: string;
+      target: string;
+      type: RelationType;
+      label: string;
+      sourceLabel: string;
+    }> = [
+      { source: 'Docente', target: 'Usuario', type: 'inheritance', label: '', sourceLabel: '' },
+      { source: 'Estudiante', target: 'Usuario', type: 'inheritance', label: '', sourceLabel: '' },
+      { source: 'Facultad', target: 'Carrera', type: 'aggregation', label: '1..*', sourceLabel: '1' },
+      { source: 'Carrera', target: 'Materia', type: 'aggregation', label: '1..*', sourceLabel: '1' },
+      { source: 'Docente', target: 'Curso', type: 'association', label: '1..*', sourceLabel: '1' },
+      { source: 'Materia', target: 'Curso', type: 'association', label: '1..*', sourceLabel: '1' },
+      { source: 'Curso', target: 'Inscripcion', type: 'association', label: '1..*', sourceLabel: '1' },
+      { source: 'Estudiante', target: 'Inscripcion', type: 'association', label: '1..*', sourceLabel: '1' },
+      { source: 'Curso', target: 'Tarea', type: 'composition', label: '1..*', sourceLabel: '1' },
+      { source: 'Tarea', target: 'Entrega', type: 'composition', label: '1..*', sourceLabel: '1' },
+      { source: 'Estudiante', target: 'Entrega', type: 'association', label: '1..*', sourceLabel: '1' },
+      { source: 'Inscripcion', target: 'Calificacion', type: 'association', label: '1:1', sourceLabel: '1' },
+      { source: 'Entrega', target: 'Revision', type: 'composition', label: '1..*', sourceLabel: '1' },
+      { source: 'Docente', target: 'Revision', type: 'association', label: '1..*', sourceLabel: '1' },
+      { source: 'Revision', target: 'Comentario', type: 'composition', label: '1..*', sourceLabel: '1' },
+      { source: 'Usuario', target: 'Notificacion', type: 'association', label: '1..*', sourceLabel: '1' },
+    ];
+
+    CANONICAL_DOMAIN_RELATIONS.forEach(rule => {
+      const sId = nodeMap.get(rule.source) || nodeMap.get(rule.source.toLowerCase());
+      const tId = nodeMap.get(rule.target) || nodeMap.get(rule.target.toLowerCase());
+      if (sId && tId && sId !== tId) {
+        const alreadyExists = (relations || []).some(
+          r => (r.sourceId === sId && r.targetId === tId) || (r.sourceId === tId && r.targetId === sId)
+        );
+        if (!alreadyExists) {
+          addRelation({
+            id: `rel_${rule.source.toLowerCase()}_${rule.target.toLowerCase()}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+            sourceId: sId,
+            targetId: tId,
+            type: rule.type,
+            label: rule.label,
+            sourceLabel: rule.sourceLabel,
+            version: 0,
+            hash: `rel_hash_${Date.now()}`
+          });
+        }
+      }
+    });
+  }, [nodes, relations, addNode, updateNode, addRelation, deleteNode, deleteRelation]);
+
+  // Ejecución asíncrona paralela de IA
+  const executeParallelAi = useCallback(async (userPromptMessage: ChatMessage) => {
+    const taskId = `task_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const botMatch = userPromptMessage.text.match(/(?:@diag(?:\s+\/([a-zA-Z0-9_-]+))?(?:\s+([\s\S]*))?|^\/([a-zA-Z0-9_-]+)(?:\s+([\s\S]*))?)/i);
+    const command = (botMatch?.[1] || botMatch?.[3] || '').toLowerCase().trim();
+    const userPrompt = (botMatch?.[2] || botMatch?.[4] || '').trim();
+
+    const activeProvider = provider;
+    let activeApiKey = '';
+    if (activeProvider === 'gemini') {
+      activeApiKey = geminiKey;
+    } else if (activeProvider === 'openrouter') {
+      activeApiKey = openrouterKey;
+    } else if (activeProvider === 'kimi') {
+      activeApiKey = kimiKey;
+    }
+
+    const currentOffset = parallelCounterRef.current++;
+
+    const newTask: ParallelAiTask = {
+      taskId,
+      promptMessageId: userPromptMessage.id,
+      prompt: userPromptMessage.text,
+      provider: activeProvider,
+      status: 'pending',
+      startTime: Date.now()
+    };
+
+    setInFlightTasks(prev => [...prev, newTask]);
+
+    const providerLabel = activeProvider === 'gemini' 
+      ? 'Google Gemini' 
+      : activeProvider === 'openrouter' 
+        ? 'OpenRouter' 
+        : 'Kimi Moonshot';
+
+    // Mensaje preliminar de la IA tipo respuesta de WhatsApp
+    const aiMessageId = `ai_reply_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const pendingAiMessage: ChatMessage = {
+      id: aiMessageId,
+      senderId: 'bot_diag',
+      senderName: `@diag (${activeProvider.toUpperCase()})`,
+      senderColor: '#25D366',
+      text: command
+        ? `Ejecutando comando /${command} con ${providerLabel}...`
+        : `Procesando requerimiento en paralelo con ${providerLabel}...`,
+      timestamp: Date.now(),
+      replyTo: {
+        id: userPromptMessage.id,
+        senderName: userPromptMessage.senderName,
+        text: userPromptMessage.text,
+        senderColor: userPromptMessage.senderColor
+      },
+      isAi: true,
+      aiStatus: 'pending',
+      provider: activeProvider
+    };
+
+    setMessages(prev => [...prev, pendingAiMessage]);
+    sendChatMessage(pendingAiMessage);
+
+    try {
+      const devNames = (roomUsers && roomUsers.length > 0)
+        ? roomUsers.map((u: any, i: number) => u.nickname || u.nombre || `Dev ${i + 1}`).join(', ')
+        : (userPromptMessage.senderName || 'Colaborador');
+
+      // 1. Comando /roles o /role con persistencia directa en colaboradores_proyecto y diagrama
+      if ((command === 'roles' || command === 'role') && proyectoId && proyectoId > 0) {
+        try {
+          const getCurrentUserNumericId = (): number => {
+            try {
+              const stored = localStorage.getItem('user');
+              if (stored) {
+                const u = JSON.parse(stored);
+                if (u?.id && Number(u.id) > 0) return Number(u.id);
+              }
+            } catch {}
+            return 1;
+          };
+
+          const extractNumericId = (rawId: any, fallback: number): number => {
+            if (typeof rawId === 'number' && !isNaN(rawId) && rawId > 0) return rawId;
+            const digits = String(rawId || '').replace(/\D/g, '');
+            if (digits) {
+              const n = parseInt(digits, 10);
+              if (!isNaN(n) && n > 0) return n;
+            }
+            return fallback;
+          };
+
+          const myNumericId = getCurrentUserNumericId();
+          const myName = userPromptMessage.senderName || 'Colaborador';
+          const devsList: Array<{ usuario_id: number; nombre: string; etiquetas: string[] }> = [];
+
+          if (roomUsers && roomUsers.length > 0) {
+            roomUsers.forEach((u: any, idx: number) => {
+              const uid = extractNumericId(u.user_id || u.id, idx + 2);
+              const nombre = u.nickname || u.nombre || `Colaborador ${idx + 1}`;
+              if (!devsList.some(d => d.usuario_id === uid)) {
+                devsList.push({
+                  usuario_id: uid,
+                  nombre,
+                  etiquetas: ['modelado', 'backend', 'frontend']
+                });
+              }
+            });
+          }
+
+          if (!devsList.some(d => d.usuario_id === myNumericId)) {
+            devsList.unshift({
+              usuario_id: myNumericId,
+              nombre: myName,
+              etiquetas: ['modelado', 'backend', 'frontend']
+            });
+          }
+
+          const res = await repartirRolesEquipo({
+            proyecto_id: proyectoId,
+            colaboradores: devsList,
+            instrucciones: userPrompt || undefined,
+            provider: activeProvider,
+            api_key: activeApiKey || undefined
+          });
+
+          // Actualizar nodos en el lienzo con los roles asignados
+          if (res.roles && res.roles.length > 0) {
+            res.roles.forEach(r => {
+              (r.clases_asignadas || []).forEach(className => {
+                const nodeToUpdate = (nodes || []).find(n => n.nombre?.toLowerCase() === className.toLowerCase());
+                if (nodeToUpdate) {
+                  updateNode(nodeToUpdate.id, {
+                    responsable: r.nombre,
+                    responsabilidades: [r.rol_ia || 'Desarrollador', ...r.areas],
+                    version: nodeToUpdate.version + 1
+                  });
+                }
+              });
+            });
+          }
+
+          window.dispatchEvent(new Event('refetch_roles_ia'));
+
+          const roleLines = res.roles.map(r =>
+            `• *${r.nombre}*: ${r.rol_ia} [Áreas: ${r.areas.join(', ')}]\n  Clases: ${r.clases_asignadas.join(', ') || 'Generales'}`
+          ).join('\n\n');
+
+          const summaryText = `Roles arquitectónicos y áreas asignadas en el proyecto:\n\n${roleLines}\n\n${res.resumen}`;
+
+          const completedAiMessage: ChatMessage = {
+            ...pendingAiMessage,
+            text: summaryText,
+            aiStatus: 'success',
+            summary: summaryText,
+            timestamp: Date.now()
+          };
+
+          setMessages(prev => prev.map(m => m.id === aiMessageId ? completedAiMessage : m));
+          sendChatMessage(completedAiMessage);
+          setInFlightTasks(prev => prev.filter(t => t.taskId !== taskId));
+          return;
+        } catch (rolesErr) {
+          console.warn('Fallo repartición de roles vía caso de uso repartir_roles:', rolesErr);
+        }
+      }
+
+      // 2. Comando /tareas o /tasks con caso de uso dedicado repartir_tareas
+      if ((command === 'tareas' || command === 'tasks') && proyectoId && proyectoId > 0) {
+        try {
+          const getCurrentUserNumericId = (): number => {
+            try {
+              const stored = localStorage.getItem('user');
+              if (stored) {
+                const u = JSON.parse(stored);
+                if (u?.id && Number(u.id) > 0) return Number(u.id);
+              }
+            } catch {}
+            return 1;
+          };
+
+          const extractNumericId = (rawId: any, fallback: number): number => {
+            if (typeof rawId === 'number' && !isNaN(rawId) && rawId > 0) return rawId;
+            const digits = String(rawId || '').replace(/\D/g, '');
+            if (digits) {
+              const n = parseInt(digits, 10);
+              if (!isNaN(n) && n > 0) return n;
+            }
+            return fallback;
+          };
+
+          const myNumericId = getCurrentUserNumericId();
+          const myName = userPromptMessage.senderName || 'Colaborador';
+          const devsList: Array<{ usuario_id: number; nombre: string; etiquetas: string[] }> = [];
+
+          if (roomUsers && roomUsers.length > 0) {
+            roomUsers.forEach((u: any, idx: number) => {
+              const uid = extractNumericId(u.user_id || u.id, idx + 2);
+              const nombre = u.nickname || u.nombre || `Colaborador ${idx + 1}`;
+              if (!devsList.some(d => d.usuario_id === uid)) {
+                devsList.push({
+                  usuario_id: uid,
+                  nombre,
+                  etiquetas: ['modelado', 'backend', 'frontend']
+                });
+              }
+            });
+          }
+
+          if (!devsList.some(d => d.usuario_id === myNumericId)) {
+            devsList.unshift({
+              usuario_id: myNumericId,
+              nombre: myName,
+              etiquetas: ['modelado', 'backend', 'frontend']
+            });
+          }
+
+          const tareasRes = await repartirTareasEquipo({
+            proyecto_id: proyectoId,
+            descripcion_proyecto: userPrompt || 'Tareas de desarrollo y modelado derivadas de la arquitectura UML actual',
+            colaboradores: devsList,
+            provider: activeProvider,
+            api_key: activeApiKey || undefined
+          });
+
+          window.dispatchEvent(new Event('refetch_tareas_ia'));
+          setTimeout(() => window.dispatchEvent(new Event('refetch_tareas_ia')), 800);
+
+          const createdTasks = tareasRes.tareas;
+          const taskLines = createdTasks.map((t, i) => `${i + 1}. [${(t.area || t.tipo).toUpperCase()}] ${t.titulo}${t.descripcion ? ` - ${t.descripcion}` : ''}`).join('\n');
+          const summaryText = `Tareas generadas y registradas en el proyecto (${createdTasks.length}):\n\n${taskLines}`;
+
+          const completedAiMessage: ChatMessage = {
+            ...pendingAiMessage,
+            text: summaryText,
+            aiStatus: 'success',
+            summary: summaryText,
+            tasksCount: createdTasks.length,
+            timestamp: Date.now()
+          };
+
+          setMessages(prev => prev.map(m => m.id === aiMessageId ? completedAiMessage : m));
+          sendChatMessage(completedAiMessage);
+          setInFlightTasks(prev => prev.filter(t => t.taskId !== taskId));
+          return;
+        } catch (taskErr) {
+          console.warn('Fallo generación directa de tareas vía endpoint de tareas, reintentando con LLM:', taskErr);
+        }
+      }
+
+      // Preparar contexto del diagrama actual en Hyper-DSL ultra-comprimido (máximo ahorro de tokens)
+      let contextString: string | null = null;
+      if (nodes && nodes.length > 0) {
+        const dslParts: string[] = [];
+        nodes.slice(0, 30).forEach(n => {
+          const typeSuffix = n.type && n.type !== 'class' ? `:${n.type}` : '';
+          const attrs = (n.atributos || [])
+            .filter(a => a.nombre.toLowerCase() !== 'id')
+            .map(a => {
+              const t = (a.tipo || '').toLowerCase();
+              if (t === 'int' || t === 'integer') return `#${a.nombre}`;
+              if (t === 'float' || t === 'double' || t === 'decimal') return `$${a.nombre}`;
+              if (t === 'bool' || t === 'boolean') return `?${a.nombre}`;
+              if (t === 'date') return `@${a.nombre}`;
+              if (t === 'datetime' || t === 'timestamp') return `^${a.nombre}`;
+              if (t === 'text' || t === 'json') return `&${a.nombre}`;
+              if (a.visibilidad === 'FK') return `*${a.nombre}`;
+              return a.nombre;
+            })
+            .join(' ');
+
+          const mets = (n.metodos || [])
+            .map(m => {
+              const ret = (m.retorno || 'void').toLowerCase();
+              let prefix = '.';
+              if (ret === 'int' || ret === 'integer') prefix = '.#';
+              else if (ret === 'float' || ret === 'double') prefix = '.$';
+              else if (ret === 'bool' || ret === 'boolean') prefix = '.?';
+              else if (ret === 'date') prefix = '.@';
+              else if (ret === 'string') prefix = '._';
+              return `${prefix}${m.nombre}()`;
+            })
+            .join(' ');
+
+          const nodeBody = [attrs, mets].filter(Boolean).join(' ');
+          dslParts.push(`${n.nombre}${typeSuffix}${nodeBody ? ' ' + nodeBody : ''}`);
+        });
+
+        if (relations && relations.length > 0) {
+          const idToName = new Map<string, string>();
+          nodes.forEach(n => idToName.set(n.id, n.nombre));
+          relations.slice(0, 30).forEach(r => {
+            const sName = idToName.get(r.sourceId) || r.sourceId;
+            const tName = idToName.get(r.targetId) || r.targetId;
+            let sym = '-';
+            if (r.type === 'inheritance') sym = '>';
+            else if (r.type === 'composition') sym = '*';
+            else if (r.type === 'aggregation') sym = 'o';
+            else if (r.type === 'dependency') sym = '.';
+            const card = r.label && r.label !== '1..*' ? `:${r.label}` : '';
+            dslParts.push(`${sName}${sym}${tName}${card}`);
+          });
+        }
+        contextString = dslParts.join(';');
+      }
+
+      // Construcción del prompt según el comando
+      let effectivePrompt = userPromptMessage.text.replace(/@diag/gi, '').trim();
+
+      let isFixRequest = /arregl|desastre|coheren|reorganiz|limpi|corrig/i.test(effectivePrompt);
+
+      if (command === 'roles' || command === 'role') {
+        effectivePrompt = `DISTRIBUCIÓN DE ROLES Y RESPONSABILIDADES:\n` +
+          `Colaboradores presentes: ${devNames}.\n` +
+          `Analiza todas las clases del diagrama y asigna roles arquitectónicos (Backend, Frontend, Base de Datos, Seguridad, Testing) a cada colaborador.\n` +
+          `Actualiza las clases del diagrama asignando |resp:NombreColaborador|resps:[rol,especialidad].\n` +
+          `En el campo 'summary', redacta OBLIGATORIAMENTE un desglose detallado indicando a quién se le asignó cada rol y qué clases tiene a su cargo.\n` +
+          (userPrompt ? `Instrucciones adicionales: ${userPrompt}` : '');
+      } else if (command === 'tareas' || command === 'tasks') {
+        effectivePrompt = `GENERACIÓN DE TAREAS PARA EL EQUIPO:\n` +
+          `Colaboradores disponibles: ${devNames}.\n` +
+          `Genera una lista de tareas (tipo 'diagrama' o 'desarrollo') para implementar o modelar las clases.\n` +
+          `Incluye el array 'tasks' con {titulo, descripcion, tipo}.\n` +
+          `En el campo 'summary', redacta un resumen estructurado de las tareas generadas.\n` +
+          (userPrompt ? `Instrucciones adicionales: ${userPrompt}` : '');
+      } else if (command === 'optimizar') {
+        isFixRequest = true;
+        effectivePrompt = `OPTIMIZACIÓN Y REFACTORIZACIÓN UML:\n` +
+          `Revisa todas las clases, atributos, métodos y relaciones del diagrama actual.\n` +
+          `Corrige cardinalidades, elimina redundancias y normaliza el diseño orientado a objetos.\n` +
+          (userPrompt ? `Instrucciones adicionales: ${userPrompt}` : '');
+      } else if (command === 'explicar') {
+        effectivePrompt = `EXPLICACIÓN ARQUITECTÓNICA:\n` +
+          `Explica de manera didáctica y concisa la arquitectura del diagrama actual, patrones utilizados y la función de cada módulo o clase principal.\n` +
+          (userPrompt ? `Pregunta del usuario: ${userPrompt}` : '');
+      } else if (command === 'limpiar') {
+        isFixRequest = true;
+        effectivePrompt = `LIMPIEZA DE DIAGRAMA:\n` +
+          `Identifica y elimina clases huérfanas, notas obsoletas o relaciones desconectadas que no aporten valor al modelo principal.\n` +
+          (userPrompt ? `Instrucciones adicionales: ${userPrompt}` : '');
+      } else if (command) {
+        effectivePrompt = `[COMANDO /${command}]\n${userPrompt || 'Ejecutar comando sobre el diagrama actual.'}`;
+      } else {
+        if (isFixRequest) {
+          effectivePrompt = `REFACTORIZACIÓN INTEGRAL DEL MODELO UNIVERSITARIO:\n` +
+            `${effectivePrompt}\n\n` +
+            `DIRECTRICES ARQUITECTÓNICAS:\n` +
+            `- Consolida todo en un único modelo universitario conectado (Docente, Estudiante, Materia, Curso, Inscripción, Tarea, Entrega, Calificación, Revisión, Comentario, Notificación).\n` +
+            `- Purga obligatoriamente en 'deletedNodes' toda clase obsoleta o en inglés (Node_x, Node_2, Node_3, Notification, Student, Grade, Course, etc.).\n` +
+            `- Cero clases huérfanas: todas las entidades deben tener relaciones lógicas (asociación, composición, herencia) con cardinalidades explícitas.`;
+        }
+      }
+
+      const result = await callGenerateDiagramAPI(
+        effectivePrompt,
+        contextString,
+        activeProvider,
+        activeApiKey || null,
+        proyectoId
+      );
+
+      // Inyectar en lienzo con reorganización semántica si es refactorización
+      await injectDiagramResult(result, currentOffset, isFixRequest);
+
+      // Si generó tareas, persistir en base de datos para que aparezcan en el checklist
+      let tasksList: any[] = Array.isArray(result.tasks) ? [...result.tasks] : [];
+      if (tasksList.length === 0 && result.summary) {
+        const rawLines = result.summary.split('\n');
+        rawLines.forEach((line: string, i: number) => {
+          const m = line.match(/^\s*(?:\d+[\.\)]|[-•*])\s*(?:\[(.*?)\])?\s*(.*?)(?:\s*[-–—:]\s*(.*))?$/);
+          if (m && m[2] && m[2].trim().length > 3 && (m[1] || command === 'tareas' || command === 'tasks' || line.toLowerCase().includes('tarea') || line.toLowerCase().includes('desarrollo') || line.toLowerCase().includes('diagrama') || line.toLowerCase().includes('backend') || line.toLowerCase().includes('frontend'))) {
+            const rawArea = (m[1] || 'desarrollo').toLowerCase().trim();
+            tasksList.push({
+              titulo: m[2].trim(),
+              descripcion: m[3] ? m[3].trim() : null,
+              tipo: rawArea.includes('diagrama') || rawArea.includes('modelado') ? 'diagrama' : 'desarrollo',
+              area: rawArea || 'general',
+              orden: i + 1
+            });
+          }
+        });
+      }
+
+      const tasksCount = tasksList.length;
+      if (tasksCount > 0 && proyectoId && proyectoId > 0) {
+        let currentUid = 1;
+        try {
+          const stored = localStorage.getItem('user');
+          if (stored) {
+            const u = JSON.parse(stored);
+            if (u?.id && Number(u.id) > 0) currentUid = Number(u.id);
+          }
+        } catch {}
+
+        for (let idx = 0; idx < tasksList.length; idx++) {
+          const t: any = tasksList[idx];
+          try {
+            await crearTareaManual({
+              proyecto_id: proyectoId,
+              usuario_id: currentUid,
+              titulo: t.titulo || `Tarea ${idx + 1}`,
+              descripcion: t.descripcion || null,
+              tipo: t.tipo || 'desarrollo',
+              area: t.area || 'general',
+              orden: idx + 1
+            });
+          } catch (saveErr) {
+            console.warn('Error al persistir tarea generada por IA:', saveErr);
+          }
+        }
+        window.dispatchEvent(new Event('refetch_tareas_ia'));
+        setTimeout(() => window.dispatchEvent(new Event('refetch_tareas_ia')), 800);
+      }
+
+      // Actualizar mensaje de la IA a completado con desglose legible
+      let summaryText = (result.summary || '').trim();
+      if (!summaryText || summaryText === '{' || summaryText.startsWith('{') || summaryText.startsWith('[')) {
+        if (command === 'roles' || command === 'role') {
+          const assigned = (result.nodes || []).filter((n: any) => n.responsable);
+          if (assigned.length > 0) {
+            summaryText = 'Distribución de roles y clases asignadas:\n\n' + assigned.map((n: any) => `• ${n.responsable}: ${n.name || n.nombre}${n.responsabilidades?.length ? ` (${n.responsabilidades.join(', ')})` : ''}`).join('\n');
+          } else {
+            summaryText = 'Roles y responsabilidades asignados en las clases del diagrama.';
+          }
+        } else if (command === 'tareas' || command === 'tasks') {
+          const tList = result.tasks || [];
+          if (tList.length > 0) {
+            summaryText = `Tareas generadas (${tList.length}):\n\n` + tList.map((t: any, i: number) => `${i + 1}. [${(t.tipo || 'desarrollo').toUpperCase()}] ${t.titulo}`).join('\n');
+          } else {
+            summaryText = 'Tareas generadas para el equipo.';
+          }
+        } else {
+          summaryText = 'Diagrama actualizado con éxito según las instrucciones.';
+        }
+      }
+
+      const completedAiMessage: ChatMessage = {
+        ...pendingAiMessage,
+        text: summaryText,
+        aiStatus: 'success',
+        summary: summaryText,
+        tasksCount,
+        timestamp: Date.now()
+      };
+
+      setMessages(prev => {
+        const found = prev.some(m => m.id === aiMessageId);
+        if (found) {
+          return prev.map(m => m.id === aiMessageId ? completedAiMessage : m);
+        }
+        return [...prev, completedAiMessage];
+      });
+      sendChatMessage(completedAiMessage);
+
+      setInFlightTasks(prev => prev.filter(t => t.taskId !== taskId));
+    } catch (err: any) {
+      const errorMsg = err?.message || 'Error al procesar la solicitud con la IA seleccionada.';
+      const failedAiMessage: ChatMessage = {
+        ...pendingAiMessage,
+        text: `Error al procesar con ${activeProvider.toUpperCase()}: ${errorMsg}`,
+        aiStatus: 'error',
+        timestamp: Date.now()
+      };
+
+      setMessages(prev => {
+        const found = prev.some(m => m.id === aiMessageId);
+        if (found) {
+          return prev.map(m => m.id === aiMessageId ? failedAiMessage : m);
+        }
+        return [...prev, failedAiMessage];
+      });
+      sendChatMessage(failedAiMessage);
+      setInFlightTasks(prev => prev.filter(t => t.taskId !== taskId));
+    }
+  }, [provider, geminiKey, openrouterKey, kimiKey, nodes, relations, injectDiagramResult, sendChatMessage, roomUsers, proyectoId]);
+
+  // Enviar mensaje en el chat grupal
+  const sendMessage = useCallback((rawText: string) => {
+    const text = rawText.trim();
+    if (!text) return;
+
+    const identity = getUserIdentity();
+    const userColor = getUserColor(identity.id || identity.nickname);
+
+    const newMessage: ChatMessage = {
+      id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      senderId: identity.id,
+      senderName: identity.nickname,
+      senderColor: userColor,
+      text,
+      timestamp: Date.now(),
+      replyTo: replyingTo || undefined
+    };
+
+    setMessages(prev => [...prev, newMessage]);
+    sendChatMessage(newMessage);
+    setReplyingTo(null);
+
+    // Detección de invocación a @diag o comando slash (/roles, /tareas, etc.)
+    if (/@diag\b/i.test(text) || /^\/[a-zA-Z0-9_-]+/i.test(text)) {
+      executeParallelAi(newMessage);
+    }
+  }, [replyingTo, sendChatMessage, executeParallelAi]);
+
+  // Lista de usuarios y bot para menciones (@)
+  const getMentionableUsers = useCallback((): RoomUserMention[] => {
+    const mentions: RoomUserMention[] = [
+      { id: 'bot_diag', name: 'diag', color: '#25D366', isAi: true }
+    ];
+
+    const seen = new Set<string>();
+    seen.add('diag');
+
+    // Añadir usuarios de la sala
+    if (Array.isArray(roomUsers)) {
+      roomUsers.forEach((u: any) => {
+        const name = u.nickname || u.nombre;
+        if (name && !seen.has(name.toLowerCase())) {
+          seen.add(name.toLowerCase());
+          mentions.push({
+            id: u.guest_id || u.id || name,
+            name,
+            color: getUserColor(u.guest_id || name)
+          });
+        }
+      });
+    }
+
+    // Añadir cursores activos
+    if (cursors) {
+      Object.entries(cursors).forEach(([id, c]) => {
+        if (c.nickname && !seen.has(c.nickname.toLowerCase())) {
+          seen.add(c.nickname.toLowerCase());
+          mentions.push({
+            id,
+            name: c.nickname,
+            color: getUserColor(id)
+          });
+        }
+      });
+    }
+
+    return mentions;
+  }, [roomUsers, cursors]);
+
+  return {
+    messages,
+    provider,
+    setProvider,
+    geminiKey,
+    setGeminiKey,
+    openrouterKey,
+    setOpenrouterKey,
+    kimiKey,
+    setKimiKey,
+    replyingTo,
+    setReplyingTo,
+    sendMessage,
+    inFlightTasks,
+    getMentionableUsers
+  };
+}
