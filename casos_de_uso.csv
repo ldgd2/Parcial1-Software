@@ -1,36 +1,38 @@
-Ciclo,NRO,CASO DE USO,ESTADO,PRIORIDAD,RIESGO,ACTOR
-Ciclo 1,CU01,Registrar usuario,APROBADO,ALTA,NORMAL,Usuario
-Ciclo 1,CU02,Iniciar sesión,APROBADO,ALTA,NORMAL,Usuario
-Ciclo 1,CU03,Cerrar sesión,APROBADO,NORMAL,NORMAL,Usuario
-Ciclo 1,CU04,Recuperar password,APROBADO,NORMAL,NORMAL,Usuario
-Ciclo 1,CU05,Configurar perfil,APROBADO,NORMAL,NORMAL,Usuario
-Ciclo 1,CU06,Crear proyecto,APROBADO,CRÍTICA,NORMAL,Usuario
-Ciclo 1,CU07,Administrar proyecto,APROBADO,MEDIA,NORMAL,Anfitrión
-Ciclo 1,CU08,Compartir proyecto,APROBADO,ALTA,NORMAL,Anfitrión
+Ciclo,NRO,CASO DE USO,PAQUETE,ESTADO,PRIORIDAD,RIESGO,ACTOR
+Ciclo 1,CU01,Registrar usuario,Gestión de Usuarios,APROBADO,ALTA,NORMAL,Usuario
+Ciclo 1,CU02,Iniciar sesión,Gestión de Usuarios,APROBADO,ALTA,NORMAL,Usuario
+Ciclo 1,CU03,Cerrar sesión,Gestión de Usuarios,APROBADO,NORMAL,NORMAL,Usuario
+Ciclo 1,CU04,Recuperar password,Gestión de Usuarios,APROBADO,NORMAL,NORMAL,Usuario
+Ciclo 1,CU05,Configurar perfil,Gestión de Usuarios,APROBADO,NORMAL,NORMAL,Usuario
+Ciclo 1,CU06,Crear proyecto,Gestión de Proyectos,APROBADO,CRÍTICA,NORMAL,Usuario
+Ciclo 1,CU07,Administrar proyecto,Gestión de Proyectos,APROBADO,MEDIA,NORMAL,Anfitrión
+Ciclo 1,CU08,Compartir proyecto,Gestión de Proyectos,APROBADO,ALTA,NORMAL,Anfitrión
 
-Ciclo 2,CU11,Cargar lienzo,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador
-Ciclo 2,CU12,Guardar lienzo,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador
-Ciclo 2,CU13,Unirse a sala,APROBADO,CRÍTICA,NORMAL,Colaborador
-Ciclo 2,CU14,Insertar elemento,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador
-Ciclo 2,CU15,Conectar elemento,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador
-Ciclo 2,CU16,Editar elemento,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador
-Ciclo 2,CU17,Eliminar elemento,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador
-Ciclo 2,CU18,Bloquear elemento,APROBADO,CRÍTICA,ALTO,Anfitrión / Colaborador
-Ciclo 2,CU19,Sincronización en tiempo real,APROBADO,CRÍTICA,ALTO,Anfitrión / Colaborador
+Ciclo 2,CU11,Cargar lienzo,Gestión de Salas,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador
+Ciclo 2,CU12,Guardar lienzo,Gestión de Salas,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador
+Ciclo 2,CU13,Unirse a sala,Gestión de Salas,APROBADO,CRÍTICA,NORMAL,Colaborador
+Ciclo 2,CU14,Insertar elemento,Gestión de Modelado,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador
+Ciclo 2,CU15,Conectar elemento,Gestión de Modelado,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador
+Ciclo 2,CU16,Editar elemento,Gestión de Modelado,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador
+Ciclo 2,CU17,Eliminar elemento,Gestión de Modelado,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador
+Ciclo 2,CU18,Bloquear elemento,Gestión de Modelado,APROBADO,CRÍTICA,ALTO,Anfitrión / Colaborador
+Ciclo 2,CU19,Sincronización en tiempo real,Gestión de Concurrencia,APROBADO,CRÍTICA,ALTO,Anfitrión / Colaborador
 
-Ciclo 3,CU09,Control de versiones (Versioning),APROBADO,CRÍTICA,ALTO,Anfitrión / Colaborador
-Ciclo 3,CU20,Sincronizar estado local (Offline),APROBADO,CRÍTICA,ALTO,Anfitrión / Colaborador
-Ciclo 3,CU21,Digitalizar desde imagen,APROBADO,ALTA,ALTO,Usuario / API IA
-Ciclo 3,CU22,Generar diagrama desde prompt,APROBADO,ALTA,ALTO,Usuario / API IA
-Ciclo 3,CU23,Exportar a GitHub (Código fuente),APROBADO,CRÍTICA,ALTO,Anfitrión / API Github
-Ciclo 3,CU24,Repartición de tareas mediante IA,APROBADO,ALTA,ALTO,Anfitrión / API IA
-Ciclo 3,CU27,Asignación estructurada por roles,APROBADO,ALTA,ALTO,Anfitrión / API IA
-Ciclo 3,CU10,Notificar despliegue,APROBADO,ALTA,ALTO,API Deployer / Anfitrión
-Ciclo 3,CU25,Exportar a XML,APROBADO,NORMAL,NORMAL,Anfitrión
-Ciclo 3,CU26,Importar desde XML,APROBADO,NORMAL,NORMAL,Anfitrión
+Ciclo 3,CU09,Control de versiones (Versioning),Gestión de Proyectos,APROBADO,CRÍTICA,ALTO,Anfitrión / Colaborador
+Ciclo 3,CU20,Sincronizar estado local (Offline),Gestión de Concurrencia,APROBADO,CRÍTICA,ALTO,Anfitrión / Colaborador
+Ciclo 3,CU21,Digitalizar desde imagen,Gestión de Asistencia IA,APROBADO,ALTA,ALTO,Usuario / API IA
+Ciclo 3,CU22,Generar diagrama desde prompt,Gestión de Asistencia IA,APROBADO,ALTA,ALTO,Usuario / API IA
+Ciclo 3,CU23,Exportar a GitHub (Código fuente),Gestión de Asistencia IA,APROBADO,CRÍTICA,ALTO,Anfitrión / API Github
+Ciclo 3,CU24,Repartición de tareas mediante IA,Gestión de Proyectos Asistida,APROBADO,ALTA,ALTO,Anfitrión / API IA
+Ciclo 3,CU27,Asignación estructurada por roles,Gestión de Proyectos Asistida,APROBADO,ALTA,ALTO,Anfitrión / API IA
+Ciclo 3,CU10,Notificar despliegue,Gestión de Despliegue,APROBADO,ALTA,ALTO,API Deployer / Anfitrión
+Ciclo 3,CU25,Exportar a XML,Gestión de Interoperabilidad,APROBADO,NORMAL,NORMAL,Anfitrión
+Ciclo 3,CU26,Importar desde XML,Gestión de Interoperabilidad,APROBADO,NORMAL,NORMAL,Anfitrión
 
-Ciclo 4,CU28,Generación de seeders con datos randómicos,APROBADO,ALTA,NORMAL,Anfitrión / API IA
-Ciclo 4,CU29,Generación de frontend móvil (Flutter),APROBADO,ALTA,ALTO,Anfitrión / API IA
-Ciclo 4,CU30,Feedback en diagramas (Comentarios colaborativos),APROBADO,MEDIA,NORMAL,Anfitrión / Colaborador
-Ciclo 4,CU31,Validación de modelos (Detector de errores en XML),APROBADO,ALTA,ALTO,Anfitrión / Motor XML
-
+Ciclo 4,CU28,Generación de seeders con datos randómicos,Gestión de Asistencia IA,APROBADO,ALTA,NORMAL,Anfitrión / API IA
+Ciclo 4,CU29,Generación de frontend móvil (Flutter),Gestión de Asistencia IA,APROBADO,ALTA,ALTO,Anfitrión / API IA
+Ciclo 4,CU30,Feedback en diagramas (Comentarios colaborativos),Gestión de Modelado,APROBADO,MEDIA,NORMAL,Anfitrión / Colaborador
+Ciclo 4,CU31,Validación de modelos (Detector de errores en XML),Gestión de Interoperabilidad,APROBADO,ALTA,ALTO,Anfitrión / Motor XML
+Ciclo 4,CU32,Visualización colaborativa en tiempo real (App móvil Flutter),Gestión Móvil,APROBADO,ALTA,ALTO,Colaborador / Observador
+Ciclo 4,CU33,Gestión de contexto persistente de IA,Gestión de Asistencia IA,APROBADO,ALTA,NORMAL,Anfitrión / API IA
+Ciclo 4,CU34,Gestión de equipo autónomo de agentes IA,Gestión de Asistencia IA,APROBADO,ALTA,ALTO,Anfitrión / API IA
