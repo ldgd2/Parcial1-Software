@@ -6,8 +6,8 @@ import { calculateSafeNodePositions } from '../utils/layoutMerger';
 import { callGenerateDiagramAPI, fetchAiPromptConfig } from '../services/aiChatService';
 import { generateDeterministicHash } from '@/features/gestion_modelado/shared/utils/hashGenerator';
 import { parseUmlAttribute, parseUmlMethod } from '@/features/gestion_modelado/shared/utils/umlParser';
-import { repartirRolesEquipo } from '@/features/gestion_asistencia_ia/repartir_roles';
-import { repartirTareasEquipo, crearTareaManual } from '@/features/gestion_asistencia_ia/repartir_tareas';
+import { repartirRolesEquipo, type ColaboradorRolOut } from '@/features/gestion_proyectos_asistida/repartir_roles';
+import { repartirTareasEquipo, crearTareaManual, type TareaItem } from '@/features/gestion_proyectos_asistida/repartir_tareas';
 import type { ChatMessage, QuotedMessage, AiProvider, RoomUserMention, ParallelAiTask } from '../types/chatTypes';
 import type { NodeType } from '@/features/gestion_modelado/shared/types/types';
 
@@ -460,8 +460,8 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
 
           // Actualizar nodos en el lienzo con los roles asignados
           if (res.roles && res.roles.length > 0) {
-            res.roles.forEach(r => {
-              (r.clases_asignadas || []).forEach(className => {
+            res.roles.forEach((r: ColaboradorRolOut) => {
+              (r.clases_asignadas || []).forEach((className: string) => {
                 const nodeToUpdate = (nodes || []).find(n => n.nombre?.toLowerCase() === className.toLowerCase());
                 if (nodeToUpdate) {
                   updateNode(nodeToUpdate.id, {
@@ -476,7 +476,7 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
 
           window.dispatchEvent(new Event('refetch_roles_ia'));
 
-          const roleLines = res.roles.map(r =>
+          const roleLines = res.roles.map((r: ColaboradorRolOut) =>
             `• *${r.nombre}*: ${r.rol_ia} [Áreas: ${r.areas.join(', ')}]\n  Clases: ${r.clases_asignadas.join(', ') || 'Generales'}`
           ).join('\n\n');
 
@@ -561,7 +561,7 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
           setTimeout(() => window.dispatchEvent(new Event('refetch_tareas_ia')), 800);
 
           const createdTasks = tareasRes.tareas;
-          const taskLines = createdTasks.map((t, i) => `${i + 1}. [${(t.area || t.tipo).toUpperCase()}] ${t.titulo}${t.descripcion ? ` - ${t.descripcion}` : ''}`).join('\n');
+          const taskLines = createdTasks.map((t: TareaItem, i: number) => `${i + 1}. [${(t.area || t.tipo).toUpperCase()}] ${t.titulo}${t.descripcion ? ` - ${t.descripcion}` : ''}`).join('\n');
           const summaryText = `Tareas generadas y registradas en el proyecto (${createdTasks.length}):\n\n${taskLines}`;
 
           const completedAiMessage: ChatMessage = {

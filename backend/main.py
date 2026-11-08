@@ -50,8 +50,8 @@ from backend.modules.gestion_asistencia_ia.digitalizar_desde_imagen.controllers.
 from backend.modules.gestion_asistencia_ia.exportar_github.controllers.exportar_controller import router as exportar_github_router
 from backend.modules.gestion_asistencia_ia.gestionar_equipo_ia.controllers.equipo_controller import router as equipo_ia_router
 from backend.modules.gestion_asistencia_ia.generar_app_movil.controllers.app_movil_controller import router as app_movil_router
-from backend.modules.gestion_asistencia_ia.repartir_roles.controllers.roles_controller import router as repartir_roles_router
-from backend.modules.gestion_asistencia_ia.repartir_tareas.controllers.tareas_controller import router as repartir_tareas_router
+from backend.modules.gestion_proyectos_asistida.repartir_roles.controllers.roles_controller import router as repartir_roles_router
+from backend.modules.gestion_proyectos_asistida.repartir_tareas.controllers.tareas_controller import router as repartir_tareas_router
 from backend.modules.gestion_asistencia_ia.gestionar_contexto_persistente.controllers.contexto_controller import router as contexto_ia_router
 from backend.modules.gestion_asistencia_ia.generar_seeders.controllers.seeders_controller import router as seeders_ia_router
 

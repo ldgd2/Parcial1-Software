@@ -1,2 +1,1 @@
-export * from './services/rolesService';
-
+export * from '@/features/gestion_proyectos_asistida/repartir_roles';

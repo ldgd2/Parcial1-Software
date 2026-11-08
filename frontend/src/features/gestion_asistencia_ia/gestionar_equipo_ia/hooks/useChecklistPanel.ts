@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { obtenerMisTareas as getMisTareasNew, obtenerTodasLasTareas as getTodasNew, marcarTarea as markTareaNew } from '@/features/gestion_asistencia_ia/repartir_tareas';
+import { obtenerMisTareas as getMisTareasNew, obtenerTodasLasTareas as getTodasNew, marcarTarea as markTareaNew } from '@/features/gestion_proyectos_asistida/repartir_tareas';
 import { obtenerMisTareas, obtenerTodasLasTareas, marcarTarea, type TareaIA } from '../services/equipoService';
 
 export function useChecklistPanel(proyectoId: number) {
