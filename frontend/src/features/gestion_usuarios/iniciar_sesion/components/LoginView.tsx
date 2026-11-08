@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
 import { Widget } from '../../../../shared/components/ui/Widget';
 import { AuthLayout } from '../../shared/AuthLayout';
 import { apiFetch } from '@/shared/lib/api';
@@ -9,6 +10,7 @@ import './login.css';
 export const LoginView: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const navigate = useNavigate();
@@ -73,14 +75,28 @@ export const LoginView: React.FC = () => {
           required
         />
         
-        <Widget.Input.Secondary 
-          type="password" 
-          placeholder="••••••••" 
-          label="CONTRASEÑA"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
+        <div className="widget-input-wrapper">
+          <label className="widget-input-label" htmlFor="login-password">CONTRASEÑA</label>
+          <div className="password-input-wrapper">
+            <input
+              id="login-password"
+              className="widget-input widget-input-secondary password-input"
+              type={showPassword ? 'text' : 'password'}
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            <button
+              type="button"
+              className="password-toggle"
+              onClick={() => setShowPassword((isVisible) => !isVisible)}
+              aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+            >
+              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+            </button>
+          </div>
+        </div>
         
         <div className="auth-actions">
           <Widget.Button.Primary type="submit" isLoading={isLoading} className="auth-btn-massive">
