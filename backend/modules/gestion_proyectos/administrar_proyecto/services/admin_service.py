@@ -9,6 +9,9 @@ from backend.modules.gestion_proyectos.administrar_proyecto.schemas.request impo
 async def listar_mis_proyectos(user: Usuario, db: AsyncSession):
     return await admin_repo.get_mis_proyectos(db, user.id)
 
+async def listar_todos_los_proyectos(db: AsyncSession):
+    return await admin_repo.get_multi(db, limit=100)
+
 async def _verificar_anfitrion(db: AsyncSession, proyecto_id: int, user_id: int):
     colaborador = await admin_repo.get_colaborador(db, proyecto_id, user_id)
     if not colaborador or colaborador.rol_proyecto != "anfitrion" or colaborador.estado != "aprobado":
