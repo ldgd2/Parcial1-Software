@@ -28,3 +28,9 @@ Ciclo 3,CU27,Asignación estructurada por roles,APROBADO,ALTA,ALTO,Anfitrión / 
 Ciclo 3,CU10,Notificar despliegue,APROBADO,ALTA,ALTO,API Deployer / Anfitrión
 Ciclo 3,CU25,Exportar a XML,APROBADO,NORMAL,NORMAL,Anfitrión
 Ciclo 3,CU26,Importar desde XML,APROBADO,NORMAL,NORMAL,Anfitrión
+
+Ciclo 4,CU28,Generación de seeders con datos randómicos,APROBADO,ALTA,NORMAL,Anfitrión / API IA
+Ciclo 4,CU29,Generación de frontend móvil (Flutter),APROBADO,ALTA,ALTO,Anfitrión / API IA
+Ciclo 4,CU30,Feedback en diagramas (Comentarios colaborativos),APROBADO,MEDIA,NORMAL,Anfitrión / Colaborador
+Ciclo 4,CU31,Validación de modelos (Detector de errores en XML),APROBADO,ALTA,ALTO,Anfitrión / Motor XML
+
