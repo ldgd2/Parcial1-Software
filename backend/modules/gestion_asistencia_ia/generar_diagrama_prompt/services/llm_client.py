@@ -105,7 +105,7 @@ async def _consultar_gemini(
         }
     }
 
-    models_to_try = ["gemini-2.5-flash"]
+    models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
     last_error = ""
 
     async with httpx.AsyncClient(timeout=90.0) as client:
@@ -307,14 +307,30 @@ async def consultar_llm(
     except Exception as exc:
         last_exc = exc
 
-    # Fallback automático a Gemini si el proveedor primario falla
-    if target != "gemini" and settings.GEMINI_API:
+    # Fallback multi-proveedor automático si el proveedor primario falla
+    providers_to_fallback = []
+    if target != "gemini" and (settings.GEMINI_API or api_key):
+        providers_to_fallback.append("gemini")
+    if target != "kimi" and settings.KIMI_API:
+        providers_to_fallback.append("kimi")
+    if target != "openrouter" and settings.OPENROUTE_API:
+        providers_to_fallback.append("openrouter")
+
+    for fb_provider in providers_to_fallback:
         try:
-            result = await _consultar_gemini(prompt, context, image_base64, image_mime_type)
+            if fb_provider == "gemini":
+                result = await _consultar_gemini(prompt, context, image_base64, image_mime_type, api_key)
+            elif fb_provider == "kimi":
+                result = await _consultar_kimi(prompt, context, image_base64, image_mime_type, api_key)
+            elif fb_provider == "openrouter":
+                result = await _consultar_openrouter(prompt, context, image_base64, image_mime_type, api_key)
+            else:
+                continue
+
             if result and len(result.strip()) >= 15 and result.strip() not in ["{", "{}", "[]", "null"]:
-                return result, "gemini (fallback)"
+                return result, f"{fb_provider} (fallback)"
         except Exception:
-            pass
+            continue
 
     if last_exc:
         raise last_exc
