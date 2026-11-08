@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, Literal, List
 from datetime import datetime
 
-NodeType = Literal["class", "interface", "abstract", "enum", "note"]
+NodeType = str
 
 
 class AtributoSchema(BaseModel):

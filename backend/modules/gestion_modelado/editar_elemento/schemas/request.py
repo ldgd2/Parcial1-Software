@@ -2,11 +2,8 @@ from pydantic import BaseModel
 from typing import Optional, Literal, List
 from datetime import datetime
 
-NodeType = Literal["class", "interface", "abstract", "enum", "note"]
-RelationType = Literal[
-    "association", "inheritance", "composition",
-    "aggregation", "dependency", "realization", "directed"
-]
+NodeType = str
+RelationType = str
 
 
 class AtributoSchema(BaseModel):

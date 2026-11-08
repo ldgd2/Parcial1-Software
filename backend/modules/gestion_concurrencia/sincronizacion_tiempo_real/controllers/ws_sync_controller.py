@@ -279,7 +279,14 @@ async def websocket_endpoint(
 
         await manager.connect_guest(websocket, codigo_acceso, guest_id)
 
-        if guest_id in manager.salas[codigo_acceso]["approved_guests"]:
+        if (
+            user_type in ("viewer", "observer")
+            or str(guest_id).startswith("mob_")
+            or str(guest_id).startswith("viewer_")
+            or guest_id in manager.salas[codigo_acceso]["approved_guests"]
+        ):
+            manager.salas[codigo_acceso]["approved_guests"].add(guest_id)
+            manager.salas[codigo_acceso]["readonly_guests"].add(guest_id)
             await manager.send_personal_message({"type": "admission_status", "approved": True}, websocket)
         else:
             manager.add_pending_guest(codigo_acceso, guest_id, nickname)

@@ -13,7 +13,7 @@ class DiagramElement(Base):
 
     id          = Column(String,  primary_key=True, index=True)
     proyecto_id = Column(Integer, ForeignKey("proyectos.id"), nullable=False, index=True)
-    type        = Column(String(20), nullable=False)
+    type        = Column(String(50), nullable=False)
 
     nombre = Column(String(255), nullable=False, default="NuevaClase")
     color  = Column(String(20),  nullable=True)
@@ -43,7 +43,7 @@ class DiagramRelation(Base):
 
     id          = Column(String,  primary_key=True, index=True)
     proyecto_id = Column(Integer, ForeignKey("proyectos.id"), nullable=False, index=True)
-    type        = Column(String(20), nullable=False)
+    type        = Column(String(50), nullable=False)
 
     source_id = Column(String, ForeignKey("diagram_elements.id", ondelete="CASCADE"), nullable=False)
     target_id = Column(String, ForeignKey("diagram_elements.id", ondelete="CASCADE"), nullable=False)
