@@ -23,6 +23,25 @@ if __name__ == "__main__":
 if __name__ == "__main__":
     fix_state()
 def _load_env(env_path: Path) -> Dict[str, str]:
+    env: Dict[str, str] = {}
+    if not env_path.is_file():
+        console.print(f"[bold red].env no encontrado en {env_path}[/bold red]")
+        # intentar buscar en carpeta Movil
+        alt_path = Path(BACKEND_DIR).parent / "Movil" / ".env"
+        if alt_path.is_file():
+            env_path = alt_path
+            console.print(f"[bold yellow]Usando .env alternativo en {env_path}[/bold yellow]")
+        else:
+            sys.exit(1)
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        env[key.strip()] = value.strip()
+    return env
 if __name__ == "__main__":
     fix_state()
     env: Dict[str, str] = {}
