@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "421074034952",
+    "project_id": "diagramador-97a74",
+    "storage_bucket": "diagramador-97a74.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:421074034952:android:dc6957cb400d70c6f44cbd",
+        "android_client_info": {
+          "package_name": "com.diagramador"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBYvzs0VF-1SlFLvq-89rEC3oBbUPMGSFc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
