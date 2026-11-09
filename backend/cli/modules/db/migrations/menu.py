@@ -168,7 +168,18 @@ def menu_migrations():
 
 
 
+        elif opcion == "7":
+        console.print("[dim]Ejecutando reparación automática del estado de migraciones...[/dim]")
+        from .fix_state import fix_state
+        fix_state()
+        # Mostrar estado actualizado
+        estado = obtener_estado()
+        if estado:
+            mostrar_estado()
+        Prompt.ask("\nPresiona Enter para continuar")
+
         elif opcion == "0":
+            break
             break
 
     while True:
@@ -235,5 +246,16 @@ def menu_migrations():
             ejecutar_comando_alembic(["history", "--indicate-current"])
             Prompt.ask("\nPresiona Enter para continuar")
 
+        elif opcion == "7":
+        console.print("[dim]Ejecutando reparación automática del estado de migraciones...[/dim]")
+        from .fix_state import fix_state
+        fix_state()
+        # Mostrar estado actualizado
+        estado = obtener_estado()
+        if estado:
+            mostrar_estado()
+        Prompt.ask("\nPresiona Enter para continuar")
+
         elif opcion == "0":
+            break
             break
