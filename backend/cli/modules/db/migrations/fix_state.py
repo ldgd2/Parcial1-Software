@@ -66,7 +66,7 @@ def fix_state() -> None:
     2. Delete the orphan revision ``e3f4a5b6c7d8``.
     3. Stamp the database to the current head.
     """
-    env_path = Path(BACKEND_DIR).parent / ".env"
+    env_path = Path(BACKEND_DIR) / ".env"
     env = _load_env(env_path)
     conn_str = _build_conn_str(env)
     orphan_rev = "e3f4a5b6c7d8"
