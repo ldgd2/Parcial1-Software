@@ -1,6 +1,6 @@
-import asyncio
 from rich.prompt import Prompt
 from backend.cli.console import console
+from backend.cli.async_runner import ejecutar_async
 from .db_executor import crear_notificacion_in_app
 
 
@@ -19,7 +19,7 @@ def ejecutar() -> None:
     url = Prompt.ask("URL de destino", default="/dashboard")
 
     try:
-        asyncio.run(crear_notificacion_in_app(
+        ejecutar_async(crear_notificacion_in_app(
             usuario_id=uid,
             titulo=titulo,
             mensaje=mensaje,

@@ -1,13 +1,9 @@
-import asyncio
 from rich.prompt import Prompt, Confirm
 from rich.table import Table
 from backend.cli.console import console
+from backend.cli.async_runner import ejecutar_async
 from backend.modules.gestion_asistencia_ia.notificaciones.firebase_init import send_fcm_message
-from .db_executor import (
-    obtener_todos_los_tokens_unicos,
-    crear_campana_in_app_todos,
-    registrar_log_envio,
-)
+from .db_executor import ejecutar_campana_completa
 
 
 def ejecutar() -> None:
@@ -22,21 +18,18 @@ def ejecutar() -> None:
         console.print("[dim]Campana cancelada.[/dim]")
         return
 
-    # 1. Crear notificaciones en la base de datos (In-App para todos)
     usuarios_notificados = 0
-    with console.status("[bold cyan]Guardando notificacion in-app para todos los usuarios..."):
+    tokens = []
+
+    with console.status("[bold cyan]Procesando campana en la base de datos..."):
         try:
-            usuarios_notificados = asyncio.run(crear_campana_in_app_todos(
-                titulo=titulo,
-                mensaje=mensaje,
-                url=url,
-            ))
+            usuarios_notificados, tokens = ejecutar_async(
+                ejecutar_campana_completa(titulo, mensaje, url)
+            )
             console.print(f"[bold green]In-App:[/bold green] Guardada para {usuarios_notificados} usuarios en la base de datos.")
         except Exception as e:
-            console.print(f"[bold red]Error al guardar notificaciones in-app:[/bold red] {e}")
+            console.print(f"[bold red]Error al procesar en base de datos:[/bold red] {e}")
 
-    # 2. Enviar notificaciones push a todos los dispositivos registrados
-    tokens = asyncio.run(obtener_todos_los_tokens_unicos())
     exitos_push = 0
     fallos_push = 0
 
@@ -60,8 +53,8 @@ def ejecutar() -> None:
                     exitos_push += 1
                 except Exception as e:
                     fallos_push += 1
+                    console.print(f"[dim red]Error en token {tok[:20]}...: {e}[/dim red]")
 
-    # 3. Resumen final de la campaña
     tabla = Table(title="Resumen de la Campana Global")
     tabla.add_column("Canal", style="cyan")
     tabla.add_column("Destinatarios", justify="right", style="white")
@@ -80,4 +73,3 @@ def ejecutar() -> None:
 
     console.print("\n")
     console.print(tabla)
-
