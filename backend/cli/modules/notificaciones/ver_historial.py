@@ -1,12 +1,12 @@
-import asyncio
 from rich.table import Table
 from backend.cli.console import console
+from backend.cli.async_runner import ejecutar_async
 from .db_executor import obtener_historial_logs
 
 
 def ejecutar() -> None:
     console.print("\n[bold cyan]=== HISTORIAL DE ENVIOS PUSH ===[/bold cyan]\n")
-    logs = asyncio.run(obtener_historial_logs(limite=20))
+    logs = ejecutar_async(obtener_historial_logs(limite=20))
 
     if not logs:
         console.print("[yellow]No hay registros en notifications_log.[/yellow]")

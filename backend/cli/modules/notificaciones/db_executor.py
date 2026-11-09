@@ -112,6 +112,59 @@ async def registrar_log_envio(
             await session.commit()
 
 
+async def ejecutar_campana_completa(
+    titulo: str,
+    mensaje: str,
+    url: str = "/dashboard",
+) -> tuple[int, List[str]]:
+    """
+    Inserta una notificacion in-app para TODOS los usuarios y obtiene
+    todos los tokens push unicos en una sola sesion limpia.
+    """
+    async with AsyncSessionLocal() as session:
+        # 1. Notificaciones in-app
+        res = await session.execute(select(Usuario.id).where(Usuario.is_active == True))
+        user_ids = res.scalars().all()
+        if not user_ids:
+            res_all = await session.execute(select(Usuario.id))
+            user_ids = res_all.scalars().all()
+
+        notifs = [
+            Notificacion(
+                usuario_id=uid,
+                tipo="campana",
+                titulo=titulo,
+                mensaje=mensaje,
+                url=url,
+                leida=False,
+            )
+            for uid in user_ids
+        ]
+        if notifs:
+            session.add_all(notifs)
+            await session.commit()
+
+        # 2. Tokens push unicos
+        tokens_set = set()
+        try:
+            res1 = await session.execute(select(DispositivoPush.token))
+            for tok in res1.scalars().all():
+                if tok and tok.strip():
+                    tokens_set.add(tok.strip())
+        except Exception:
+            pass
+
+        try:
+            res2 = await session.execute(select(NotificationToken.device_token))
+            for tok in res2.scalars().all():
+                if tok and tok.strip():
+                    tokens_set.add(tok.strip())
+        except Exception:
+            pass
+
+        return len(notifs), list(tokens_set)
+
+
 async def crear_campana_in_app_todos(
     titulo: str,
     mensaje: str,

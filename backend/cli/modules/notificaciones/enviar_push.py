@@ -1,6 +1,6 @@
-import asyncio
 from rich.prompt import Prompt
 from backend.cli.console import console
+from backend.cli.async_runner import ejecutar_async
 from backend.modules.gestion_asistencia_ia.notificaciones.firebase_init import send_fcm_message
 from .db_executor import (
     obtener_token_por_usuario,
@@ -24,7 +24,7 @@ def ejecutar() -> None:
     cuerpo = Prompt.ask("Cuerpo del mensaje", default="Aviso general para todos los colaboradores")
 
     if op == "1":
-        tokens = asyncio.run(obtener_todos_los_tokens_unicos())
+        tokens = ejecutar_async(obtener_todos_los_tokens_unicos())
         if not tokens:
             console.print("[bold red]No hay dispositivos registrados en la base de datos para enviar la campana.[/bold red]")
             return
@@ -62,7 +62,7 @@ def ejecutar() -> None:
             console.print("[bold red]ID invalido.[/bold red]")
             return
 
-        token_destino = asyncio.run(obtener_token_por_usuario(uid)) or ""
+        token_destino = ejecutar_async(obtener_token_por_usuario(uid)) or ""
         if not token_destino:
             console.print(f"[bold red]No se encontro ningun token de dispositivo para el usuario {uid}.[/bold red]")
             return
@@ -87,9 +87,9 @@ def ejecutar() -> None:
         console.print(f"[dim]Firebase Message ID: {msg_id}[/dim]")
 
         if usuario_id_log > 0:
-            asyncio.run(registrar_log_envio(usuario_id_log, titulo, cuerpo, True, {"msg_id": msg_id}))
+            ejecutar_async(registrar_log_envio(usuario_id_log, titulo, cuerpo, True, {"msg_id": msg_id}))
 
     except Exception as e:
         console.print(f"[bold red]Error al enviar la notificacion:[/bold red] {e}")
         if usuario_id_log > 0:
-            asyncio.run(registrar_log_envio(usuario_id_log, titulo, cuerpo, False, {"error": str(e)}))
+            ejecutar_async(registrar_log_envio(usuario_id_log, titulo, cuerpo, False, {"error": str(e)}))

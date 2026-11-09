@@ -1,12 +1,12 @@
-import asyncio
 from rich.table import Table
 from backend.cli.console import console
+from backend.cli.async_runner import ejecutar_async
 from .db_executor import obtener_todos_los_tokens
 
 
 def ejecutar() -> None:
     console.print("\n[bold cyan]=== DISPOSITIVOS Y TOKENS REGISTRADOS ===[/bold cyan]\n")
-    tokens = asyncio.run(obtener_todos_los_tokens())
+    tokens = ejecutar_async(obtener_todos_los_tokens())
 
     if not tokens:
         console.print("[yellow]No hay tokens de dispositivos registrados en la base de datos.[/yellow]")
@@ -31,4 +31,3 @@ def ejecutar() -> None:
         )
 
     console.print(tabla)
-
