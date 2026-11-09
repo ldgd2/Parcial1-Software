@@ -25,13 +25,28 @@ class NotificationsService:
         await db.commit()
 
     @staticmethod
-    async def send_notification(
-        db: AsyncSession,
-        user_id: int,
-        title: str,
-        body: str,
-        data: Optional[Dict[str, str]] = None,
-    ) -> str:
+    async def _should_send(db: AsyncSession, user_id: int, priority: int) -> bool:
+        # Retrieve user preferences
+        from backend.modules.gestion_asistencia_ia.notificaciones.repositories.preference_repository import PreferenceRepository
+        prefs = await PreferenceRepository.get_by_user(db, user_id)
+        if not prefs:
+            # default behavior if no prefs stored
+            return priority >= 4
+        # Quiet mode overrides low priorities
+        if prefs.quiet_mode:
+            if prefs.quiet_mode_until and prefs.quiet_mode_until > datetime.utcnow():
+                # still in quiet period
+                return priority >= 4
+            # quiet_mode without until => always on
+            return priority >= 4
+        # Map preference fields to types
+        # For simplicity, allow all high priority notifications
+        if priority >= 4:
+            return True
+        # Low/medium priority filtering based on preferences
+        # Assume type mapping handled by caller via data['type']
+        return True
+
         token = await NotificationsService._get_device_token(db, user_id)
         if not token:
             raise ValueError("Device token not found for user")

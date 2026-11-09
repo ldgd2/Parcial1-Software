@@ -24,6 +24,8 @@ class NotificationLog(Base):
     data = Column(Text)  # JSON string
     sent = Column(Boolean, default=False)
     sent_at = Column(DateTime, default=datetime.utcnow)
+    priority = Column(Integer, default=3)  # 1 low - 5 critical
+    type = Column(String, nullable=False, default="generic")
 
     notification = relationship("NotificationToken", back_populates="logs")
 
