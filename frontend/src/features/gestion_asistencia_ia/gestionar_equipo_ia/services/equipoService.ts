@@ -20,6 +20,8 @@ export interface GenerarEquipoRequest {
   proyecto_id: number;
   descripcion_proyecto: string;
   desarrolladores: HabilidadDesarrollador[];
+  /** false: la IA solo propone (las tareas se crean al aprobar) */
+  persistir?: boolean;
 }
 
 export interface TareaIA {

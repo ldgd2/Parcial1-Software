@@ -104,7 +104,7 @@
 }
 
 .url-copy-action-btn.copy-btn.copied {
-  background: #10b981;
+  background: var(--success);
   color: #ffffff;
 }
 

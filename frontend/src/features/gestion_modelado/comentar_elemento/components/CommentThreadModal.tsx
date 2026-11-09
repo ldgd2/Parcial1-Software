@@ -49,7 +49,7 @@ export const CommentThreadModal: React.FC<Props> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 99999,
+        zIndex: 'var(--z-max)',
         padding: '16px'
       }}
       onClick={onClose}
@@ -81,7 +81,7 @@ export const CommentThreadModal: React.FC<Props> = ({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--info)' }} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
             <div>
@@ -126,7 +126,7 @@ export const CommentThreadModal: React.FC<Props> = ({
                   backgroundColor: '#1e293b',
                   borderRadius: '8px',
                   padding: '10px 12px',
-                  borderLeft: `3px solid ${c.estado === 'abierto' ? '#f59e0b' : '#22c55e'}`
+                  borderLeft: `3px solid ${c.estado === 'abierto' ? 'var(--warning)' : 'var(--success)'}`
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
@@ -139,7 +139,7 @@ export const CommentThreadModal: React.FC<Props> = ({
                         borderRadius: '4px',
                         fontWeight: 600,
                         backgroundColor: c.estado === 'abierto' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(34, 197, 94, 0.15)',
-                        color: c.estado === 'abierto' ? '#f59e0b' : '#22c55e'
+                        color: c.estado === 'abierto' ? 'var(--warning)' : 'var(--success)'
                       }}
                     >
                       {c.estado}
@@ -167,7 +167,7 @@ export const CommentThreadModal: React.FC<Props> = ({
                       style={{
                         background: 'transparent',
                         border: 'none',
-                        color: '#ef4444',
+                        color: 'var(--danger)',
                         cursor: 'pointer',
                         padding: '2px'
                       }}
@@ -210,7 +210,7 @@ export const CommentThreadModal: React.FC<Props> = ({
             type="submit"
             disabled={enviando || !nuevoTexto.trim()}
             style={{
-              backgroundColor: '#38bdf8',
+              backgroundColor: 'var(--info)',
               border: 'none',
               borderRadius: '6px',
               padding: '8px 14px',

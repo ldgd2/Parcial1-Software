@@ -10,6 +10,8 @@ export interface RepartirRolesRequest {
   instrucciones?: string;
   provider?: string;
   api_key?: string;
+  /** false: la IA solo propone (no se guarda nada hasta aprobar) */
+  persistir?: boolean;
 }
 
 export interface ColaboradorRolOut {

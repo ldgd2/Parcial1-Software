@@ -5,7 +5,7 @@
   display: flex;
   flex-direction: column;
   box-shadow: -4px 0 15px rgba(0, 0, 0, 0.2);
-  z-index: 100;
+  z-index: var(--z-sticky);
   height: 100%;
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -159,11 +159,11 @@
 }
 
 .correccion-card--abierta {
-  border-left-color: #ef4444; /* red */
+  border-left-color: var(--danger); /* red */
 }
 
 .correccion-card--resuelta {
-  border-left-color: #10b981; /* green */
+  border-left-color: var(--success); /* green */
   opacity: 0.7;
 }
 
@@ -194,7 +194,7 @@
 
 .correccion-card__resolve {
   background: rgba(16, 185, 129, 0.1);
-  color: #10b981;
+  color: var(--success);
   border: 1px solid rgba(16, 185, 129, 0.2);
   border-radius: 4px;
   padding: 0.4rem 0.6rem;
@@ -239,12 +239,12 @@
 }
 
 .correccion-input textarea:focus {
-  border-color: #ef4444;
+  border-color: var(--danger);
 }
 
 .correccion-input button {
   background: var(--primary);
-  color: white;
+  color: var(--text-on-primary);
   border: none;
   border-radius: 4px;
   padding: 0.6rem;

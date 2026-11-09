@@ -127,12 +127,12 @@ export const FlutterPreviewModal: React.FC<Props> = ({
           </div>
         ) : error ? (
           <div className="flutter-empty-view">
-            <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="#ef4444" strokeWidth="2">
+            <svg viewBox="0 0 24 24" width="36" height="36" fill="none" style={{ stroke: 'var(--danger)' }} strokeWidth="2">
               <circle cx="12" cy="12" r="10" />
               <line x1="15" y1="9" x2="9" y2="15" />
               <line x1="9" y1="9" x2="15" y2="15" />
             </svg>
-            <p style={{ color: '#ef4444' }}>{error}</p>
+            <p style={{ color: 'var(--danger)' }}>{error}</p>
           </div>
         ) : (
           <div className="flutter-modal-body">
@@ -196,7 +196,7 @@ export const FlutterPreviewModal: React.FC<Props> = ({
                 </button>
               </form>
               {refinementSuccess && (
-                <div style={{ padding: '6px 16px', fontSize: '0.75rem', color: '#10b981', background: '#064e3b' }}>
+                <div style={{ padding: '6px 16px', fontSize: '0.75rem', color: 'var(--success)', background: '#064e3b' }}>
                   {refinementSuccess}
                 </div>
               )}

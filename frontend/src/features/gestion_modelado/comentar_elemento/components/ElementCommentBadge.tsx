@@ -19,7 +19,7 @@ export const ElementCommentBadge: React.FC<Props> = ({ count, hasOpen = false, o
         alignItems: 'center',
         gap: '3px',
         backgroundColor: hasOpen ? '#b45309' : '#1e293b',
-        border: `1px solid ${hasOpen ? '#f59e0b' : '#334155'}`,
+        border: `1px solid ${hasOpen ? 'var(--warning)' : '#334155'}`,
         color: '#f8fafc',
         borderRadius: '9999px',
         padding: '2px 6px',

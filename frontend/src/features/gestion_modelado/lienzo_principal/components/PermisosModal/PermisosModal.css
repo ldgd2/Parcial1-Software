@@ -6,7 +6,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2000;
+  z-index: var(--z-modal-mid);
   animation: fadeInModal 0.15s ease-out forwards;
 }
 
@@ -125,7 +125,7 @@
 }
 
 .permisos-badge-pulse {
-  background: #b91c1c;
+  background: var(--danger-strong);
   color: #ffffff;
   font-size: 0.65rem;
   font-weight: 700;
@@ -224,7 +224,7 @@
 }
 
 .permisos-status.online {
-  background: #16a34a;
+  background: var(--success);
 }
 
 .permisos-status.offline {
@@ -272,7 +272,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  background: #b91c1c;
+  background: var(--danger-strong);
   color: #ffffff;
   border: none;
   padding: 6px 12px;
@@ -289,7 +289,7 @@
 
 .btn-kick {
   background: rgba(185, 28, 28, 0.15);
-  color: #f87171;
+  color: var(--danger-text);
   border: 1px solid rgba(185, 28, 28, 0.3);
   padding: 5px 10px;
   border-radius: var(--radius-md, 4px);

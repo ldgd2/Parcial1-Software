@@ -167,7 +167,7 @@ const TareaItem: React.FC<TareaItemProps> = ({ tarea, onToggle }) => (
               padding: '1px 5px',
               borderRadius: '4px',
               background: 'rgba(56, 189, 248, 0.15)',
-              color: '#38bdf8',
+              color: 'var(--info)',
               letterSpacing: '0.04em'
             }}
           >

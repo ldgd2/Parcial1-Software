@@ -126,7 +126,7 @@
   background: var(--surface-color);
   border: 1px solid var(--border-color);
   min-width: 130px;
-  z-index: 50;
+  z-index: var(--z-raised);
   animation: dropIn 0.15s ease forwards;
 }
 
@@ -155,5 +155,5 @@
   background: rgba(223, 208, 184, 0.06);
   color: var(--text-primary);
 }
-.proyecto-card__dropdown-danger { color: #e6a3a3 !important; }
-.proyecto-card__dropdown-danger:hover { color: #e6a3a3 !important; }
+.proyecto-card__dropdown-danger { color: var(--danger-soft) !important; }
+.proyecto-card__dropdown-danger:hover { color: var(--danger-soft) !important; }

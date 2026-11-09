@@ -21,6 +21,8 @@ export interface RepartirTareasRequest {
   }>;
   provider?: string;
   api_key?: string;
+  /** false: la IA solo propone (las tareas se crean al aprobar) */
+  persistir?: boolean;
 }
 
 export interface RepartirTareasResponse {

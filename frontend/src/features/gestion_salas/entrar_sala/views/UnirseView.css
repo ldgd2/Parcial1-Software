@@ -200,7 +200,7 @@
 .unirse-card__icon-wrapper--aprobado {
   background: rgba(21, 128, 61, 0.2);
   border: 1px solid #15803d;
-  color: #4ade80;
+  color: var(--success-text);
 }
 
 .unirse-card__icon-wrapper--pendiente {
@@ -211,8 +211,8 @@
 
 .unirse-card__icon-wrapper--error {
   background: rgba(185, 28, 28, 0.2);
-  border: 1px solid #b91c1c;
-  color: #f87171;
+  border: 1px solid var(--danger-strong);
+  color: var(--danger-text);
 }
 
 .unirse-card__svg-icon.spin {
@@ -250,11 +250,11 @@
 }
 
 .unirse-title--success {
-  color: #4ade80 !important;
+  color: var(--success-text) !important;
 }
 
 .unirse-title--error {
-  color: #f87171 !important;
+  color: var(--danger-text) !important;
 }
 
 .unirse-card__body p {
@@ -364,8 +364,8 @@
 }
 
 .unirse-card__btn-cancel:hover {
-  background: #b91c1c;
-  border-color: #b91c1c;
+  background: var(--danger-strong);
+  border-color: var(--danger-strong);
   color: #ffffff;
 }
 

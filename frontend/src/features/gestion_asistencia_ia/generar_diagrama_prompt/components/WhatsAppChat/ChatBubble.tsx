@@ -2,17 +2,25 @@ import React from 'react';
 import type { ChatMessage, QuotedMessage } from '../../types/chatTypes';
 import { QuotedPreview } from './QuotedPreview';
 import { IconReply, IconDoubleCheck, IconBot } from './ChatIcons';
+import { PropuestaCard } from './PropuestaCard';
 
 interface ChatBubbleProps {
   message: ChatMessage;
   currentUserId: string;
   onReply: (quote: QuotedMessage) => void;
+  /** Propuestas de la IA */
+  puedeDecidir?: boolean;
+  onDecidirPropuesta?: (messageId: string, aceptar: boolean) => Promise<void>;
+  onVerPropuesta?: (versionId: number) => void;
 }
 
 export const ChatBubble: React.FC<ChatBubbleProps> = ({
   message,
   currentUserId,
-  onReply
+  onReply,
+  puedeDecidir = false,
+  onDecidirPropuesta,
+  onVerPropuesta
 }) => {
   const isOwn = message.senderId === currentUserId;
   const isAi = message.isAi;
@@ -108,6 +116,15 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({
             renderFormattedText(message.text)
           )}
         </div>
+
+        {message.propuesta && message.aiStatus !== 'pending' && (
+          <PropuestaCard
+            propuesta={message.propuesta}
+            puedeDecidir={puedeDecidir}
+            onDecidir={onDecidirPropuesta ? aceptar => onDecidirPropuesta(message.id, aceptar) : undefined}
+            onVerCambios={onVerPropuesta ? () => onVerPropuesta(message.propuesta!.versionId) : undefined}
+          />
+        )}
 
         {/* Pie: hora y confirmación de lectura */}
         <div className="whatsapp-bubble__footer">

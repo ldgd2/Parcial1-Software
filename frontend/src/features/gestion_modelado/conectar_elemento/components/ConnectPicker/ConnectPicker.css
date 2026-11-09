@@ -1,12 +1,12 @@
 .connect-picker__overlay {
   position: fixed;
   inset: 0;
-  z-index: 99;
+  z-index: calc(var(--z-sticky) - 1);
 }
 
 .connect-picker {
   position: fixed;
-  z-index: 100;
+  z-index: var(--z-sticky);
   background: #1a1f2e;
   border: 1px solid #2d3548;
   border-radius: 10px;

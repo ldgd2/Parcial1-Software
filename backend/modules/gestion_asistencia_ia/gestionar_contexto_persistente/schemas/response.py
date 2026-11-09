@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -17,6 +17,29 @@ class CorreccionItem(BaseModel):
     estado: str = Field(..., description="abierta o resuelta")
 
 
+class AccionMemoria(BaseModel):
+    ts: int = 0
+    intent: str
+    cmd: str
+    summary: str
+    delta: str
+
+
+class CorreccionMemoria(BaseModel):
+    target: str
+    text: str
+
+
+class MemoriaSecciones(BaseModel):
+    """La memoria inyectada en el prompt, por partes (misma selección que el texto)."""
+    dominio: str
+    resumen: str
+    ultimas_acciones: List[AccionMemoria]
+    correcciones_abiertas: List[CorreccionMemoria]
+    total_correcciones_abiertas: int
+    diagrama_dsl: str
+
+
 class ContextoIAResponse(BaseModel):
     id: int
     proyecto_id: int
@@ -29,6 +52,9 @@ class ContextoIAResponse(BaseModel):
     version: int
     contexto_compilado_llm: str
     fecha_actualizacion: Optional[str] = None
+    memoria_secciones: Optional[MemoriaSecciones] = None
+    # Versión creada por esta operación (solo en registrar_interaccion)
+    version_id: Optional[int] = None
 
 
 class CompilarContextoResponse(BaseModel):
@@ -38,4 +64,32 @@ class CompilarContextoResponse(BaseModel):
     tokens_ahorrados: int
     total_eventos_recordados: int
     correcciones_activas_count: int
+    memoria_secciones: Optional[MemoriaSecciones] = None
+
+
+class VersionResumen(BaseModel):
+    id: int
+    ts: int
+    intent: str
+    cmd: str
+    resumen: str
+    delta: str
+    autor: Optional[str] = None
+    tiene_antes: bool
+    tiene_despues: bool
+    # Propuestas de la IA: None (no es propuesta) | pendiente | aprobada | rechazada
+    estado_propuesta: Optional[str] = None
+    decidida_por: Optional[str] = None
+    decidida_en: Optional[int] = None   # Unix
+
+
+class VersionDetalle(VersionResumen):
+    estado_antes: Optional[Dict[str, Any]] = None
+    estado_despues: Optional[Dict[str, Any]] = None
+    propuesta: Optional[Dict[str, Any]] = None
+
+
+class VersionesPagina(BaseModel):
+    items: List[VersionResumen]
+    hay_mas: bool
 

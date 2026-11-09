@@ -294,39 +294,41 @@ async def ejecutar_reparticion_roles(
                 "responsabilidades": template["responsabilidades"]
             })
 
-    # 4. Guardar roles y áreas permanentemente en la base de datos (colaboradores_proyecto)
-    await guardar_roles_colaboradores(req.proyecto_id, guardar_db_items, db)
+    # Con persistir=False la IA solo propone: nada se guarda hasta que alguien apruebe
+    if req.persistir:
+        # 4. Guardar roles y áreas permanentemente en la base de datos (colaboradores_proyecto)
+        await guardar_roles_colaboradores(req.proyecto_id, guardar_db_items, db)
 
-    # 5. Actualizar el lienzo_json con los responsables de cada clase
-    if nodos:
-        class_to_dev = {}
-        for r in roles_finales:
-            for c_name in r.clases_asignadas:
-                class_to_dev[c_name.lower()] = r
+        # 5. Actualizar el lienzo_json con los responsables de cada clase
+        if nodos:
+            class_to_dev = {}
+            for r in roles_finales:
+                for c_name in r.clases_asignadas:
+                    class_to_dev[c_name.lower()] = r
 
-        for nodo in nodos:
-            c_name = str(nodo.get("nombre") or "").lower()
-            if c_name in class_to_dev:
-                asig = class_to_dev[c_name]
-                nodo["responsable"] = asig.nombre
-                nodo["responsabilidades"] = [asig.rol_ia] + asig.areas
+            for nodo in nodos:
+                c_name = str(nodo.get("nombre") or "").lower()
+                if c_name in class_to_dev:
+                    asig = class_to_dev[c_name]
+                    nodo["responsable"] = asig.nombre
+                    nodo["responsabilidades"] = [asig.rol_ia] + asig.areas
 
-        proyecto.lienzo_json = json.dumps(lienzo_data)
-        await db.commit()
+            proyecto.lienzo_json = json.dumps(lienzo_data)
+            await db.commit()
 
-        # Notificar cambio del diagrama a los clientes conectados
+            # Notificar cambio del diagrama a los clientes conectados
+            if proyecto.codigo_acceso:
+                await manager.broadcast_to_sala({
+                    "type": "diagram_event",
+                    "payload": {"type": "roles_updated", "nodes": nodos}
+                }, proyecto.codigo_acceso)
+
+        # 6. Notificar por WebSocket que los roles fueron actualizados
         if proyecto.codigo_acceso:
             await manager.broadcast_to_sala({
-                "type": "diagram_event",
-                "payload": {"type": "roles_updated", "nodes": nodos}
+                "type": "roles_actualizados",
+                "proyecto_id": req.proyecto_id
             }, proyecto.codigo_acceso)
-
-    # 6. Notificar por WebSocket que los roles fueron actualizados
-    if proyecto.codigo_acceso:
-        await manager.broadcast_to_sala({
-            "type": "roles_actualizados",
-            "proyecto_id": req.proyecto_id
-        }, proyecto.codigo_acceso)
 
     resumen = resultado_ia.get("resumen") or (
         f"Se repartieron {len(roles_finales)} roles y áreas técnicas exitosamente en el proyecto."

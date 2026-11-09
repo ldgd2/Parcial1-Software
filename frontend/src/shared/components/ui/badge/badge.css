@@ -13,8 +13,8 @@
 
 .widget-badge-primary {
   background-color: var(--primary);
-  color: #fff;
-  box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+  color: var(--text-on-primary);
+  box-shadow: 0 0 10px rgba(223, 208, 184, 0.4);
 }
 
 .widget-badge-outline {

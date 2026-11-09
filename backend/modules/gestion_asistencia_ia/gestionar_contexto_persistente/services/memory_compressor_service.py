@@ -72,6 +72,48 @@ def generar_delta_compacto(added: List[str], updated: List[str], deleted: List[s
     return " | ".join(parts) if parts else "sin_cambios"
 
 
+ACCIONES_EN_PROMPT = 5        # interacciones recientes que recibe la IA
+CORRECCIONES_EN_PROMPT = 6    # correcciones abiertas que recibe la IA
+
+
+def secciones_contexto(
+    dominio: str,
+    resumen_acumulado: str,
+    historial: List[Dict[str, Any]],
+    correcciones: List[Dict[str, Any]],
+    snapshot_dsl: str
+) -> Dict[str, Any]:
+    """
+    Partes de la memoria que se inyectan en el prompt, ya seleccionadas.
+    Es la única fuente de esa selección: `compilar_contexto_para_llm` arma el
+    texto a partir de aquí, y el modal las muestra tal cual (lo que se ve es
+    exactamente lo que recibe la IA).
+    """
+    recientes = historial[-ACCIONES_EN_PROMPT:] if historial else []
+    abiertas = [c for c in (correcciones or []) if c.get("estado", "abierta") == "abierta"]
+    return {
+        "dominio": dominio or "Sistema de Software",
+        "resumen": resumen_acumulado or "",
+        "ultimas_acciones": [
+            {
+                "ts": ev.get("ts", 0),
+                "intent": ev.get("intent", "ACTION"),
+                "cmd": ev.get("cmd", ""),
+                "summary": ev.get("summary", ""),
+                "delta": ev.get("delta", ""),
+            }
+            for ev in recientes
+        ],
+        "correcciones_abiertas": [
+            {"target": c.get("target", "General"), "text": c.get("text", "")}
+            for c in abiertas[:CORRECCIONES_EN_PROMPT]
+        ],
+        "total_correcciones_abiertas": len(abiertas),
+        # DSL ultra-comprimido en una sola línea
+        "diagrama_dsl": (snapshot_dsl or "").replace("\n", ";").strip(),
+    }
+
+
 def compilar_contexto_para_llm(
     proyecto_id: int,
     dominio: str,
@@ -85,38 +127,30 @@ def compilar_contexto_para_llm(
     listo para inyección directa en el prompt del LLM.
     Retorna: (bloque_texto, tokens_estimados, tokens_ahorrados_estimados).
     """
+    s = secciones_contexto(dominio, resumen_acumulado, historial, correcciones, snapshot_dsl)
+
     lineas: List[str] = [
         f"[MEMORIA DEL PROYECTO #{proyecto_id}]",
-        f"Dominio: {dominio or 'Sistema de Software'}"
+        f"Dominio: {s['dominio']}"
     ]
 
-    if resumen_acumulado:
-        lineas.append(f"Estado Acumulado: {resumen_acumulado}")
+    if s["resumen"]:
+        lineas.append(f"Estado Acumulado: {s['resumen']}")
 
-    # Últimas 5 interacciones episódicas (rolling memory)
-    recientes = historial[-5:] if historial else []
-    if recientes:
+    # Últimas interacciones episódicas (rolling memory)
+    if s["ultimas_acciones"]:
         lineas.append("Historial Episódico Reciente:")
-        for ev in recientes:
-            intent = ev.get("intent", "ACTION")
-            cmd = ev.get("cmd", "")
-            summary = ev.get("summary", "")
-            delta = ev.get("delta", "")
-            lineas.append(f"• [{intent}] {cmd} -> {summary} (Δ: {delta})")
+        for ev in s["ultimas_acciones"]:
+            lineas.append(f"• [{ev['intent']}] {ev['cmd']} -> {ev['summary']} (Δ: {ev['delta']})")
 
     # Correcciones activas pendientes
-    abiertas = [c for c in correcciones if c.get("estado", "abierta") == "abierta"]
-    if abiertas:
-        lineas.append(f"Correcciones / Tareas Pendientes ({len(abiertas)}):")
-        for c in abiertas[:6]:
-            target = c.get("target", "General")
-            text = c.get("text", "")
-            lineas.append(f"• [{target}]: {text}")
+    if s["correcciones_abiertas"]:
+        lineas.append(f"Correcciones / Tareas Pendientes ({s['total_correcciones_abiertas']}):")
+        for c in s["correcciones_abiertas"]:
+            lineas.append(f"• [{c['target']}]: {c['text']}")
 
-    if snapshot_dsl:
-        # DSL ultra-comprimido en una sola línea
-        clean_dsl = snapshot_dsl.replace("\n", ";").strip()
-        lineas.append(f"Diagrama Actual: {clean_dsl}")
+    if s["diagrama_dsl"]:
+        lineas.append(f"Diagrama Actual: {s['diagrama_dsl']}")
 
     bloque = "\n".join(lineas)
     

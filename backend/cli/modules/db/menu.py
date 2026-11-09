@@ -1,3 +1,4 @@
+from backend.cli.async_runner import ejecutar_async
 from backend.cli.console import console, print_header
 from rich.prompt import Prompt
 from backend.cli.modules.db.migrations.menu import menu_migrations
@@ -28,29 +29,31 @@ def menu_db():
                             console.print("\n[bold green]¡Conexión exitosa a la base de datos![/bold green]")
                     except Exception as e:
                         console.print(f"\n[bold red]Error al conectar:[/bold red] {e}")
-                asyncio.run(ping())
+                ejecutar_async(ping())
             Prompt.ask("\nPresiona Enter para continuar")
         elif opcion == "4":
             with console.status("[bold cyan]Inicializando tablas en la base de datos..."):
-                import asyncio
                 import backend.main
                 from backend.core.database import init_db
-                from alembic.config import Config
-                from alembic import command
-                
-                async def inicializar():
+                from backend.cli.modules.db.migrations.menu import ejecutar_comando_alembic
+
+                async def inicializar() -> bool:
                     try:
                         await init_db()
                         console.print("\n[bold green]¡Tablas creadas exitosamente con Base.metadata.create_all![/bold green]")
-                        try:
-                            alembic_cfg = Config("alembic.ini")
-                            command.stamp(alembic_cfg, "head")
-                            console.print("[bold green]¡Alembic sincronizado (stamp head)![/bold green]")
-                        except Exception as e_alembic:
-                            console.print(f"[yellow]Aviso Alembic stamp: {e_alembic}[/yellow]")
+                        return True
                     except Exception as e:
                         console.print(f"\n[bold red]Error al inicializar tablas:[/bold red] {e}")
-                asyncio.run(inicializar())
+                        return False
+
+                if ejecutar_async(inicializar()):
+                    # El stamp va fuera de la corrutina: el env.py de Alembic llama a
+                    # asyncio.run() y no puede ejecutarse dentro de un loop activo.
+                    ok, _ = ejecutar_comando_alembic(["stamp", "head"], mostrar=False)
+                    if ok:
+                        console.print("[bold green]¡Alembic sincronizado (stamp head)![/bold green]")
+                    else:
+                        console.print("[yellow]Aviso: no se pudo sellar Alembic en head (usa Migraciones > [4]).[/yellow]")
             Prompt.ask("\nPresiona Enter para continuar")
         elif opcion == "0":
             break

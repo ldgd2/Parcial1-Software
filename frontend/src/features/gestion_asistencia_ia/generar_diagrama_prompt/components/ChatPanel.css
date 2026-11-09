@@ -5,7 +5,7 @@
     display: flex;
     flex-direction: column;
     box-shadow: -4px 0 15px rgba(0, 0, 0, 0.2);
-    z-index: 90;
+    z-index: calc(var(--z-sticky) - 10);
     height: 100%;
     transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -135,7 +135,7 @@
 
 .chat-panel__input-area.drag-over {
     background: var(--bg-hover, rgba(59, 130, 246, 0.15));
-    border: 2px dashed #3b82f6;
+    border: 2px dashed var(--info-strong);
     border-radius: 8px;
 }
 

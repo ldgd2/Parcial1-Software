@@ -4,7 +4,7 @@
   left: 0;
   width: 100vw;
   height: 100vh;
-  z-index: 9998;
+  z-index: calc(var(--z-modal-high) - 1);
 }
 
 .context-menu {
@@ -15,7 +15,7 @@
   padding: 6px 0;
   min-width: 180px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
-  z-index: 9999;
+  z-index: var(--z-modal-high);
   font-family: var(--font-sans, system-ui);
   animation: contextMenuFadeIn 0.1s ease-out;
 }
@@ -43,12 +43,12 @@
 
 .context-menu__item:hover {
   background: var(--primary-transparent, rgba(74, 127, 212, 0.15));
-  color: var(--primary, #4a7fd4);
+  color: var(--primary, var(--info-strong));
 }
 
 .context-menu__item--danger:hover {
   background: rgba(230, 163, 163, 0.15);
-  color: #e6a3a3;
+  color: var(--danger-soft);
 }
 
 .context-menu__icon {

@@ -20,6 +20,29 @@ export interface ChatMessage {
   provider?: AiProvider;
   summary?: string;
   tasksCount?: number;
+  /** Cambios de la IA pendientes de aprobación (no se aplican solos) */
+  propuesta?: PropuestaIA;
+}
+
+export interface PropuestaIA {
+  versionId: number;
+  /** Qué se aplica al aprobar (por defecto, cambios del diagrama) */
+  tipo?: 'diagrama' | 'roles' | 'tareas';
+  /** Resumen legible para roles / tareas ("Ana → Backend Lead (3 clases)") */
+  lineas?: string[];
+  /** Tareas incluidas en la propuesta */
+  tareas?: number;
+  estado: 'pendiente' | 'aprobada' | 'rechazada';
+  solicitadaPor: string;
+  decididaPor?: string | null;
+  decididaEn?: number;
+  agregadas: string[];
+  modificadas: string[];
+  eliminadas: string[];
+  relaciones: number;
+  /** Datos para aplicar igual que antes (posición y modo refactor) */
+  offset: number;
+  refactor: boolean;
 }
 
 export interface RoomUserMention {

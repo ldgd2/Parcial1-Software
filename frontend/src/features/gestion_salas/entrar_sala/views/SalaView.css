@@ -94,7 +94,7 @@
   padding: 0.625rem 1.5rem;
   font-family: var(--font-sans);
   animation: toastIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  z-index: 9999;
+  z-index: var(--z-toast);
 }
 
 @keyframes toastIn {
@@ -103,10 +103,10 @@
 }
 
 .sala-view__save-toast--saved {
-  border-left: 3px solid #a3e6a3;
-  color: #a3e6a3;
+  border-left: 3px solid var(--success-soft);
+  color: var(--success-soft);
 }
 .sala-view__save-toast--error {
-  border-left: 3px solid #e6a3a3;
-  color: #e6a3a3;
+  border-left: 3px solid var(--danger-soft);
+  color: var(--danger-soft);
 }
