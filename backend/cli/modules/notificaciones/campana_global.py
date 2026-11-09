@@ -80,3 +80,4 @@ def ejecutar() -> None:
 
     console.print("\n")
     console.print(tabla)
+

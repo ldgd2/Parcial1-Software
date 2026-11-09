@@ -86,6 +86,8 @@ Thumbs.db
 backend/modules/gestion_asistencia_ia/notificaciones/config/diagramador-firebase-service.json
 # Flutter Firebase config JSON (no versionar)
 Movil/lib/assets/google-services.json
+Movil/android/app/google-services.json
+*google-services.json
 docs/
 # CU39: credenciales de Firebase (nunca al repo)
 *firebase-service-account*.json
