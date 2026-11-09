@@ -178,8 +178,8 @@ def menu_migrations():
             mostrar_estado()
         Prompt.ask("\nPresiona Enter para continuar")
 
-        elif opcion == "0":
-            break
+    elif opcion == "0":
+        break
             break
 
     while True:
@@ -256,6 +256,6 @@ def menu_migrations():
             mostrar_estado()
         Prompt.ask("\nPresiona Enter para continuar")
 
-        elif opcion == "0":
-            break
+    elif opcion == "0":
+        break
             break
