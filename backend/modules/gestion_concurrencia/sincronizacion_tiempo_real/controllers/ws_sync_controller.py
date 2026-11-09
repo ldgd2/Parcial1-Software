@@ -1,11 +1,47 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from jose import jwt
+from backend.core.config import settings
 from backend.core.websockets.connection_manager import manager
 from backend.core.database import get_db
 from backend.modules.gestion_proyectos.versioning.models import GitObject, Commit
+from backend.modules.gestion_proyectos.models import Proyecto, ColaboradorProyecto
 from sqlalchemy import select
+import asyncio
 import json
 
 router = APIRouter(tags=["WebSockets Salas"])
+
+
+async def _usuario_anfitrion(codigo_acceso: str, token: str | None) -> int | None:
+    """
+    Devuelve el id del usuario si el token es válido y pertenece a un ANFITRIÓN
+    aprobado del proyecto con ese código de acceso; si no, None.
+
+    Antes el rol de host se tomaba del parámetro `user_type` de la URL, sin
+    verificar nada: cualquiera con el código de sala podía entrar como host
+    (aprobar invitados, expulsar, cambiar roles).
+    """
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        usuario_id = int(payload.get("sub"))
+    except Exception:
+        return None
+
+    async for db in get_db():
+        resultado = await db.execute(
+            select(ColaboradorProyecto.usuario_id)
+            .join(Proyecto, Proyecto.id == ColaboradorProyecto.proyecto_id)
+            .where(
+                Proyecto.codigo_acceso == codigo_acceso,
+                ColaboradorProyecto.usuario_id == usuario_id,
+                ColaboradorProyecto.rol_proyecto == "anfitrion",
+                ColaboradorProyecto.estado == "aprobado",
+            )
+        )
+        return usuario_id if resultado.scalar_one_or_none() is not None else None
+    return None
 
 
 async def _save_delta_to_db(new_objects: dict, head_hash: str, author: str):
@@ -99,7 +135,23 @@ async def websocket_endpoint(
     nickname: str = None,
 ):
     if user_type == "host":
-        await manager.connect_host(websocket, codigo_acceso, host_id=guest_id, nickname=nickname)
+        # El rol de host se verifica en el servidor. El token llega en el PRIMER
+        # mensaje (no en la URL, que queda en logs de servidores y proxies).
+        await websocket.accept()
+        token = None
+        try:
+            primero = json.loads(await asyncio.wait_for(websocket.receive_text(), timeout=5))
+            if isinstance(primero, dict) and primero.get("type") == "auth":
+                token = primero.get("token")
+        except (asyncio.TimeoutError, ValueError, WebSocketDisconnect):
+            token = None
+        if await _usuario_anfitrion(codigo_acceso, token) is None:
+            try:
+                await websocket.close(code=1008, reason="No autorizado como anfitrión de esta sala")
+            except RuntimeError:
+                pass  # el cliente ya cerró
+            return
+        await manager.connect_host(websocket, codigo_acceso, host_id=guest_id, nickname=nickname, accept=False)
 
         # Enviar guests pendientes al host
         pending = manager.salas[codigo_acceso].get("pending_guests", {})

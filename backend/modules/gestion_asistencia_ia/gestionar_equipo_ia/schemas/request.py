@@ -25,6 +25,8 @@ class TareaIAOut(BaseModel):
     descripcion: Optional[str]
     completada: bool
     orden: int
+    estimacion_horas: Optional[int] = None   # CU37
+    complejidad: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

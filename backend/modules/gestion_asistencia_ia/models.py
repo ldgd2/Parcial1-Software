@@ -1,4 +1,5 @@
-from sqlalchemy import BigInteger, Column, Integer, String, DateTime, ForeignKey, Index, Text, JSON
+from sqlalchemy import BigInteger, Boolean, Column, Computed, Integer, String, DateTime, ForeignKey, Index, Text, JSON, text
+from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -74,4 +75,57 @@ class VersionContextoIA(Base):
 
     __table_args__ = (
         Index("ix_versiones_contexto_ia_proyecto", "proyecto_id", "id"),
+    )
+
+
+# Texto indexado para la búsqueda en español (mismo SQL que la migración c1d2e3f4a5b6)
+_BUSQUEDA_MEMORIA = (
+    "to_tsvector('spanish', coalesce(topic_key, '') || ' ' || coalesce(titulo, '') || ' ' || "
+    "coalesce(que, '') || ' ' || coalesce(por_que, '') || ' ' || coalesce(donde, '') || ' ' || "
+    "coalesce(aprendido, ''))"
+)
+
+
+class MemoriaIA(Base):
+    """
+    Memoria del proyecto al estilo Engram: observaciones elegidas (no el chat completo).
+
+    - tipo: decision | restriccion | convencion | correccion | rechazo
+    - topic_key: tema estable ("entidades/cliente"); guardar otra observación con el mismo
+      tema la REEMPLAZA (la anterior queda con vigente=False y se conserva como historial).
+    - en_conflicto: la nueva contradice a la anterior (p. ej. se aprobó y luego se rechazó
+      lo mismo); una persona decide cuál vale.
+    """
+    __tablename__ = "memorias_ia"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    proyecto_id = Column(Integer, ForeignKey("proyectos.id", ondelete="CASCADE"), nullable=False)
+
+    tipo = Column(String, nullable=False, default="decision")
+    topic_key = Column(String, nullable=False)
+    titulo = Column(String, nullable=False, default="")
+    que = Column(Text, nullable=False, default="")         # Qué se decidió / qué pasa
+    por_que = Column(Text, nullable=False, default="")     # Por qué
+    donde = Column(Text, nullable=False, default="")       # Dónde aplica (clase, área)
+    aprendido = Column(Text, nullable=False, default="")   # Qué debe tener en cuenta la IA
+
+    origen = Column(String, nullable=False, default="manual")  # aprobacion | rechazo | manual
+    version_id = Column(BigInteger, ForeignKey("versiones_contexto_ia.id", ondelete="SET NULL"), nullable=True)
+    autor = Column(String, nullable=True)
+
+    vigente = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    reemplaza_id = Column(BigInteger, ForeignKey("memorias_ia.id", ondelete="SET NULL"), nullable=True)
+    en_conflicto = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+
+    busqueda = Column(TSVECTOR, Computed(_BUSQUEDA_MEMORIA, persisted=True))
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    __table_args__ = (
+        Index("ix_memorias_ia_proyecto", "proyecto_id", "vigente"),
+        Index("ix_memorias_ia_busqueda", "busqueda", postgresql_using="gin"),
+        # Un solo recuerdo vigente por tema
+        Index("ux_memorias_ia_tema_vigente", "proyecto_id", "topic_key", unique=True,
+              postgresql_where=text("vigente")),
     )

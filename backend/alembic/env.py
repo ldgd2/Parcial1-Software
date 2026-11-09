@@ -30,7 +30,9 @@ import backend.modules.gestion_usuarios.models  # noqa: F401  usuarios, otp_code
 import backend.modules.gestion_proyectos.models  # noqa: F401  proyectos, colaboradores_proyecto
 import backend.modules.gestion_proyectos.versioning.models  # noqa: F401  git_objects, commits
 import backend.modules.gestion_modelado.models  # noqa: F401  diagram_elements, diagram_relations, diagram_element_comments
-import backend.modules.gestion_asistencia_ia.models  # noqa: F401  contextos_ia_proyecto
+import backend.modules.gestion_asistencia_ia.models  # noqa: F401  contextos_ia_proyecto, versiones, memorias
+import backend.modules.gestion_proyectos.plantillas.models  # noqa: F401  plantillas_proyecto
+import backend.modules.gestion_notificaciones.models  # noqa: F401  notificaciones, dispositivos_push
 import backend.modules.gestion_proyectos_asistida.models  # noqa: F401
 
 # Quitamos el set_main_option para evitar que ConfigParser falle al interpretar los % del password encodeado

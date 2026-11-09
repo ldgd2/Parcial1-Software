@@ -15,6 +15,7 @@ const hora = (ms?: number) =>
 export const PropuestaCard: React.FC<Props> = ({ propuesta: p, puedeDecidir, onDecidir, onVerCambios }) => {
   const [enviando, setEnviando] = useState<null | 'aprobar' | 'rechazar'>(null);
   const [error, setError] = useState<string | null>(null);
+  const [expandida, setExpandida] = useState(false);
 
   const decidir = async (aceptar: boolean) => {
     if (!onDecidir) return;
@@ -35,6 +36,15 @@ export const PropuestaCard: React.FC<Props> = ({ propuesta: p, puedeDecidir, onD
     ...p.eliminadas.map(n => ({ t: 'del', s: `− ${n}` })),
   ];
 
+  // Plegado: se muestra un resumen y el resto bajo "Ver más"
+  const LIM_CHIPS = 6;
+  const LIM_LINEAS = 4;
+  const lineas = p.lineas ?? [];
+  const hayMas = chips.length > LIM_CHIPS || lineas.length > LIM_LINEAS;
+  const chipsVisibles = expandida ? chips : chips.slice(0, LIM_CHIPS);
+  const lineasVisibles = expandida ? lineas : lineas.slice(0, LIM_LINEAS);
+  const ocultos = Math.max(0, chips.length - LIM_CHIPS) + Math.max(0, lineas.length - LIM_LINEAS);
+
   return (
     <div className={`propuesta-card propuesta-card--${p.estado}`}>
       <div className="propuesta-card__head">
@@ -48,17 +58,25 @@ export const PropuestaCard: React.FC<Props> = ({ propuesta: p, puedeDecidir, onD
 
       {chips.length > 0 && (
         <div className="propuesta-card__chips">
-          {chips.slice(0, 8).map((c, i) => (
+          {chipsVisibles.map((c, i) => (
             <span key={i} className={`propuesta-card__chip propuesta-card__chip--${c.t}`}>{c.s}</span>
           ))}
-          {chips.length > 8 && <span className="propuesta-card__chip">+{chips.length - 8} más</span>}
         </div>
       )}
-      {p.lineas && p.lineas.length > 0 && (
+      {lineasVisibles.length > 0 && (
         <ul className="propuesta-card__lineas">
-          {p.lineas.slice(0, 8).map((l, i) => <li key={i}>{l}</li>)}
-          {p.lineas.length > 8 && <li>… y {p.lineas.length - 8} más</li>}
+          {lineasVisibles.map((l, i) => <li key={i}>{l}</li>)}
         </ul>
+      )}
+      {hayMas && (
+        <button
+          type="button"
+          className="propuesta-card__mas"
+          onClick={() => setExpandida(v => !v)}
+          aria-expanded={expandida}
+        >
+          {expandida ? "Ver menos ▴" : `Ver ${ocultos} más ▾`}
+        </button>
       )}
       {(p.tareas ?? 0) > 0 && p.tipo !== 'tareas' && (
         <div className="propuesta-card__meta">Incluye {p.tareas} tarea{(p.tareas ?? 0) > 1 ? 's' : ''} para el equipo</div>
@@ -77,13 +95,8 @@ export const PropuestaCard: React.FC<Props> = ({ propuesta: p, puedeDecidir, onD
 
       {error && <div className="propuesta-card__error" role="alert">{error}</div>}
 
-      <div className="propuesta-card__acciones">
-        {onVerCambios && (
-          <button type="button" className="propuesta-card__btn" onClick={onVerCambios}>
-            Ver en historial
-          </button>
-        )}
-        {p.estado === 'pendiente' && (puedeDecidir ? (
+      {p.estado === 'pendiente' && (puedeDecidir ? (
+        <div className="propuesta-card__acciones">
           <>
             <button
               type="button"
@@ -102,10 +115,16 @@ export const PropuestaCard: React.FC<Props> = ({ propuesta: p, puedeDecidir, onD
               {enviando === 'aprobar' ? 'Aplicando…' : 'Aprobar'}
             </button>
           </>
-        ) : (
-          <span className="propuesta-card__meta">Esperando aprobación de alguien con permiso de edición</span>
-        ))}
-      </div>
+        </div>
+      ) : (
+        <div className="propuesta-card__meta propuesta-card__espera">Esperando aprobación de alguien con permiso de edición</div>
+      ))}
+
+      {onVerCambios && (
+        <button type="button" className="propuesta-card__link" onClick={onVerCambios}>
+          Ver en historial →
+        </button>
+      )}
     </div>
   );
 };

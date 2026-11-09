@@ -8,6 +8,9 @@ export interface TareaItem {
   descripcion: string | null;
   completada: boolean;
   orden: number;
+  /** CU37: estimación de esfuerzo */
+  estimacion_horas?: number | null;
+  complejidad?: string | null;
 }
 
 export interface RepartirTareasRequest {
@@ -40,5 +43,7 @@ export interface CrearTareaManualRequest {
   area?: string;
   descripcion?: string;
   orden?: number;
+  estimacion_horas?: number;
+  complejidad?: string;
 }
 

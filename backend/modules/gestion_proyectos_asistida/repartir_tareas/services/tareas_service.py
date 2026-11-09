@@ -7,7 +7,7 @@ from sqlalchemy.future import select
 from backend.core.config import settings
 from backend.core.websockets.connection_manager import manager
 from backend.modules.gestion_proyectos.models import Proyecto, ColaboradorProyecto
-from backend.modules.gestion_usuarios.models import TareaIA, Usuario
+from backend.modules.gestion_usuarios.models import TareaIA, Usuario, estimar_tarea
 from backend.modules.gestion_proyectos_asistida.repartir_tareas.schemas.request import (
     RepartirTareasRequest,
     CrearTareaRequest,
@@ -83,7 +83,7 @@ async def _llamar_ia_tareas(prompt: str, provider: Optional[str] = None, api_key
                                 "content": (
                                     "Role: Senior Agile Lead. Distribute actionable development & modeling tasks. "
                                     "Output STRICT MINIFIED JSON ONLY: "
-                                    "{\"tareas\":[{\"usuario_id\":int,\"tipo\":\"diagrama\"|\"desarrollo\",\"area\":str,\"titulo\":str,\"descripcion\":str,\"orden\":int}]}"
+                                    "{\"tareas\":[{\"usuario_id\":int,\"tipo\":\"diagrama\"|\"desarrollo\",\"area\":str,\"titulo\":str,\"descripcion\":str,\"orden\":int,\"estimacion_horas\":int,\"complejidad\":\"baja\"|\"media\"|\"alta\"}]}"
                                 ),
                             },
                             {"role": "user", "content": prompt},
@@ -126,7 +126,7 @@ async def _llamar_ia_tareas(prompt: str, provider: Optional[str] = None, api_key
                 "messages": [
                     {
                         "role": "system",
-                        "content": "Role: Senior Agile Lead. Distribute actionable development & modeling tasks. Output STRICT MINIFIED JSON: {\"tareas\":[{\"usuario_id\":int,\"tipo\":\"diagrama\"|\"desarrollo\",\"area\":str,\"titulo\":str,\"descripcion\":str,\"orden\":int}]}"
+                        "content": "Role: Senior Agile Lead. Distribute actionable development & modeling tasks. Output STRICT MINIFIED JSON: {\"tareas\":[{\"usuario_id\":int,\"tipo\":\"diagrama\"|\"desarrollo\",\"area\":str,\"titulo\":str,\"descripcion\":str,\"orden\":int,\"estimacion_horas\":int,\"complejidad\":\"baja\"|\"media\"|\"alta\"}]}"
                     },
                     {"role": "user", "content": prompt}
                 ],
@@ -243,7 +243,8 @@ async def ejecutar_reparticion_tareas(
         f"Instructions: Create concrete development & modeling tasks assigned according to each member's Role & Areas. "
         f"Field 'tipo': 'diagrama' | 'desarrollo'. "
         f"Field 'area': 'backend' | 'frontend' | 'base_de_datos' | 'testing' | 'modelado'. "
-        f"Output JSON: {{\"tareas\":[{{\"usuario_id\":int,\"tipo\":str,\"area\":str,\"titulo\":str,\"descripcion\":str,\"orden\":int}}]}}"
+        f"Field 'estimacion_horas': realistic effort in hours (1-40). Field 'complejidad': 'baja' | 'media' | 'alta'. "
+        f"Output JSON: {{\"tareas\":[{{\"usuario_id\":int,\"tipo\":str,\"area\":str,\"titulo\":str,\"descripcion\":str,\"orden\":int,\"estimacion_horas\":int,\"complejidad\":str}}]}}"
     )
 
     resultado_ia = await _llamar_ia_tareas(prompt, req.provider, req.api_key)
@@ -286,6 +287,9 @@ async def ejecutar_reparticion_tareas(
                 completada=False,
                 orden=item.get("orden", idx + 1),
             )
+            nueva_tarea.estimacion_horas, nueva_tarea.complejidad = estimar_tarea(
+                nueva_tarea.tipo, titulo, item.get("descripcion"), item.get("estimacion_horas"), item.get("complejidad")
+            )
             nuevas_entidades.append(nueva_tarea)
     else:
         # Fallback heurístico si no responde la IA
@@ -301,6 +305,8 @@ async def ejecutar_reparticion_tareas(
                 descripcion=f"Diseño y construcción de componentes correspondientes al área de {area_principal}.",
                 completada=False,
                 orden=idx + 1,
+                estimacion_horas=estimar_tarea("diagrama" if idx == 0 else "desarrollo")[0],
+                complejidad="media",
             ))
 
     # Con persistir=False la IA solo propone: las tareas se crean al aprobar la propuesta
@@ -323,6 +329,8 @@ async def ejecutar_reparticion_tareas(
             descripcion=t.descripcion,
             completada=t.completada,
             orden=t.orden,
+            estimacion_horas=t.estimacion_horas,
+            complejidad=t.complejidad,
         )
         for t in nuevas_entidades
     ]
@@ -392,6 +400,8 @@ async def registrar_tarea_manual(req: CrearTareaRequest, db: AsyncSession) -> Ta
         descripcion=req.descripcion,
         completada=False,
         orden=req.orden or 0,
+        estimacion_horas=req.estimacion_horas,
+        complejidad=req.complejidad,
     )
     guardadas = await insertar_tareas([nueva], db)
     t = guardadas[0]

@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
+import { Sparkles } from 'lucide-react';
 import { useDiagram } from '@/features/gestion_modelado/shared/context/DiagramContext';
 import { useRealTimeSync, getUserIdentity } from '@/features/gestion_concurrencia/sincronizacion_tiempo_real/context/RealTimeSyncContext';
 import { X, ChevronRight, ChevronLeft, MessageSquarePlus, CheckCircle2, Lock } from 'lucide-react';
 import './PropertiesPanel.css';
+import { pedirALaIA } from '@/features/gestion_asistencia_ia/generar_diagrama_prompt/utils/solicitudesIA';
 
 function getCurrentUser() {
   const cached = localStorage.getItem('usuario_nombre');
@@ -205,11 +207,11 @@ export const PropertiesPanel: React.FC = () => {
                           title="Asignarme a mí como responsable"
                           style={{
                             background: 'var(--primary)',
-                            color: '#fff',
+                            color: 'var(--text-on-primary)',
                             border: 'none',
                             borderRadius: '4px',
-                            padding: '0 8px',
-                            fontSize: '11px',
+                            padding: '0 10px',
+                            fontSize: '12px',
                             cursor: 'pointer',
                             fontWeight: 600,
                             whiteSpace: 'nowrap'
@@ -232,10 +234,10 @@ export const PropertiesPanel: React.FC = () => {
                                 style={{
                                   background: isCurrentResp ? 'var(--primary)' : 'rgba(255,255,255,0.06)',
                                   border: '1px solid ' + (isCurrentResp ? 'var(--primary)' : 'var(--border-color)'),
-                                  color: isCurrentResp ? '#fff' : 'var(--text-secondary)',
+                                  color: isCurrentResp ? 'var(--text-on-primary)' : 'var(--text-secondary)',
                                   borderRadius: '10px',
-                                  padding: '1px 7px',
-                                  fontSize: '10px',
+                                  padding: '2px 8px',
+                                  fontSize: '11.5px',
                                   cursor: 'pointer',
                                   fontWeight: isCurrentResp ? 700 : 400
                                 }}
@@ -394,9 +396,24 @@ export const PropertiesPanel: React.FC = () => {
                     <span className="correccion-card__fecha">{new Date(c.fecha).toLocaleDateString()}</span>
                   </div>
                   <p className="correccion-card__texto">{c.texto}</p>
-                  <button className="correccion-card__resolve" onClick={() => resolveCorreccion(selectedId, c.id, userName)}>
-                    <CheckCircle2 size={14} /> Solucionar
-                  </button>
+                  <div className="correccion-card__acciones">
+                    <button className="correccion-card__resolve" onClick={() => resolveCorreccion(selectedId, c.id, userName)}>
+                      <CheckCircle2 size={14} /> Solucionar
+                    </button>
+                    <button
+                      className="correccion-card__resolve correccion-card__resolve--ia"
+                      title="Pedirle a la IA que la resuelva: llega como propuesta y, al aprobarla, la corrección queda resuelta"
+                      onClick={() => {
+                        const clase = nodes.find(n => n.id === selectedId)?.nombre || 'la clase';
+                        pedirALaIA({
+                          texto: `resuelve en ${clase} la corrección: ${c.texto}`,
+                          correccion: { nodoId: selectedId, id: c.id, clase },
+                        });
+                      }}
+                    >
+                      <Sparkles size={13} aria-hidden="true" /> Solucionar con IA
+                    </button>
+                  </div>
                 </div>
               ))}
               {resueltas.map(c => (

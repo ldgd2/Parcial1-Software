@@ -53,3 +53,5 @@ faker==40.38.0
 typer[all]
 rich
 httpx
+pypdf==7.0.0
+firebase-admin==7.7.0

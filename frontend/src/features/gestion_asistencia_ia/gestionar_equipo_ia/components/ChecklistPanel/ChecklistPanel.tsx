@@ -1,4 +1,5 @@
 import React from 'react';
+import { etiquetaEsfuerzo } from '@/shared/utils/esfuerzo';
 import type { TareaIA } from '../../services/equipoService';
 import { useChecklistPanel } from '../../hooks/useChecklistPanel';
 import './ChecklistPanel.css';
@@ -6,11 +7,10 @@ import './ChecklistPanel.css';
 interface Props {
   proyectoId: number;
   isHost?: boolean;
-  isChatOpen?: boolean;
   onOpenGestor?: () => void;
 }
 
-export const ChecklistPanel: React.FC<Props> = ({ proyectoId, isHost, isChatOpen, onOpenGestor }) => {
+export const ChecklistPanel: React.FC<Props> = ({ proyectoId, isHost, onOpenGestor }) => {
   const { tareas, loading, open, setOpen, toggleTarea, completadas, porcentaje, cargar } =
     useChecklistPanel(proyectoId);
 
@@ -18,7 +18,7 @@ export const ChecklistPanel: React.FC<Props> = ({ proyectoId, isHost, isChatOpen
   const tareasDesarrollo = tareas.filter((t: TareaIA) => (t.tipo || '').toLowerCase() !== 'diagrama');
 
   return (
-    <div className={`checklist-panel ${open ? 'checklist-panel--open' : ''} ${isChatOpen ? 'checklist-panel--shifted' : ''}`}>
+    <div className={`checklist-panel ${open ? 'checklist-panel--open' : ''}`}>
       <button
         id="btn-toggle-checklist"
         className="checklist-panel__trigger"
@@ -175,6 +175,7 @@ const TareaItem: React.FC<TareaItemProps> = ({ tarea, onToggle }) => (
           </span>
         )}
         <span className="checklist-item__titulo">{tarea.titulo}</span>
+        {etiquetaEsfuerzo(tarea) && <span className="checklist-item__esfuerzo" style={{ marginLeft: 6, fontSize: 10.5, opacity: 0.7, whiteSpace: 'nowrap' }}>{etiquetaEsfuerzo(tarea)}</span>}
       </div>
       {tarea.descripcion && (
         <span className="checklist-item__desc">{tarea.descripcion}</span>

@@ -10,6 +10,9 @@ from ..schemas.request import (
     ActualizarVersionDespuesRequest,
     CrearVersionRequest,
     DecidirPropuestaRequest,
+    CrearMemoriaRequest,
+    EditarMemoriaRequest,
+    ResolverConflictoRequest,
 )
 from ..schemas.response import (
     ContextoIAResponse,
@@ -17,7 +20,9 @@ from ..schemas.response import (
     VersionDetalle,
     VersionResumen,
     VersionesPagina,
+    MemoriaItem,
 )
+from typing import List
 from ..services.contexto_service import ContextoService
 
 router = APIRouter(prefix="/api/ia/contexto", tags=["IA - Contexto Persistente"])
@@ -136,3 +141,73 @@ async def guardar_version_despues(
     """El frontend envía el diagrama tal como quedó después de aplicar el cambio de la IA."""
     service = ContextoService(db)
     return await service.guardar_version_despues(proyecto_id, version_id, req.estado_despues)
+
+
+# ─── CU40: actividad y contribución por miembro ─────────────────────────────
+
+@router.get("/{proyecto_id}/actividad")
+async def actividad_por_miembro(
+    proyecto_id: int,
+    dias: Optional[int] = Query(30, ge=1, le=3650, description="Últimos N días; sin valor = todo"),
+    todo: bool = Query(False, description="Ignorar 'dias' y contar todo el historial"),
+    db: AsyncSession = Depends(get_db),
+    _ = Depends(get_current_user_optional),
+):
+    from ..services.actividad_service import contribucion
+    return await contribucion(db, proyecto_id, None if todo else dias)
+
+
+# ─── Memoria del proyecto (estilo Engram) ───────────────────────────────────
+
+@router.get("/{proyecto_id}/memorias", response_model=List[MemoriaItem])
+async def listar_memorias(
+    proyecto_id: int,
+    incluir_historial: bool = Query(False, description="Incluir las observaciones reemplazadas"),
+    db: AsyncSession = Depends(get_db),
+    _ = Depends(get_current_user_optional),
+) -> List[MemoriaItem]:
+    return await ContextoService(db).listar_memorias(proyecto_id, incluir_historial)
+
+
+@router.post("/{proyecto_id}/memorias", response_model=MemoriaItem, status_code=201)
+async def crear_memoria(
+    proyecto_id: int,
+    req: CrearMemoriaRequest,
+    db: AsyncSession = Depends(get_db),
+    _ = Depends(get_current_user_optional),
+) -> MemoriaItem:
+    """Guardar algo a mano (también lo usa /recordar del chat)."""
+    return await ContextoService(db).crear_memoria(proyecto_id, req)
+
+
+@router.put("/{proyecto_id}/memorias/{memoria_id}", response_model=MemoriaItem)
+async def editar_memoria(
+    proyecto_id: int,
+    memoria_id: int,
+    req: EditarMemoriaRequest,
+    db: AsyncSession = Depends(get_db),
+    _ = Depends(get_current_user_optional),
+) -> MemoriaItem:
+    return await ContextoService(db).editar_memoria(proyecto_id, memoria_id, req)
+
+
+@router.delete("/{proyecto_id}/memorias/{memoria_id}", status_code=204)
+async def eliminar_memoria(
+    proyecto_id: int,
+    memoria_id: int,
+    db: AsyncSession = Depends(get_db),
+    _ = Depends(get_current_user_optional),
+) -> None:
+    await ContextoService(db).eliminar_memoria(proyecto_id, memoria_id)
+
+
+@router.post("/{proyecto_id}/memorias/{memoria_id}/resolver", response_model=MemoriaItem)
+async def resolver_conflicto_memoria(
+    proyecto_id: int,
+    memoria_id: int,
+    req: ResolverConflictoRequest,
+    db: AsyncSession = Depends(get_db),
+    _ = Depends(get_current_user_optional),
+) -> MemoriaItem:
+    """Una memoria escrita a mano fue reemplazada por algo automático: elegir cuál vale."""
+    return await ContextoService(db).resolver_conflicto_memoria(proyecto_id, memoria_id, req.mantener_nueva)

@@ -18,6 +18,9 @@
   /* Distinto de --surface-color para que los bordes sean visibles */
   --border-color: #5c626d;
 
+  /* Texto atenuado legible (AA) sobre --bg-color y --surface-color */
+  --text-muted: #b8ad99;
+
   /* Texto sobre fondos claros (--primary / --secondary) */
   --text-on-primary: #222831;
 

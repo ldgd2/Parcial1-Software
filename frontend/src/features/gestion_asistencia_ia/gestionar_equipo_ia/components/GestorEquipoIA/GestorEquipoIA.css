@@ -1,7 +1,7 @@
 .gestor-equipo {
   background: var(--surface-color);
   border: 1px solid var(--border-color);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   padding: 18px;
   display: flex;
   flex-direction: column;
@@ -17,7 +17,7 @@
 .gestor-equipo__icon {
   width: 40px;
   height: 40px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--surface-color);
   border: 1px solid var(--border-color);
   display: flex;
@@ -48,7 +48,7 @@
   color: var(--danger-text);
   font-size: 12px;
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
 }
 
 .gestor-equipo__section-label {
@@ -83,7 +83,7 @@
   flex: 1;
   background: var(--surface-color);
   border: 1px solid var(--border-color);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 6px 10px;
   font-size: 12px;
   color: var(--text-primary);
@@ -108,7 +108,7 @@
   flex: 1;
   background: var(--primary);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   color: var(--bg-color);
   font-size: 12px;
   font-weight: 700;
@@ -131,7 +131,7 @@
 .gestor-equipo__btn-secondary {
   background: var(--surface-color);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
@@ -157,7 +157,7 @@
 .gestor-equipo__dev-card {
   background: var(--surface-color);
   border: 1px solid var(--border-color);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   padding: 12px;
   display: flex;
   flex-direction: column;
@@ -185,14 +185,14 @@
 .gestor-equipo__bar-wrap {
   height: 3px;
   background: var(--border-color);
-  border-radius: 2px;
+  border-radius: var(--radius-md);
   overflow: hidden;
 }
 
 .gestor-equipo__bar {
   height: 100%;
   background: linear-gradient(90deg, var(--primary), var(--primary));
-  border-radius: 2px;
+  border-radius: var(--radius-md);
   transition: width 0.4s ease;
 }
 
@@ -221,7 +221,7 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   flex-shrink: 0;
 }
 
@@ -248,7 +248,7 @@
   color: var(--text-secondary);
   background: var(--surface-color);
   border-left: 3px solid var(--primary);
-  border-radius: 4px;
+  border-radius: var(--radius-md);
 }
 
 .gestor-equipo__propuesta {
@@ -256,7 +256,7 @@
   padding: 12px;
   background: var(--bg-color);
   border: 1px solid var(--primary);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
 }
 
 .gestor-equipo__propuesta-head {
@@ -280,7 +280,7 @@
   font-weight: 700;
   color: var(--bg-color);
   background: #d9b779;
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
 }
 
 .gestor-equipo__propuesta-meta {
@@ -318,4 +318,16 @@
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* CU37: estimación de esfuerzo */
+.gestor-equipo__esfuerzo {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 0 6px;
+  font-size: 10.5px;
+  color: var(--secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  white-space: nowrap;
 }

@@ -198,9 +198,9 @@
   gap: 1.25rem;
   padding: 1rem 1.5rem;
   margin-bottom: 2rem;
-  background: var(--surface-color, #393E46);
+  background: var(--surface-color);
   border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
-  border-left: 4px solid var(--primary, #DFD0B8);
+  border-left: 4px solid var(--primary);
   border-radius: var(--radius-lg, 8px);
   backdrop-filter: blur(12px);
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
@@ -216,10 +216,10 @@
 .dashboard-offline-banner__icon {
   width: 42px;
   height: 42px;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   background: rgba(223, 208, 184, 0.1);
   border: 1px solid rgba(223, 208, 184, 0.25);
-  color: var(--primary, #DFD0B8);
+  color: var(--primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -231,14 +231,14 @@
   font-size: 0.82rem;
   font-weight: 800;
   letter-spacing: 0.08em;
-  color: var(--text-primary, #ffffff);
+  color: var(--text-primary);
   margin-bottom: 2px;
 }
 
 .dashboard-offline-banner__text p {
   margin: 0;
   font-size: 0.78rem;
-  color: var(--text-secondary, #DFD0B8);
+  color: var(--text-secondary);
   line-height: 1.4;
   opacity: 0.85;
 }
@@ -249,9 +249,9 @@
   gap: 8px;
   padding: 0.65rem 1.25rem;
   border-radius: var(--radius-md, 4px);
-  background: var(--primary, #DFD0B8);
-  border: 1px solid var(--primary, #DFD0B8);
-  color: var(--bg-color, #222831);
+  background: var(--primary);
+  border: 1px solid var(--primary);
+  color: var(--bg-color);
   font-size: 0.75rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -263,7 +263,7 @@
 }
 
 .dashboard-btn-offline:hover {
-  background: var(--primary-hover, #eaddcb);
+  background: var(--primary-hover);
   box-shadow: 0 4px 12px rgba(223, 208, 184, 0.25);
 }
 
@@ -273,9 +273,9 @@
   gap: 8px;
   padding: 0.625rem 1.25rem;
   border-radius: var(--radius-md, 4px);
-  background: var(--surface-color, #393E46);
+  background: var(--surface-color);
   border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
-  color: var(--primary, #DFD0B8);
+  color: var(--primary);
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -285,7 +285,7 @@
 }
 
 .dashboard-btn-offline-secondary:hover {
-  border-color: var(--primary, #DFD0B8);
+  border-color: var(--primary);
   background: rgba(223, 208, 184, 0.08);
 }
 
@@ -295,7 +295,7 @@
   align-items: center;
   justify-content: center;
   padding: 4rem 2rem;
-  background: var(--surface-color, #393E46);
+  background: var(--surface-color);
   border: 1px dashed var(--border-color, rgba(255, 255, 255, 0.18));
   border-radius: var(--radius-lg, 8px);
 }
@@ -303,10 +303,10 @@
 .dashboard-empty__badge {
   width: 64px;
   height: 64px;
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: rgba(223, 208, 184, 0.08);
   border: 1px solid rgba(223, 208, 184, 0.2);
-  color: var(--primary, #DFD0B8);
+  color: var(--primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -317,13 +317,13 @@
   font-size: 1.1rem;
   font-weight: 800;
   letter-spacing: 0.06em;
-  color: var(--text-primary, #ffffff);
+  color: var(--text-primary);
   margin: 0 0 0.5rem;
 }
 
 .dashboard-empty--offline p {
   font-size: 0.85rem;
-  color: var(--text-secondary, #DFD0B8);
+  color: var(--text-secondary);
   max-width: 480px;
   margin: 0 0 1.5rem;
   line-height: 1.5;
@@ -336,9 +336,9 @@
   gap: 8px;
   padding: 0.75rem 1.75rem;
   border-radius: var(--radius-md, 4px);
-  background: var(--primary, #DFD0B8);
-  border: 1px solid var(--primary, #DFD0B8);
-  color: var(--bg-color, #222831);
+  background: var(--primary);
+  border: 1px solid var(--primary);
+  color: var(--bg-color);
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -348,7 +348,7 @@
 }
 
 .dashboard-btn-offline-action:hover {
-  background: var(--primary-hover, #eaddcb);
+  background: var(--primary-hover);
   box-shadow: 0 4px 16px rgba(223, 208, 184, 0.3);
 }
 

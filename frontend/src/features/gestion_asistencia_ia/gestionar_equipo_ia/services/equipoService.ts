@@ -34,6 +34,9 @@ export interface TareaIA {
   descripcion: string | null;
   completada: boolean;
   orden: number;
+  /** CU37: estimación de esfuerzo */
+  estimacion_horas?: number | null;
+  complejidad?: string | null;
 }
 
 export async function generarTareasEquipo(req: GenerarEquipoRequest): Promise<TareaIA[]> {

@@ -78,5 +78,5 @@
   border-color: var(--primary);
   color: var(--primary);
 }
-.dash-navbar__settings { background: transparent; border: none; color: #a6adc8; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 8px; border-radius: 6px; transition: color 0.2s, background 0.2s; margin-right: 12px; }
+.dash-navbar__settings { background: transparent; border: none; color: #a6adc8; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 8px; border-radius: var(--radius-md); transition: color 0.2s, background 0.2s; margin-right: 12px; }
 .dash-navbar__settings:hover { background: rgba(255, 255, 255, 0.05); color: #cdd6f4; }

@@ -8,6 +8,7 @@ import {
   registrarCierreRafaga,
   registroManualPausado,
   tomarOrigenPendiente,
+  avisarDiagramaEstable,
   type OrigenCambio,
 } from '../utils/registroCambios';
 import { EVENTO_VERSIONES_ACTUALIZADAS } from './useVersionesContexto';
@@ -111,6 +112,7 @@ export function useRegistroCambiosManuales({
 
     const cmp = compararVersiones(r.antes, despues);
     if (cmp.sinCambios) return;   // p. ej. solo se movieron clases
+    if (!keepalive) avisarDiagramaEstable(despues);   // revisar y sugerir en el chat (CU33)
 
     const descripcion = describir(cmp);
     crearVersion(pid, {

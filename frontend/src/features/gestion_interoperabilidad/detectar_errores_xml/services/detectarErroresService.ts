@@ -1,6 +1,8 @@
+import { API_URL } from '@/shared/lib/api';
+import { TokenService } from '@/shared/lib/TokenService';
 import type { DetectarErroresResponse, CorregirErroresResponse } from '../types';
 
-const API_BASE = '/api/interoperabilidad';
+const API_BASE = `${API_URL}/api/interoperabilidad`;
 
 export const detectarErroresService = {
   async detectarErrores(params: {
@@ -9,7 +11,7 @@ export const detectarErroresService = {
     relations?: any[];
     proyecto_id?: number;
   }): Promise<DetectarErroresResponse> {
-    const token = localStorage.getItem('token');
+    const token = TokenService.getToken();
     const res = await fetch(`${API_BASE}/detectar-errores`, {
       method: 'POST',
       headers: {
@@ -33,7 +35,7 @@ export const detectarErroresService = {
     relations?: any[];
     errores_ids?: string[];
   }): Promise<CorregirErroresResponse> {
-    const token = localStorage.getItem('token');
+    const token = TokenService.getToken();
     const res = await fetch(`${API_BASE}/corregir-errores`, {
       method: 'POST',
       headers: {

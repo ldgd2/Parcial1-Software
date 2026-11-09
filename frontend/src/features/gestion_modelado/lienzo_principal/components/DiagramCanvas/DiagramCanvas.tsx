@@ -1,4 +1,5 @@
 import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
+import { Hand, MousePointer2, Minus, Plus, Maximize } from 'lucide-react';
 import { useDiagram } from '@/features/gestion_modelado/shared/context/DiagramContext';
 import { ClassNode as ClassNodeComponent } from '@/features/gestion_modelado/editar_elemento/components/ClassNode/ClassNode';
 import { RelationLayer } from '@/features/gestion_modelado/conectar_elemento/components/RelationLayer/RelationLayer';
@@ -14,6 +15,21 @@ import {
 import type { RelationType } from '@/features/gestion_modelado/shared/types/types';
 import './DiagramCanvas.css';
 
+const MIN_ZOOM = 0.2;
+const MAX_ZOOM = 3;
+const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
+/** Margen (en unidades del diagrama) alrededor del contenido para las barras y "ajustar". */
+const CONTENT_PAD = 200;
+const FIT_PAD_PX = 80;
+const SCROLLBAR_SIZE = 8;
+const SCROLLBAR_INSET = 4;
+
+const isTypingTarget = (t: EventTarget | null) => {
+  const el = t as HTMLElement | null;
+  if (!el) return false;
+  return ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName) || el.isContentEditable;
+};
+
 interface Props {
   onCanvasClick: () => void;
   proyectoId?: number;
@@ -23,11 +39,48 @@ export const DiagramCanvas: React.FC<Props> = ({ onCanvasClick, proyectoId }) =>
   const { nodes, addNode, updateNode, deleteNode, deleteRelation, moveNode, selectedIds, setSelectedIds, connectingSource, activeTool, setActiveTool, startConnect, finishConnect, cancelConnect } = useDiagram();
   const canvasRef = useRef<HTMLDivElement>(null);
 
-  // Pan & zoom
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
+  // Pan & zoom en un solo estado para que el zoom hacia el cursor sea consistente
+  const [view, setView] = useState({ x: 0, y: 0, zoom: 1 });
+  const pan = useMemo(() => ({ x: view.x, y: view.y }), [view.x, view.y]);
+  const zoom = view.zoom;
+  const setPan = useCallback(
+    (fn: (p: { x: number; y: number }) => { x: number; y: number }) =>
+      setView(v => ({ ...v, ...fn({ x: v.x, y: v.y }) })),
+    []
+  );
   const isPanning = useRef(false);
   const lastMouse = useRef({ x: 0, y: 0 });
+
+  // Herramienta mano (estilo Figma): H la activa, V vuelve a selección,
+  // mantener Espacio la activa temporalmente. El botón central también panea.
+  const [handTool, setHandTool] = useState(false);
+  const [spaceHeld, setSpaceHeld] = useState(false);
+  const [isGrabbing, setIsGrabbing] = useState(false);
+  const handActive = handTool || spaceHeld;
+
+  // Tamaño visible del lienzo (barras de desplazamiento y "ajustar al contenido")
+  const [viewport, setViewport] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      setViewport({ w: entry.contentRect.width, h: entry.contentRect.height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  /** Zoom manteniendo fijo el punto (cx, cy) de la pantalla; por defecto el centro. */
+  const zoomAt = useCallback((factor: number | ((current: number) => number), cx?: number, cy?: number) => {
+    setView(v => {
+      const z = clampZoom(typeof factor === 'function' ? factor(v.zoom) : v.zoom * factor);
+      const px = cx ?? viewport.w / 2;
+      const py = cy ?? viewport.h / 2;
+      const worldX = (px - v.x) / v.zoom;
+      const worldY = (py - v.y) / v.zoom;
+      return { x: px - worldX * z, y: py - worldY * z, zoom: z };
+    });
+  }, [viewport.w, viewport.h]);
 
   // Multi-Drag
   const dragging = useRef<{ items: { id: string; startX: number; startY: number; nodeX: number; nodeY: number }[] } | null>(null);
@@ -60,6 +113,23 @@ export const DiagramCanvas: React.FC<Props> = ({ onCanvasClick, proyectoId }) =>
     refreshComments();
   }, [refreshComments]);
 
+  // Comentarios que deja la IA al aplicarse una propuesta (aquí o en otro cliente de la sala)
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout> | null = null;
+    const pronto = () => { if (t) clearTimeout(t); t = setTimeout(refreshComments, 600); };
+    const alMensaje = (e: Event) => {
+      const m = (e as CustomEvent<any>).detail;
+      if (m?.propuesta?.estado === 'aprobada') pronto();
+    };
+    window.addEventListener('comentarios_actualizados', pronto);
+    window.addEventListener('remote_chat_message', alMensaje);
+    return () => {
+      window.removeEventListener('comentarios_actualizados', pronto);
+      window.removeEventListener('remote_chat_message', alMensaje);
+      if (t) clearTimeout(t);
+    };
+  }, [refreshComments]);
+
   const commentCountsByElement = useMemo(() => {
     const map: Record<string, number> = {};
     for (const c of allComments) {
@@ -90,15 +160,99 @@ export const DiagramCanvas: React.FC<Props> = ({ onCanvasClick, proyectoId }) =>
     };
   });
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    // Si clickea con click central, iniciamos paneo
-    if (e.button === 1) {
-      e.preventDefault();
-      isPanning.current = true;
-      lastMouse.current = { x: e.clientX, y: e.clientY };
+  // Límites del contenido en coordenadas del diagrama
+  const bounds = nodePositions.length
+    ? {
+        minX: Math.min(...nodePositions.map(n => n.x)),
+        minY: Math.min(...nodePositions.map(n => n.y)),
+        maxX: Math.max(...nodePositions.map(n => n.x + n.width)),
+        maxY: Math.max(...nodePositions.map(n => n.y + n.height)),
+      }
+    : null;
+
+  const fitToContent = () => {
+    if (!bounds || !viewport.w || !viewport.h) {
+      setView({ x: 0, y: 0, zoom: 1 });
       return;
     }
+    const bw = Math.max(1, bounds.maxX - bounds.minX);
+    const bh = Math.max(1, bounds.maxY - bounds.minY);
+    const z = clampZoom(Math.min(
+      (viewport.w - FIT_PAD_PX * 2) / bw,
+      (viewport.h - FIT_PAD_PX * 2) / bh,
+      1
+    ));
+    setView({
+      x: (viewport.w - bw * z) / 2 - bounds.minX * z,
+      y: (viewport.h - bh * z) / 2 - bounds.minY * z,
+      zoom: z,
+    });
+  };
+  const fitRef = useRef(fitToContent);
+  const zoomAtRef = useRef(zoomAt);
+  useEffect(() => {
+    fitRef.current = fitToContent;
+    zoomAtRef.current = zoomAt;
+  });
 
+  // Atajos de navegación: H (mano), V (selección), Espacio mantenido, Shift+1 (ajustar), Shift+0 (100%)
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (isTypingTarget(e.target)) return;
+      if (e.code === 'Space') {
+        e.preventDefault(); // evita scroll de la página y "clic" en el botón enfocado
+        if (!e.repeat) setSpaceHeld(true);
+        return;
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.shiftKey && e.code === 'Digit1') { e.preventDefault(); fitRef.current(); return; }
+      if (e.shiftKey && e.code === 'Digit0') {
+        e.preventDefault();
+        zoomAtRef.current(() => 1);
+        return;
+      }
+      if (!e.shiftKey && e.key.toLowerCase() === 'h') setHandTool(true);
+      if (!e.shiftKey && e.key.toLowerCase() === 'v') setHandTool(false);
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') setSpaceHeld(false);
+    };
+    const onBlur = () => setSpaceHeld(false);
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, []);
+
+  /** true si el evento ocurre sobre la superficie del diagrama (no en menús, modales o controles). */
+  const isCanvasSurface = (target: EventTarget | null) => {
+    const el = target as HTMLElement | null;
+    if (!el || !canvasRef.current) return false;
+    return el === canvasRef.current || !!el.closest('.diagram-canvas__inner');
+  };
+
+  // Fase de captura: con la mano activa (o botón central) se panea aunque se pulse sobre un nodo
+  const handleMouseDownCapture = useCallback((e: React.MouseEvent) => {
+    if (!isCanvasSurface(e.target)) return;
+    if (e.button === 1 || (e.button === 0 && handActive)) {
+      e.preventDefault();
+      e.stopPropagation();
+      isPanning.current = true;
+      setIsGrabbing(true);
+      lastMouse.current = { x: e.clientX, y: e.clientY };
+    }
+  }, [handActive]);
+
+  // Con la mano activa, los clics no seleccionan ni editan elementos
+  const handleClickCapture = useCallback((e: React.MouseEvent) => {
+    if (handActive && isCanvasSurface(e.target)) e.stopPropagation();
+  }, [handActive]);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // Click izquierdo en el fondo = Iniciar Marquee
     if (e.button === 0 && (e.target === canvasRef.current || (e.target as HTMLElement).classList.contains('diagram-canvas__inner') || (e.target as HTMLElement).classList.contains('diagram-canvas__grid'))) {
       if (connectingSource) {
@@ -129,14 +283,16 @@ export const DiagramCanvas: React.FC<Props> = ({ onCanvasClick, proyectoId }) =>
       // Shift + Wheel = Pan Vertical
       setPan(p => ({ x: p.x, y: p.y - e.deltaY * 2 }));
     } else {
-      // Wheel sola = Zoom (o podría ser pan y Ctrl = zoom, pero mantendremos wheel=zoom, shift/ctrl=pan)
-      // Ajustaremos zoom si e.deltaY != 0, o podemos hacer que wheel solo panee
-      // El usuario pidió "utilizar control con la ruta de mouse para moverme horizontalmente, shift rueda raton para verticalmente"
-      // Asumiremos que rueda normal = zoom
-      const delta = e.deltaY > 0 ? 0.9 : 1.1;
-      setZoom(z => Math.min(3, Math.max(0.2, z * delta)));
+      // Rueda sola = zoom hacia la posición del cursor
+      const rect = canvasRef.current?.getBoundingClientRect();
+      const factor = e.deltaY > 0 ? 0.9 : 1.1;
+      if (rect) {
+        zoomAtRef.current(factor, e.clientX - rect.left, e.clientY - rect.top);
+      } else {
+        zoomAtRef.current(factor);
+      }
     }
-  }, []);
+  }, [setPan]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -234,7 +390,7 @@ export const DiagramCanvas: React.FC<Props> = ({ onCanvasClick, proyectoId }) =>
         setSelectedIds(newSelected);
       }
     }
-  }, [zoom, moveNode, pan, marquee, nodePositions, setSelectedIds]);
+  }, [zoom, moveNode, pan, marquee, nodePositions, setSelectedIds, setPan]);
 
   const handleMouseUp = useCallback(() => {
     if (dragging.current) {
@@ -266,8 +422,8 @@ export const DiagramCanvas: React.FC<Props> = ({ onCanvasClick, proyectoId }) =>
 
     dragging.current = null;
     isPanning.current = false;
+    setIsGrabbing(false);
     setMarquee(null);
-    if (canvasRef.current) canvasRef.current.style.cursor = 'default';
   }, [nodes, deleteNode]);
 
   const handleNodeClick = useCallback((id: string, e: React.MouseEvent) => {
@@ -373,10 +529,88 @@ export const DiagramCanvas: React.FC<Props> = ({ onCanvasClick, proyectoId }) =>
     }
   };
 
+  // ── Barras de desplazamiento ──────────────────────────────────────────
+  // El rango desplazable es la unión del contenido (con margen) y lo que se ve ahora.
+  const visX = -view.x / zoom;
+  const visY = -view.y / zoom;
+  const visW = viewport.w / zoom;
+  const visH = viewport.h / zoom;
+  const rangeMinX = Math.min(visX, (bounds?.minX ?? visX) - CONTENT_PAD);
+  const rangeMaxX = Math.max(visX + visW, (bounds?.maxX ?? visX + visW) + CONTENT_PAD);
+  const rangeMinY = Math.min(visY, (bounds?.minY ?? visY) - CONTENT_PAD);
+  const rangeMaxY = Math.max(visY + visH, (bounds?.maxY ?? visY + visH) + CONTENT_PAD);
+  const showHBar = !!bounds && viewport.w > 0 && rangeMaxX - rangeMinX > visW + 1;
+  const showVBar = !!bounds && viewport.h > 0 && rangeMaxY - rangeMinY > visH + 1;
+
+  const buildBar = (axis: 'x' | 'y') => {
+    const isX = axis === 'x';
+    const track = (isX ? viewport.w : viewport.h) - SCROLLBAR_INSET * 2
+      - ((isX ? showVBar : showHBar) ? SCROLLBAR_SIZE + SCROLLBAR_INSET : 0);
+    const rangeMin = isX ? rangeMinX : rangeMinY;
+    const range = (isX ? rangeMaxX : rangeMaxY) - rangeMin;
+    const vis = isX ? visW : visH;
+    const visStart = isX ? visX : visY;
+    const thumb = Math.max(32, track * (vis / range));
+    const free = Math.max(1, track - thumb);
+    const scrollable = Math.max(1, range - vis);
+    const offset = ((visStart - rangeMin) / scrollable) * free;
+    // Píxeles de pan por cada píxel que se mueve el pulgar
+    const panPerPx = (scrollable / free) * zoom;
+    return { track, thumb, offset, panPerPx, rangeMin, scrollable, free };
+  };
+  const hBar = showHBar ? buildBar('x') : null;
+  const vBar = showVBar ? buildBar('y') : null;
+
+  const startScrollDrag = (axis: 'x' | 'y', startClient: number, startPanValue: number, panPerPx: number) => {
+    const onMove = (ev: MouseEvent) => {
+      const d = (axis === 'x' ? ev.clientX : ev.clientY) - startClient;
+      const next = startPanValue - d * panPerPx;
+      setView(v => (axis === 'x' ? { ...v, x: next } : { ...v, y: next }));
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  const handleThumbMouseDown = (axis: 'x' | 'y', e: React.MouseEvent) => {
+    const bar = axis === 'x' ? hBar : vBar;
+    if (!bar || e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    startScrollDrag(axis, axis === 'x' ? e.clientX : e.clientY, axis === 'x' ? view.x : view.y, bar.panPerPx);
+  };
+
+  // Clic en la pista: centra el pulgar en ese punto y permite seguir arrastrando
+  const handleTrackMouseDown = (axis: 'x' | 'y', e: React.MouseEvent) => {
+    const bar = axis === 'x' ? hBar : vBar;
+    if (!bar || e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const pos = axis === 'x' ? e.clientX - rect.left : e.clientY - rect.top;
+    const thumbStart = Math.min(bar.free, Math.max(0, pos - bar.thumb / 2));
+    const worldStart = bar.rangeMin + (thumbStart / bar.free) * bar.scrollable;
+    const nextPan = -worldStart * zoom;
+    setView(v => (axis === 'x' ? { ...v, x: nextPan } : { ...v, y: nextPan }));
+    startScrollDrag(axis, axis === 'x' ? e.clientX : e.clientY, nextPan, bar.panPerPx);
+  };
+
+  const canvasClass = [
+    'diagram-canvas',
+    connectingSource ? 'diagram-canvas--connecting' : '',
+    handActive ? 'diagram-canvas--hand' : '',
+    isGrabbing ? 'diagram-canvas--grabbing' : '',
+  ].filter(Boolean).join(' ');
+
   return (
     <div
-      className={`diagram-canvas${connectingSource ? ' diagram-canvas--connecting' : ''}`}
+      className={canvasClass}
       ref={canvasRef}
+      onMouseDownCapture={handleMouseDownCapture}
+      onClickCapture={handleClickCapture}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -434,8 +668,74 @@ export const DiagramCanvas: React.FC<Props> = ({ onCanvasClick, proyectoId }) =>
         )}
       </div>
 
-      <div className="diagram-canvas__zoom-badge">
-        {Math.round(zoom * 100)}%
+      {hBar && (
+        <div
+          className="diagram-canvas__scrollbar diagram-canvas__scrollbar--h"
+          style={{ width: hBar.track }}
+          onMouseDown={(e) => handleTrackMouseDown('x', e)}
+        >
+          <div
+            className="diagram-canvas__scroll-thumb"
+            style={{ width: hBar.thumb, transform: `translateX(${hBar.offset}px)` }}
+            onMouseDown={(e) => handleThumbMouseDown('x', e)}
+          />
+        </div>
+      )}
+      {vBar && (
+        <div
+          className="diagram-canvas__scrollbar diagram-canvas__scrollbar--v"
+          style={{ height: vBar.track }}
+          onMouseDown={(e) => handleTrackMouseDown('y', e)}
+        >
+          <div
+            className="diagram-canvas__scroll-thumb"
+            style={{ height: vBar.thumb, transform: `translateY(${vBar.offset}px)` }}
+            onMouseDown={(e) => handleThumbMouseDown('y', e)}
+          />
+        </div>
+      )}
+
+      {/* Controles de navegación */}
+      <div className="diagram-canvas__hud" onMouseDown={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          className={`diagram-canvas__hud-btn${!handActive ? ' is-active' : ''}`}
+          onClick={() => setHandTool(false)}
+          title="Seleccionar (V)"
+          aria-label="Herramienta de selección"
+          aria-pressed={!handActive}
+        >
+          <MousePointer2 size={15} />
+        </button>
+        <button
+          type="button"
+          className={`diagram-canvas__hud-btn${handActive ? ' is-active' : ''}`}
+          onClick={() => setHandTool(h => !h)}
+          title="Mano para mover el lienzo (H) · o mantén Espacio"
+          aria-label="Herramienta mano"
+          aria-pressed={handActive}
+        >
+          <Hand size={15} />
+        </button>
+        <span className="diagram-canvas__hud-sep" aria-hidden="true" />
+        <button type="button" className="diagram-canvas__hud-btn" onClick={() => zoomAt(1 / 1.2)} title="Alejar" aria-label="Alejar">
+          <Minus size={15} />
+        </button>
+        <button
+          type="button"
+          className="diagram-canvas__hud-btn diagram-canvas__hud-zoom"
+          onClick={() => zoomAt(() => 1)}
+          title="Restablecer al 100% (Shift+0)"
+          aria-label={`Zoom ${Math.round(zoom * 100)}%, restablecer al 100%`}
+        >
+          {Math.round(zoom * 100)}%
+        </button>
+        <button type="button" className="diagram-canvas__hud-btn" onClick={() => zoomAt(1.2)} title="Acercar" aria-label="Acercar">
+          <Plus size={15} />
+        </button>
+        <button type="button" className="diagram-canvas__hud-btn" onClick={fitToContent} title="Ajustar al contenido (Shift+1)" aria-label="Ajustar al contenido">
+          <Maximize size={15} />
+        </button>
       </div>
 
       {picker && (

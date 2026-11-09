@@ -61,9 +61,60 @@ class TareaIA(Base):
     # Área de la tarea (ej: 'backend', 'frontend', 'modelado', 'base_de_datos', 'testing', 'general')
     area = Column(String, nullable=True, default="general")
 
+    # CU37: estimación de esfuerzo (la da la IA; si no, se calcula con estimar_tarea)
+    estimacion_horas = Column(Integer, nullable=True)
+    complejidad = Column(String, nullable=True)   # baja | media | alta
     titulo = Column(String, nullable=False)
     descripcion = Column(Text, nullable=True)
     completada = Column(Boolean, nullable=False, default=False)
     orden = Column(Integer, nullable=False, default=0)
 
     usuario = relationship("Usuario")
+
+
+# ─── CU37: estimación de esfuerzo de tareas ─────────────────────────────────
+
+_COMPLEJIDADES = ("baja", "media", "alta")
+# Ojo: palabras de *trabajo* complejo, no nombres de clases ("Modelar Pago" no es complejo; "integrar pagos" sí)
+_PALABRAS_ALTA = ("integrar", "integración", "seguridad", "autentic", "pasarela", "migr", "despleg", "arquitectura",
+                  "optimiz", "concurren", "sincroniz", "tiempo real", "refactor")
+_PALABRAS_BAJA = ("renombrar", "documentar", "revisar", "ajustar", "corregir texto", "estilo", "color")
+
+
+def estimar_tarea(tipo=None, titulo="", descripcion="", horas_ia=None, complejidad_ia=None):
+    """
+    Devuelve (horas, complejidad). Usa lo que propuso la IA si es válido; si no, una regla simple:
+    diagrama 2 h, desarrollo 4 h, ajustado por palabras clave y largo de la descripción.
+    """
+    complejidad = str(complejidad_ia or "").strip().lower()
+    try:
+        horas = int(round(float(horas_ia)))
+    except (TypeError, ValueError):
+        horas = None
+    if horas is not None and 1 <= horas <= 80 and complejidad in _COMPLEJIDADES:
+        return horas, complejidad
+
+    texto = f"{titulo or ''} {descripcion or ''}".lower()
+    if any(p in texto for p in _PALABRAS_ALTA) or len(descripcion or "") > 280:
+        calc = "alta"
+    elif any(p in texto for p in _PALABRAS_BAJA):
+        calc = "baja"
+    else:
+        calc = "media"
+    complejidad = complejidad if complejidad in _COMPLEJIDADES else calc
+    if horas is None or not (1 <= horas <= 80):
+        base = 2 if (tipo or "") == "diagrama" else 4
+        horas = {"baja": max(1, base // 2), "media": base, "alta": base * 2}[complejidad]
+    return horas, complejidad
+
+
+from sqlalchemy import event as _event  # noqa: E402
+
+
+@_event.listens_for(TareaIA, "before_insert")
+def _completar_estimacion(mapper, connection, tarea):
+    """Toda tarea que se guarda sin estimación (p. ej. creada a mano) recibe una."""
+    if tarea.estimacion_horas is None or not tarea.complejidad:
+        h, c = estimar_tarea(tarea.tipo, tarea.titulo, tarea.descripcion, tarea.estimacion_horas, tarea.complejidad)
+        tarea.estimacion_horas = tarea.estimacion_horas or h
+        tarea.complejidad = tarea.complejidad or c

@@ -18,7 +18,7 @@
   background: #FF5722;
   color: white;
   padding: 2px 8px;
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   font-size: 12px;
   position: absolute;
   top: 20px;

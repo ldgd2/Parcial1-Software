@@ -42,3 +42,7 @@ Thumbs.db
 .agent/
 .agent/
 .gemini/
+
+# CU39: credenciales de Firebase (nunca al repo)
+*firebase-service-account*.json
+backend/firebase*.json

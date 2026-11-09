@@ -17,6 +17,8 @@ export interface CrearComentarioPayload {
   elemento_tipo: 'node' | 'relation';
   texto: string;
   autor_nombre?: string;
+  /** Lo escribe la IA al aplicarse una propuesta: se firma "IA (aprobado por …)" */
+  autor_ia?: boolean;
 }
 
 export interface ActualizarComentarioPayload {

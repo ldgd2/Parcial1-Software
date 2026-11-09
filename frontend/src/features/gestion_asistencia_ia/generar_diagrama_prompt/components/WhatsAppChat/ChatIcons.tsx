@@ -38,14 +38,14 @@ export const IconReply: React.FC<{ size?: number; color?: string }> = ({ size = 
   </svg>
 );
 
-export const IconDoubleCheck: React.FC<{ size?: number; color?: string }> = ({ size = 14, color = '#53bdeb' }) => (
+export const IconDoubleCheck: React.FC<{ size?: number; color?: string }> = ({ size = 14, color = 'var(--chat-accent, currentColor)' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M18 6L7 17l-5-5" />
     <path d="M22 10l-7.5 7.5-1.5-1.5" />
   </svg>
 );
 
-export const IconBot: React.FC<{ size?: number; color?: string }> = ({ size = 16, color = '#25D366' }) => (
+export const IconBot: React.FC<{ size?: number; color?: string }> = ({ size = 16, color = 'var(--chat-accent, currentColor)' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="3" y="11" width="18" height="10" rx="2" />
     <circle cx="12" cy="5" r="2" />

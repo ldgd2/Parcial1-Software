@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { configApi } from '../services/config_api';
-import { API_URL, apiFetch } from '@/shared/lib/api';
+import { apiFetch } from '@/shared/lib/api';
+import { exportarGithubApi } from '@/features/gestion_asistencia_ia/exportar_github/services/exportar_api';
 import { actualizarHabilidades } from '@/features/gestion_asistencia_ia/gestionar_equipo_ia/services/equipoService';
 import './ConfiguracionView.css';
 
@@ -201,12 +202,7 @@ export const ConfiguracionView: React.FC = () => {
   // Handlers for GitHub
   const handleIniciarVinculacionGithub = async () => {
     try {
-      const res = await fetch(`${API_URL}/exportar-github/auth-url`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      const data = await res.json();
+      const data = await exportarGithubApi.getAuthUrl();
       if (data.url) {
         window.location.href = data.url;
       }

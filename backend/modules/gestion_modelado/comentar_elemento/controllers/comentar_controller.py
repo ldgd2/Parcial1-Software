@@ -19,6 +19,9 @@ async def crear_comentario(
     service = ComentarService(db)
     autor_id = current_user.id if current_user else None
     autor_nombre = getattr(current_user, "nombre", None) if current_user else (req.autor_nombre or "Colaborador")
+    if req.autor_ia:
+        # Lo escribe la IA; se conserva autor_id de quien aprobó para saber quién fue
+        autor_nombre = f"IA (aprobado por {autor_nombre})" if current_user or req.autor_nombre else "IA"
     return await service.agregar_comentario(req, autor_id=autor_id, autor_nombre=autor_nombre)
 
 

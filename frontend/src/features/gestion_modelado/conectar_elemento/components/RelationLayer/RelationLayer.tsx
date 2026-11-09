@@ -450,10 +450,21 @@ const RelationLine: React.FC<RelationLineProps> = ({
             style={{ width: '100%', background: '#1a1f2e', color: '#fff', border: '1px solid #a8b5c8', borderRadius: 4, padding: '2px 6px', fontSize: 11 }} />
         </foreignObject>
       ) : (
-        <text x={midX} y={midY - 6} className="relation-layer__label" textAnchor="middle"
-          onDoubleClick={() => setEditingLabel(true)}>
-          {relation.label || (hovered ? '✎' : '')}
-        </text>
+        relation.label ? (
+          <text x={midX} y={midY - 6} className="relation-layer__label" textAnchor="middle"
+            onDoubleClick={() => setEditingLabel(true)}>
+            {relation.label}
+          </text>
+        ) : hovered ? (
+          // Sin etiqueta: lápiz para indicar que se puede añadir (doble clic)
+          <g transform={`translate(${midX - 6}, ${midY - 18})`} style={{ cursor: 'text', pointerEvents: 'all' }}
+            onDoubleClick={() => setEditingLabel(true)}>
+            <title>Doble clic para añadir una etiqueta</title>
+            <rect x={-3} y={-3} width={18} height={18} fill="transparent" />
+            <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" transform="scale(0.5)"
+              fill="none" stroke="#a8b5c8" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+          </g>
+        ) : null
       ))}
 
       {/* Botón de comentarios de la relación */}
@@ -467,12 +478,24 @@ const RelationLine: React.FC<RelationLineProps> = ({
             onOpenComments?.(relation.id, relName);
           }}
         >
-          <circle r="8" fill={commentCount > 0 ? '#0284c7' : '#1e293b'} stroke="#38bdf8" strokeWidth="1" />
-          <path d="M-3 -2 h6 v3 h-4 l-1.5 1.5 v-1.5 h-0.5 z" fill="#fff" />
-          {commentCount > 0 && (
-            <text x="0" y="2.5" fill="#fff" fontSize="7" fontWeight="bold" textAnchor="middle">
+          <title>{commentCount > 0 ? `${commentCount} comentario(s) abierto(s)` : 'Comentarios de la relación'}</title>
+          <circle r="11" fill={commentCount > 0 ? '#0369a1' : '#1e293b'} stroke="#38bdf8" strokeWidth="1.5" />
+          {commentCount > 0 ? (
+            // Con comentarios: solo el número (antes se superponía con el icono)
+            <text x="0" y="3.5" fill="#fff" fontSize="10" fontWeight="bold" textAnchor="middle">
               {commentCount}
             </text>
+          ) : (
+            // Sin comentarios: globo de diálogo (mismo trazo que en los nodos)
+            <path
+              d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+              transform="translate(-6.5 -6.5) scale(0.54)"
+              fill="none"
+              stroke="#fff"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           )}
         </g>
       )}

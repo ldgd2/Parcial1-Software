@@ -5,6 +5,7 @@ import { Widget } from '../../../../shared/components/ui/Widget';
 import { AuthLayout } from '../../shared/AuthLayout';
 import { apiFetch } from '@/shared/lib/api';
 import { TokenService } from '@/shared/lib/TokenService';
+import { limpiarDatosDeSesion } from '@/shared/lib/session';
 import './login.css';
 
 export const LoginView: React.FC = () => {
@@ -25,6 +26,8 @@ export const LoginView: React.FC = () => {
         body: JSON.stringify({ email, password }),
       });
       if (data.access_token) {
+        // Nueva sesión: no arrastrar datos de quien usó el navegador antes
+        limpiarDatosDeSesion();
         TokenService.setToken(data.access_token);
         
         try {

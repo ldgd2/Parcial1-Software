@@ -1,0 +1,278 @@
+/* Diagnóstico de errores en la BD — contenedor, cabecera y pie los pone <Modal>. */
+
+.errores-modal {
+  height: min(85vh, 760px);
+}
+
+.errores__intro {
+  margin: 0;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+/* ── Estados (cargando, error, sin errores) ──────────────────── */
+.errores__estado {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.errores__estado p {
+  margin: 0;
+  max-width: 460px;
+  line-height: 1.5;
+}
+
+.errores__estado--error { color: var(--danger-soft); }
+
+.errores__ok {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--success-text);
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.errores__ok-titulo {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.errores__spin {
+  color: var(--primary);
+  animation: errores-spin 0.9s linear infinite;
+}
+
+@keyframes errores-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Layout lista / detalle ──────────────────────────────────── */
+.errores__layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(280px, 38%) 1fr;
+}
+
+.errores__lista {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1rem;
+  border-right: 1px solid var(--border-color);
+  background: var(--bg-color);
+}
+
+.errores__lista ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.errores__lista-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.errores__stats {
+  display: inline-flex;
+  gap: 0.4rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.errores__stats .is-alta { color: var(--danger-text); }
+.errores__stats .is-media { color: var(--warning-text); }
+
+.errores__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.75rem 0.875rem;
+  text-align: left;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--border-color);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.errores__item--alta { border-left-color: var(--danger-text); }
+.errores__item--media { border-left-color: var(--warning-text); }
+.errores__item--baja { border-left-color: var(--info); }
+
+.errores__item:hover { border-color: var(--text-muted); }
+
+.errores__item.is-active {
+  border-color: var(--primary);
+  background: rgba(223, 208, 184, 0.08);
+}
+
+.errores__item-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.errores__tabla {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.errores__desc {
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Etiquetas ───────────────────────────────────────────────── */
+.errores__sev {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid;
+  border-radius: var(--radius-full);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.errores__sev--alta { color: var(--danger-text); border-color: rgba(248, 113, 113, 0.4); background: rgba(248, 113, 113, 0.1); }
+.errores__sev--media { color: var(--warning-text); border-color: rgba(251, 191, 36, 0.4); background: rgba(251, 191, 36, 0.1); }
+.errores__sev--baja { color: var(--info); border-color: rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.1); }
+
+.errores__tipo {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.75rem;
+}
+
+/* ── Detalle ─────────────────────────────────────────────────── */
+.errores__detalle {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.errores__detalle-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.errores__detalle-titulo {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.errores__detalle-id {
+  margin: 0;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.errores__bloque {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.errores__label {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+}
+
+.errores__caja {
+  margin: 0;
+  padding: 0.875rem 1rem;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.errores__caja--solucion {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  border-left: 3px solid var(--success);
+  color: var(--text-primary);
+}
+
+.errores__caja--solucion svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--success-text);
+}
+
+/* Pie: la nota queda a la izquierda */
+.errores__pie-nota {
+  margin-right: auto;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+@media (max-width: 720px) {
+  .errores__layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .errores__lista { max-height: 40vh; border-right: none; border-bottom: 1px solid var(--border-color); }
+}

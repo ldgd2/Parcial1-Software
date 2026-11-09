@@ -132,10 +132,10 @@
   align-items: center;
   gap: 6px;
   padding: 3px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   background: rgba(223, 208, 184, 0.1);
   border: 1px solid rgba(223, 208, 184, 0.25);
-  color: var(--primary, #DFD0B8);
+  color: var(--primary);
   font-size: 0.65rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -144,7 +144,7 @@
 
 .menustrip__offline-badge svg {
   flex-shrink: 0;
-  color: var(--primary, #DFD0B8);
+  color: var(--primary);
 }
 
 .menustrip__node-count {
@@ -161,9 +161,9 @@
   height: 28px;
   padding: 0 0.85rem;
   border-radius: var(--radius-md, 4px);
-  background: var(--surface-color, #393E46);
+  background: var(--surface-color);
   border: 1px solid var(--border-color, rgba(255, 255, 255, 0.15));
-  color: var(--text-primary, #ffffff);
+  color: var(--text-primary);
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -174,12 +174,12 @@
 }
 
 .menustrip__save-btn svg {
-  color: var(--primary, #DFD0B8);
+  color: var(--primary);
   flex-shrink: 0;
 }
 
 .menustrip__save-btn:hover:not(:disabled) {
-  border-color: var(--primary, #DFD0B8);
+  border-color: var(--primary);
   background: rgba(223, 208, 184, 0.08);
   box-shadow: 0 0 10px rgba(223, 208, 184, 0.15);
 }
@@ -259,9 +259,9 @@
   height: 28px;
   padding: 0 0.95rem;
   border-radius: var(--radius-md, 4px);
-  background: var(--primary, #DFD0B8);
-  border: 1px solid var(--primary, #DFD0B8);
-  color: var(--bg-color, #222831);
+  background: var(--primary);
+  border: 1px solid var(--primary);
+  color: var(--bg-color);
   font-size: 0.7rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -272,12 +272,12 @@
 }
 
 .menustrip__share-btn svg {
-  color: var(--bg-color, #222831);
+  color: var(--bg-color);
   flex-shrink: 0;
 }
 
 .menustrip__share-btn:hover {
-  background: var(--primary-hover, #eaddcb);
+  background: var(--primary-hover);
 }
 
 .menustrip__share-btn--copiado {
@@ -295,8 +295,8 @@
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  background: var(--bg-color, #222831);
-  border: 1px solid var(--border-color, #393E46);
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-md, 4px);
   width: 340px;
   padding: 1rem;
@@ -310,7 +310,7 @@
   font-size: 0.65rem;
   font-weight: 800;
   letter-spacing: 0.12em;
-  color: var(--primary, #DFD0B8);
+  color: var(--primary);
   margin-bottom: 0.625rem;
   text-transform: uppercase;
 }
@@ -322,14 +322,14 @@
   margin-bottom: 0.625rem;
   border-radius: var(--radius-md, 4px);
   overflow: hidden;
-  border: 1px solid var(--border-color, #393E46);
+  border: 1px solid var(--border-color);
 }
 
 .menustrip__share-input {
   flex: 1;
-  background: var(--surface-color, #393E46);
+  background: var(--surface-color);
   border: none;
-  color: var(--text-primary, #ffffff);
+  color: var(--text-primary);
   font-size: 0.72rem;
   font-family: monospace;
   padding: 0.55rem 0.75rem;
@@ -345,9 +345,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--primary, #DFD0B8);
+  background: var(--primary);
   border: none;
-  color: var(--bg-color, #222831);
+  color: var(--bg-color);
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -359,7 +359,7 @@
 }
 .menustrip__share-copy:hover,
 .menustrip__share-copy-btn:hover { 
-  background: var(--primary-hover, #eaddcb); 
+  background: var(--primary-hover); 
 }
 .menustrip__share-copy--done {
   background: #15803d !important;
@@ -368,7 +368,7 @@
 
 .menustrip__share-hint {
   font-size: 0.68rem;
-  color: var(--secondary, #948979);
+  color: var(--secondary);
   line-height: 1.4;
   margin: 0;
 }
@@ -386,7 +386,7 @@
   align-items: center;
   gap: 12px;
   z-index: var(--z-toast);
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   animation: slideInToast 0.3s ease-out forwards;
 }
 .menustrip__toast--success { border-left-color: var(--success-soft); }

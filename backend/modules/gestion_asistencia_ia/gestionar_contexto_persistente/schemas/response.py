@@ -30,6 +30,14 @@ class CorreccionMemoria(BaseModel):
     text: str
 
 
+class MemoriaPrompt(BaseModel):
+    tipo: str
+    topic_key: str
+    titulo: str
+    que: str
+    aprendido: str
+
+
 class MemoriaSecciones(BaseModel):
     """La memoria inyectada en el prompt, por partes (misma selección que el texto)."""
     dominio: str
@@ -38,6 +46,7 @@ class MemoriaSecciones(BaseModel):
     correcciones_abiertas: List[CorreccionMemoria]
     total_correcciones_abiertas: int
     diagrama_dsl: str
+    memorias: List[MemoriaPrompt] = []
 
 
 class ContextoIAResponse(BaseModel):
@@ -93,3 +102,22 @@ class VersionesPagina(BaseModel):
     items: List[VersionResumen]
     hay_mas: bool
 
+
+class MemoriaItem(BaseModel):
+    """Observación de la memoria del proyecto (estilo Engram)."""
+    id: int
+    tipo: str
+    topic_key: str
+    titulo: str
+    que: str
+    por_que: str
+    donde: str
+    aprendido: str
+    origen: str
+    autor: Optional[str] = None
+    vigente: bool
+    en_conflicto: bool
+    reemplaza_id: Optional[int] = None
+    version_id: Optional[int] = None
+    creada: int
+    actualizada: int

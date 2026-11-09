@@ -63,3 +63,28 @@ class LimpiarMemoriaRequest(BaseModel):
     proyecto_id: int = Field(..., description="ID del proyecto a reiniciar")
     conservar_dominio: bool = Field(True, description="Si es True, conserva la categoría del dominio")
 
+
+class CrearMemoriaRequest(BaseModel):
+    """O bien `texto` (como en /recordar), o los campos explícitos."""
+    texto: Optional[str] = Field(None, max_length=2000, description="'tema/sub: contenido' o texto libre")
+    tipo: Optional[str] = Field(None, description="decision | restriccion | convencion | correccion | rechazo")
+    topic_key: Optional[str] = Field(None, max_length=120)
+    titulo: Optional[str] = Field(None, max_length=200)
+    que: Optional[str] = Field(None, max_length=4000)
+    por_que: Optional[str] = Field(None, max_length=2000)
+    donde: Optional[str] = Field(None, max_length=500)
+    aprendido: Optional[str] = Field(None, max_length=2000)
+    autor: Optional[str] = Field(None, max_length=120)
+
+
+class EditarMemoriaRequest(BaseModel):
+    tipo: Optional[str] = None
+    titulo: Optional[str] = Field(None, max_length=200)
+    que: Optional[str] = Field(None, max_length=4000)
+    por_que: Optional[str] = Field(None, max_length=2000)
+    donde: Optional[str] = Field(None, max_length=500)
+    aprendido: Optional[str] = Field(None, max_length=2000)
+
+
+class ResolverConflictoRequest(BaseModel):
+    mantener_nueva: bool = Field(..., description="True: queda la nueva; False: vuelve la anterior (la escrita a mano)")
