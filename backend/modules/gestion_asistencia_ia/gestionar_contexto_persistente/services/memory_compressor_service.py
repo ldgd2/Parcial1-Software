@@ -152,6 +152,7 @@ def compilar_contexto_para_llm(
     correcciones: List[Dict[str, Any]],
     snapshot_dsl: str,
     memorias: List[Dict[str, Any]] = None,
+    incluir_diagrama: bool = True,
 ) -> Tuple[str, int, int]:
     """
     Compila el contexto de memoria a un bloque de texto ultra-denso
@@ -190,8 +191,10 @@ def compilar_contexto_para_llm(
         for c in s["correcciones_abiertas"]:
             lineas.append(f"• [{c['target']}]: {c['text']}")
 
-    if s["diagrama_dsl"]:
-        lineas.append(f"Diagrama Actual: {s['diagrama_dsl']}")
+    # El snapshot guardado es el de la interacción ANTERIOR: si el pedido trae el lienzo en vivo,
+    # no se repite (dos diagramas distintos confunden a la IA y puede revivir clases borradas).
+    if incluir_diagrama and s["diagrama_dsl"]:
+        lineas.append(f"Último diagrama guardado: {s['diagrama_dsl']}")
 
     bloque = "\n".join(lineas)
     

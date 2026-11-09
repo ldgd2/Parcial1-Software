@@ -70,6 +70,7 @@ async def generar_diagrama(
             tasks=resultado.get("tasks"),
             provider_used=resultado.get("provider_used", settings.AI_PROVIDER),
             version_id=resultado.get("version_id"),
+            uso_tokens=resultado.get("uso_tokens"),
         )
     except HTTPException as http_exc:
         logger.error(f"[POST /prompt/generar] HTTPException {http_exc.status_code}: {http_exc.detail}")

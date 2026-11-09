@@ -1,6 +1,8 @@
 import asyncio
+import re
+import unicodedata
 from typing import Optional, Any
-from .llm_client import consultar_llm, transcribir_audio
+from .llm_client import consultar_llm, transcribir_audio, iniciar_medicion, hay_presupuesto
 from .dsl_normalizer import normalize_ai_output, extraer_entidades_de_texto, garantizar_conectividad_relacional
 from .prompt_compressor import HybridPromptCompressor
 
@@ -42,6 +44,36 @@ def deduplicar_resultado(resultado: dict) -> dict:
     return resultado
 
 
+# Encabezados que arma el chat para comandos que SÍ cambian el diagrama
+_PEDIDOS_DE_CAMBIO = ("GENERAR DIAGRAMA", "REFACTORIZ", "REVISIÓN COMPLETA", "LIMPIEZA DE DIAGRAMA",
+                      "DIAGRAMA DE", "SISTEMA DE", "MODELA")
+# Verbos de cambio por raíz (sin acentos). No se usa el compresor: ahí "hace"/"hacia" cuentan como ADD.
+_VERBO_DE_CAMBIO = re.compile(
+    r"\b(agreg|anad|crea|crear|cree|incluy|insert|elimin|borr|quit|remuev|remov|modific|cambi|renombr|"
+    r"edit|actualiz|conect|relacion[ae]|vincul|asoci[ae]|un[ea]\b|corrig|correg|arregl|repar|solucion|"
+    r"normaliz|refactoriz|genera|disen|separ|divid|fusion|mueve|muev|convierte|convert|reemplaz|ajust)\w*",
+)
+
+
+def _sin_acentos(texto: str) -> str:
+    return unicodedata.normalize("NFKD", texto or "").encode("ascii", "ignore").decode().lower()
+
+
+def _pide_cambios(prompt: str) -> bool:
+    """¿El pedido es para crear/cambiar el diagrama? (preguntas y explicaciones no)."""
+    if any(p in (prompt or "").upper() for p in _PEDIDOS_DE_CAMBIO):
+        return True
+    return bool(_VERBO_DE_CAMBIO.search(_sin_acentos(prompt)))
+
+
+def _tiene_cambios(resultado: dict) -> bool:
+    return bool(
+        resultado.get("nodes") or resultado.get("relations")
+        or resultado.get("deletedNodes") or resultado.get("deletedRelations")
+        or resultado.get("tasks")
+    )
+
+
 async def generar_diagrama_desde_prompt(
     prompt: str,
     context: Optional[str] = None,
@@ -66,6 +98,7 @@ async def generar_diagrama_desde_prompt(
     5. Persiste el nuevo estado cognitivo ahorrando tokens.
     """
     effective_context = context or ""
+    uso = iniciar_medicion()   # tokens reales de este pedido (todas las llamadas que haga)
 
     if db is not None and proyecto_id is not None and proyecto_id > 0:
         try:
@@ -74,15 +107,20 @@ async def generar_diagrama_desde_prompt(
             if correcciones is not None:
                 # las correcciones del diagrama entran a la memoria ANTES de armar el contexto
                 await service.sincronizar_correcciones(proyecto_id, correcciones)
-            compilado = await service.compilar_contexto(proyecto_id, consulta=prompt)
+            compilado = await service.compilar_contexto(proyecto_id, consulta=prompt, incluir_diagrama=not context)
             if compilado and compilado.contexto_compilado_llm:
-                effective_context = f"{compilado.contexto_compilado_llm}\n\nLienzo Actual:\n{effective_context}"
+                effective_context = (
+                    f"{compilado.contexto_compilado_llm}\n\nDiagrama actual (en vivo):\n{context}"
+                    if context else compilado.contexto_compilado_llm
+                )
         except Exception as ctx_err:
             print(f"[ContextoPersistente] Advertencia al compilar memoria: {ctx_err}")
 
-    compressor = HybridPromptCompressor()
-    compressed_prompt = compressor.compress(prompt) if not image_base64 else prompt
-    prompt_to_send = compressed_prompt if compressed_prompt and len(compressed_prompt) >= 4 else prompt
+    # Se envía el pedido ORIGINAL: comprimirlo (minúsculas, sin acentos, verbos → ADD/EDIT…) cambiaba
+    # los nombres de clases y atributos ("MétodoPago" → "metodopago") y ahorraba muy pocos tokens.
+    # La compresión se sigue usando solo para guardar el historial en la memoria.
+    prompt_to_send = prompt
+    rescatar = bool(image_base64) or _pide_cambios(prompt)   # una imagen siempre es para digitalizar
 
     raw_response, used_provider = await consultar_llm(
         prompt=prompt_to_send,
@@ -96,11 +134,17 @@ async def generar_diagrama_desde_prompt(
     resultado = normalize_ai_output(raw_response, context=effective_context)
     resultado["provider_used"] = used_provider
 
-    # Rescate nivel 1: Si el proveedor no generó clases, recurrir inmediatamente a Gemini
-    if (not resultado.get("nodes") or len(resultado["nodes"]) == 0) and used_provider != "gemini":
+    # Rescates SOLO si se pidió cambiar el diagrama y la respuesta no trae ningún cambio.
+    # (Antes también corrían con una respuesta que solo borraba o solo traía tareas, y con preguntas:
+    #  la IA respondía en prosa y se "extraían" clases inventadas como propuesta.)
+    rescatar = rescatar and not _tiene_cambios(resultado)
+
+    # Rescate nivel 1: recurrir a Gemini con la llave del SERVIDOR (la del usuario es de otro proveedor)
+    # used_provider puede ser "gemini (fallback)": antes se volvía a llamar a Gemini con el mismo pedido
+    if rescatar and hay_presupuesto() and not used_provider.startswith("gemini"):
         try:
             from .llm_client import _consultar_gemini
-            fb_raw = await _consultar_gemini(prompt_to_send, context=effective_context, api_key=api_key)
+            fb_raw = await _consultar_gemini(prompt_to_send, context=effective_context, api_key=None)
             fb_res = normalize_ai_output(fb_raw, context=effective_context)
             if fb_res.get("nodes") and len(fb_res["nodes"]) > 0:
                 resultado = fb_res
@@ -109,10 +153,10 @@ async def generar_diagrama_desde_prompt(
             print(f"[PromptService] Fallback automático a Gemini falló: {fb_err}")
 
     # Rescate nivel 2: Si aún no hay clases, probar OpenRouter
-    if (not resultado.get("nodes") or len(resultado["nodes"]) == 0) and used_provider != "openrouter":
+    if rescatar and hay_presupuesto() and not _tiene_cambios(resultado) and not resultado.get("provider_used", "").startswith("openrouter"):
         try:
             from .llm_client import _consultar_openrouter
-            fb_raw = await _consultar_openrouter(prompt_to_send, context=effective_context, api_key=api_key)
+            fb_raw = await _consultar_openrouter(prompt_to_send, context=effective_context, api_key=None)
             fb_res = normalize_ai_output(fb_raw, context=effective_context)
             if fb_res.get("nodes") and len(fb_res["nodes"]) > 0:
                 resultado = fb_res
@@ -121,7 +165,7 @@ async def generar_diagrama_desde_prompt(
             print(f"[PromptService] Fallback automático a OpenRouter falló: {fb_err2}")
 
     # Rescate nivel 3: Si la respuesta fue en prosa y describe entidades, extraerlas limpiamente
-    if not resultado.get("nodes") or len(resultado["nodes"]) == 0:
+    if rescatar and not _tiene_cambios(resultado):
         extracted = extraer_entidades_de_texto(f"{resultado.get('summary') or ''} {raw_response}")
         if extracted:
             resultado["nodes"] = extracted
@@ -143,11 +187,7 @@ async def generar_diagrama_desde_prompt(
             from backend.modules.gestion_asistencia_ia.gestionar_contexto_persistente.schemas.request import RegistrarInteraccionRequest
             service = ContextoService(db)
             # La respuesta queda como propuesta pendiente si cambia el diagrama
-            hay_cambios = bool(
-                resultado.get("nodes") or resultado.get("relations")
-                or resultado.get("deletedNodes") or resultado.get("deletedRelations")
-                or resultado.get("tasks")
-            )
+            hay_cambios = _tiene_cambios(resultado)
             propuesta = {
                 "nodes": resultado.get("nodes") or [],
                 "relations": resultado.get("relations") or [],
@@ -174,7 +214,11 @@ async def generar_diagrama_desde_prompt(
         except Exception as reg_err:
             print(f"[ContextoPersistente] Advertencia al persistir interacción: {reg_err}")
 
-    return deduplicar_resultado(resultado)
+    final = deduplicar_resultado(resultado)
+    final["uso_tokens"] = dict(uso)
+    print(f"[IA] pedido proyecto={proyecto_id}: {uso['llamadas']} llamada(s), "
+          f"{uso['entrada']} tokens de entrada, {uso['salida']} de salida ({', '.join(uso['proveedores'])})")
+    return final
 
 
 async def transcribe_audio_with_gemini(

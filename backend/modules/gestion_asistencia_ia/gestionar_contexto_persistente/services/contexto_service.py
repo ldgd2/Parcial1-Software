@@ -37,7 +37,7 @@ from .memory_compressor_service import (
 MAX_EVENTOS_MEMORIA = 15
 
 
-def _compilar(contexto, memorias=None):
+def _compilar(contexto, memorias=None, incluir_diagrama=True):
     return compilar_contexto_para_llm(
         proyecto_id=contexto.proyecto_id,
         dominio=contexto.dominio,
@@ -46,6 +46,7 @@ def _compilar(contexto, memorias=None):
         correcciones=contexto.correcciones,
         snapshot_dsl=contexto.snapshot_dsl,
         memorias=memorias,
+        incluir_diagrama=incluir_diagrama,
     )
 
 
@@ -212,11 +213,12 @@ class ContextoService:
         actualizado = await self.repo.update(contexto)
         return _respuesta(actualizado)
 
-    async def compilar_contexto(self, proyecto_id: int, consulta: str = "") -> CompilarContextoResponse:
-        """`consulta` es el pedido actual: se usa para elegir las memorias relevantes."""
+    async def compilar_contexto(self, proyecto_id: int, consulta: str = "", incluir_diagrama: bool = True) -> CompilarContextoResponse:
+        """`consulta` es el pedido actual: se usa para elegir las memorias relevantes.
+        `incluir_diagrama=False` cuando el pedido ya trae el lienzo en vivo."""
         contexto = await self.repo.create_or_get(proyecto_id)
         memorias = await self._memorias(proyecto_id, consulta)
-        bloque, tokens_est, tokens_ahor = _compilar(contexto, memorias)
+        bloque, tokens_est, tokens_ahor = _compilar(contexto, memorias, incluir_diagrama)
 
         abiertas_count = sum(1 for c in contexto.correcciones if c.get("estado") == "abierta")
 

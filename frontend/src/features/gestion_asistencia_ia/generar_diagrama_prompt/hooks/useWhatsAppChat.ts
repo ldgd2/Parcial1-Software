@@ -177,24 +177,13 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId, proyecto
   const injectDiagramResult = useCallback(async (result: any, offsetIndex: number, isRefactoring: boolean = false) => {
     if (!result) return;
 
+    // Nombres de relleno que a veces devuelve la IA (no son clases del dominio).
+    // Antes la lista incluía Student, Course, Task, Notificaciones… y BORRABA esas clases reales del
+    // lienzo del usuario en cada respuesta de la IA. Ahora solo se filtra lo que llega de la IA.
     const JUNK_NAMES = new Set([
       'diagrama', 'eliminadas', 'eliminada', 'borradas', 'borrada', 'clases', 'clase',
-      'node', 'nodo', 'tabla', 'tablas', 'elementos', 'notification', 'notifications',
-      'notificaciones', 'task', 'tasks', 'assignment', 'assignments', 'student', 'students',
-      'grade', 'grades', 'course', 'courses', 'teacher', 'instructor'
+      'node', 'nodo', 'tabla', 'tablas', 'elementos'
     ]);
-
-    // Purga automática de nodos basura, temporales o duplicados existentes en el lienzo
-    nodes.forEach(n => {
-      const nameLower = (n.nombre || '').toLowerCase().trim();
-      if (
-        JUNK_NAMES.has(nameLower) ||
-        /^node_\w+$/i.test(nameLower) ||
-        nameLower === 'node_x'
-      ) {
-        deleteNode(n.id);
-      }
-    });
 
     // 1. Procesar eliminaciones si las hay (soporta ID exacto o Nombre de la clase)
     if (Array.isArray(result.deletedNodes)) {
@@ -214,9 +203,20 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId, proyecto
     }
 
     if (Array.isArray(result.deletedRelations)) {
+      // La IA no conoce los ids: pide borrar por {source, target} con nombres de clase
+      const idDeClase = (nombre: string) =>
+        nodes.find(n => n.id === nombre || (n.nombre || '').trim().toLowerCase() === nombre.trim().toLowerCase())?.id;
       result.deletedRelations.forEach((item: any) => {
-        const targetId = typeof item === 'string' ? item : item.id;
-        if (targetId) deleteRelation(targetId);
+        if (typeof item === 'string' || item?.id) {
+          deleteRelation(typeof item === 'string' ? item : item.id);
+          return;
+        }
+        const origen = idDeClase(String(item?.source ?? item?.from ?? ''));
+        const destino = idDeClase(String(item?.target ?? item?.to ?? ''));
+        if (!origen || !destino) return;
+        relations
+          .filter(r => (r.sourceId === origen && r.targetId === destino) || (r.sourceId === destino && r.targetId === origen))
+          .forEach(r => deleteRelation(r.id));
       });
     }
 
@@ -794,7 +794,7 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId, proyecto
         if (relations && relations.length > 0) {
           const idToName = new Map<string, string>();
           nodes.forEach(n => idToName.set(n.id, n.nombre));
-          relations.slice(0, 30).forEach(r => {
+          relations.slice(0, 120).forEach(r => {
             const sName = idToName.get(r.sourceId) || r.sourceId;
             const tName = idToName.get(r.targetId) || r.targetId;
             let sym = '-';
@@ -802,6 +802,7 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId, proyecto
             else if (r.type === 'composition') sym = '*';
             else if (r.type === 'aggregation') sym = 'o';
             else if (r.type === 'dependency') sym = '.';
+            else if (r.type === 'realization') sym = '~';
             const card = r.label && r.label !== '1..*' ? `:${r.label}` : '';
             dslParts.push(`${sName}${sym}${tName}${card}`);
           });
@@ -1048,6 +1049,7 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId, proyecto
         tasksCount,
         propuesta: propuestaInfo,
         sugerencias: sugerenciasRevision,
+        usoTokens: result.uso_tokens ?? undefined,
         timestamp: Date.now()
       };
 

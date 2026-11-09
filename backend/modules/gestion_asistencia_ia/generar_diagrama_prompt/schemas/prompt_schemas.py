@@ -26,6 +26,8 @@ class PromptResponse(BaseModel):
     provider_used: Optional[str] = "gemini"
     # Versión del historial creada para esta interacción (el cliente envía luego el "después")
     version_id: Optional[int] = None
+    # Tokens reales del pedido: {llamadas, entrada, salida, proveedores, estimado}
+    uso_tokens: Optional[Dict[str, Any]] = None
 
 class AudioRequest(BaseModel):
     audio_base64: str

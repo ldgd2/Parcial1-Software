@@ -28,6 +28,17 @@ export interface ChatMessage {
   archivo?: { nombre: string; contenido: string };
   /** Pedido nacido de "Solucionar con IA": la corrección que resuelve */
   correccion?: { nodoId: string; id: string; clase: string };
+  /** Tokens reales que gastó este pedido (lo informa el backend) */
+  usoTokens?: UsoTokens;
+}
+
+export interface UsoTokens {
+  llamadas: number;
+  entrada: number;
+  salida: number;
+  proveedores: string[];
+  /** true si el proveedor no informó tokens y se estimaron por caracteres */
+  estimado: boolean;
 }
 
 export interface SugerenciaIA {

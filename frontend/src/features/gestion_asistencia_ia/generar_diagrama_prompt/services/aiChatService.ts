@@ -16,6 +16,8 @@ export interface GenerateDiagramResult {
   provider_used?: string;
   /** Versión del historial creada para esta interacción (para guardar luego el "después") */
   version_id?: number | null;
+  /** Tokens reales del pedido (todas las llamadas a la IA que hizo el backend) */
+  uso_tokens?: import('../types/chatTypes').UsoTokens | null;
 }
 
 export async function callGenerateDiagramAPI(

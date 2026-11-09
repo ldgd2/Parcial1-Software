@@ -38,6 +38,8 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  const formatoTokens = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
+
   const renderFormattedText = (text: string) => {
     // Resaltar menciones (@diag, @nombre) y comandos (/roles, /tareas, etc.)
     const parts = text.split(/(@[a-zA-Z0-9_\-\.]+|\/[a-zA-Z0-9_\-]+)/g);
@@ -181,6 +183,19 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({
 
         {/* Pie: hora y confirmación de lectura */}
         <div className="whatsapp-bubble__footer">
+          {isAi && message.usoTokens && message.usoTokens.llamadas > 0 && (
+            <span
+              className={`whatsapp-bubble__tokens${message.usoTokens.llamadas > 1 ? ' is-varias' : ''}`}
+              title={
+                `Entrada: ${message.usoTokens.entrada} · Salida: ${message.usoTokens.salida}` +
+                ` · ${message.usoTokens.llamadas} llamada(s): ${message.usoTokens.proveedores.join(', ')}` +
+                (message.usoTokens.estimado ? ' · estimado' : '')
+              }
+            >
+              {message.usoTokens.estimado ? '≈' : ''}{formatoTokens(message.usoTokens.entrada + message.usoTokens.salida)} tokens
+              {message.usoTokens.llamadas > 1 ? ` · ${message.usoTokens.llamadas} llamadas` : ''}
+            </span>
+          )}
           <span className="whatsapp-bubble__time">
             {formatTime(message.timestamp)}
           </span>

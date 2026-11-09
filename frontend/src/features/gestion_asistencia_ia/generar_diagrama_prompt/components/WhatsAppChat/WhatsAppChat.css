@@ -263,6 +263,16 @@
   font-size: 11px;
 }
 
+/* Tokens que gastó el pedido a la IA (con varias llamadas se resalta: hubo respaldo o rescate) */
+.whatsapp-bubble__tokens {
+  margin-right: auto;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+  cursor: help;
+}
+.whatsapp-bubble__tokens.is-varias { color: #d9b36c; opacity: 1; }
+
 .whatsapp-bubble__checks {
   display: flex;
   align-items: center;
