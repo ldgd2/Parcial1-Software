@@ -28,6 +28,7 @@ from backend.modules.gestion_proyectos.administrar_proyecto.controllers.admin_co
 from backend.modules.gestion_proyectos.compartir_proyecto.controllers.compartir_controller import router as compartir_proyecto_router
 from backend.modules.gestion_proyectos.notificar_despliegue.controllers.callback_controller import router as callback_router
 from backend.modules.gestion_salas.unirse_sala.controllers.unirse_controller import router as unirse_sala_router
+from backend.modules.gestion_asistencia_ia.notificaciones.controllers.notifications_controller import router as notifications_router
 from backend.modules.gestion_salas.cargar_lienzo.controllers.cargar_controller import router as cargar_lienzo_router
 from backend.modules.gestion_salas.guardar_lienzo.controllers.guardar_controller import router as guardar_lienzo_router
 from backend.modules.gestion_concurrencia.sincronizacion_tiempo_real.controllers.ws_sync_controller import router as ws_router
@@ -101,6 +102,7 @@ app.include_router(unirse_sala_router)
 app.include_router(cargar_lienzo_router)
 app.include_router(guardar_lienzo_router)
 app.include_router(ws_router)
+app.include_router(notifications_router)
 
 # Gestión de Modelado (CU8 - CU11)
 app.include_router(insertar_elemento_router)

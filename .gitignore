@@ -42,3 +42,8 @@ Thumbs.db
 .agent/
 .agent/
 .gemini/
+# Backend Firebase service account (no versionar)
+backend/modules/gestion_asistencia_ia/notificaciones/config/diagramador-firebase-service.json
+# Flutter Firebase config JSON (no versionar)
+Movil/lib/assets/google-services.json
+docs/
