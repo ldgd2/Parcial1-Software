@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'core/services/push_notification_service.dart';
 import 'shared/utils/ui_engine/tema.dart';
 import 'modules/auth/auth_routes.dart';
 import 'modules/proyectos/proyectos_routes.dart';
@@ -11,6 +12,7 @@ void main() async {
   try {
     await dotenv.load(fileName: ".env");
   } catch (_) {}
+  await PushNotificationService.inicializar();
   runApp(const MovilVisorApp());
 }
 

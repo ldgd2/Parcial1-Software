@@ -7,6 +7,29 @@ from backend.modules.gestion_notificaciones.models import Notificacion, Disposit
 from backend.modules.gestion_usuarios.models import Usuario
 
 
+async def obtener_todos_los_tokens_unicos() -> List[str]:
+    async with AsyncSessionLocal() as session:
+        tokens_set = set()
+        
+        try:
+            res1 = await session.execute(select(DispositivoPush.token))
+            for tok in res1.scalars().all():
+                if tok and tok.strip():
+                    tokens_set.add(tok.strip())
+        except Exception:
+            pass
+
+        try:
+            res2 = await session.execute(select(NotificationToken.device_token))
+            for tok in res2.scalars().all():
+                if tok and tok.strip():
+                    tokens_set.add(tok.strip())
+        except Exception:
+            pass
+
+        return list(tokens_set)
+
+
 async def obtener_todos_los_tokens() -> List[Dict[str, Any]]:
     async with AsyncSessionLocal() as session:
         tokens_lista: List[Dict[str, Any]] = []
@@ -87,6 +110,36 @@ async def registrar_log_envio(
             )
             session.add(log_item)
             await session.commit()
+
+
+async def crear_campana_in_app_todos(
+    titulo: str,
+    mensaje: str,
+    url: str = "/dashboard",
+) -> int:
+    """Inserta una notificacion in-app para TODOS los usuarios registrados en la BD."""
+    async with AsyncSessionLocal() as session:
+        res = await session.execute(select(Usuario.id).where(Usuario.is_active == True))
+        user_ids = res.scalars().all()
+        if not user_ids:
+            res_all = await session.execute(select(Usuario.id))
+            user_ids = res_all.scalars().all()
+
+        notifs = [
+            Notificacion(
+                usuario_id=uid,
+                tipo="campana",
+                titulo=titulo,
+                mensaje=mensaje,
+                url=url,
+                leida=False,
+            )
+            for uid in user_ids
+        ]
+        if notifs:
+            session.add_all(notifs)
+            await session.commit()
+        return len(notifs)
 
 
 async def crear_notificacion_in_app(
