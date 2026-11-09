@@ -1,0 +1,64 @@
+import asyncio
+from rich.prompt import Prompt
+from backend.cli.console import console
+from backend.modules.gestion_asistencia_ia.notificaciones.firebase_init import send_fcm_message
+from .db_executor import obtener_token_por_usuario, registrar_log_envio
+
+
+def ejecutar() -> None:
+    console.print("\n[bold cyan]=== ENVIAR NOTIFICACION PUSH (FCM) ===[/bold cyan]\n")
+    console.print("[1] Enviar a Usuario registrado (por ID)")
+    console.print("[2] Enviar a Token FCM directo")
+    console.print("[0] Cancelar")
+
+    op = Prompt.ask("Selecciona el modo de envio", choices=["1", "2", "0"], default="1")
+    if op == "0":
+        return
+
+    token_destino = ""
+    usuario_id_log = 0
+
+    if op == "1":
+        uid_str = Prompt.ask("Ingresa el ID del usuario")
+        try:
+            uid = int(uid_str)
+            usuario_id_log = uid
+        except ValueError:
+            console.print("[bold red]ID invalido.[/bold red]")
+            return
+
+        token_destino = asyncio.run(obtener_token_por_usuario(uid)) or ""
+        if not token_destino:
+            console.print(f"[bold red]No se encontro ningun token de dispositivo para el usuario {uid}.[/bold red]")
+            return
+        console.print(f"[dim]Token encontrado: {token_destino[:25]}...[/dim]")
+
+    elif op == "2":
+        token_destino = Prompt.ask("Pega el Device Token de Firebase").strip()
+        if not token_destino:
+            console.print("[bold red]El token no puede estar vacio.[/bold red]")
+            return
+
+    titulo = Prompt.ask("Titulo de la notificacion", default="Prueba de Notificacion")
+    cuerpo = Prompt.ask("Cuerpo del mensaje", default="Mensaje enviado desde el Manager CLI")
+
+    console.print("\n[dim]Enviando mensaje via Firebase Cloud Messaging...[/dim]")
+
+    try:
+        msg_id = send_fcm_message(
+            token=token_destino,
+            title=titulo,
+            body=cuerpo,
+            data={"tipo": "prueba_cli", "origen": "manager"},
+        )
+        console.print(f"[bold green]Notificacion enviada con exito.[/bold green]")
+        console.print(f"[dim]Firebase Message ID: {msg_id}[/dim]")
+
+        if usuario_id_log > 0:
+            asyncio.run(registrar_log_envio(usuario_id_log, titulo, cuerpo, True, {"msg_id": msg_id}))
+
+    except Exception as e:
+        console.print(f"[bold red]Error al enviar la notificacion:[/bold red] {e}")
+        if usuario_id_log > 0:
+            asyncio.run(registrar_log_envio(usuario_id_log, titulo, cuerpo, False, {"error": str(e)}))
+

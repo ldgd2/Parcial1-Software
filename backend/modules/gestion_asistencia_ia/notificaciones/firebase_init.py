@@ -1,13 +1,25 @@
 import os
 from pathlib import Path
 from typing import Optional
-import firebase_admin
-from firebase_admin import credentials, messaging
+
+try:
+    import firebase_admin
+    from firebase_admin import credentials, messaging
+    _HAS_FIREBASE_SDK = True
+except ImportError:
+    firebase_admin = None  # type: ignore
+    credentials = None     # type: ignore
+    messaging = None       # type: ignore
+    _HAS_FIREBASE_SDK = False
 
 _firebase_initialized = False
 
+
 def _init_firebase() -> bool:
     global _firebase_initialized
+    if not _HAS_FIREBASE_SDK or firebase_admin is None:
+        return False
+
     if firebase_admin._apps:
         _firebase_initialized = True
         return True
@@ -41,13 +53,17 @@ def _init_firebase() -> bool:
     print("[firebase_init] AVISO: No se encontraron credenciales de Firebase validas. Push notifications estaran deshabilitadas.")
     return False
 
-_init_firebase()
+if _HAS_FIREBASE_SDK:
+    _init_firebase()
 
 
 def send_fcm_message(token: str, title: str, body: str, data: Optional[dict] = None) -> str:
     """Send a push notification via Firebase Cloud Messaging.
     Returns the message ID returned by FCM.
     """
+    if not _HAS_FIREBASE_SDK or messaging is None:
+        raise RuntimeError("firebase-admin no esta instalado en este entorno de Python.")
+
     if not firebase_admin._apps:
         if not _init_firebase():
             raise RuntimeError("Firebase Admin no esta configurado.")
