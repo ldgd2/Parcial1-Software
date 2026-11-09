@@ -242,7 +242,7 @@ export const ClassNode: React.FC<Props> = ({
     return (
       <div
         className={`class-node class-node--part${isSelected ? ' class-node--selected' : ''}${isConnectingMode ? ' class-node--connectable' : ''}${isConnectingSource ? ' class-node--connect-source' : ''}${hasOpenCorrections ? ' class-node--has-corrections' : ''}`}
-        style={{ left: node.x, top: node.y, width: node.width, minHeight: 60, borderColor: node.color, backgroundColor: '#cce5ff', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4, position: 'absolute', cursor: 'grab', border: '1px solid #4a7fd4' }}
+        style={{ left: node.x, top: node.y, width: node.width, minHeight: 60, borderColor: node.color, backgroundColor: '#cce5ff', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4, position: 'absolute', cursor: 'grab', border: '1px solid var(--info-strong)' }}
         onClick={(e) => { e.stopPropagation(); if (onNodeClick) { onNodeClick(e); } else { setSelectedIds([node.id]); } }}
         onMouseDown={(e) => { e.stopPropagation(); onDragStart(e); }}
       >
@@ -258,7 +258,7 @@ export const ClassNode: React.FC<Props> = ({
     return (
       <div
         className={`class-node class-node--port${isSelected ? ' class-node--selected' : ''}${isConnectingMode ? ' class-node--connectable' : ''}${isConnectingSource ? ' class-node--connect-source' : ''}${hasOpenCorrections ? ' class-node--has-corrections' : ''}`}
-        style={{ left: node.x, top: node.y, width: 24, height: 24, backgroundColor: '#cce5ff', border: '1px solid #4a7fd4', position: 'absolute', cursor: 'grab', zIndex: 10 }}
+        style={{ left: node.x, top: node.y, width: 24, height: 24, backgroundColor: '#cce5ff', border: '1px solid var(--info-strong)', position: 'absolute', cursor: 'grab', zIndex: 10 }}
         onClick={(e) => { e.stopPropagation(); if (onNodeClick) { onNodeClick(e); } else { setSelectedIds([node.id]); } }}
         onMouseDown={(e) => { e.stopPropagation(); onDragStart(e); }}
       >
@@ -352,33 +352,19 @@ export const ClassNode: React.FC<Props> = ({
         )}
         <button
           type="button"
-          className="class-node__comment-btn"
+          className={`class-node__comment-btn${commentCount > 0 ? ' class-node__comment-btn--active' : ''}`}
           onClick={(e) => {
             e.stopPropagation();
             onOpenComments?.(node.id, node.nombre, 'node');
           }}
-          title="Ver comentarios técnicos"
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: commentCount > 0 ? '#38bdf8' : '#94a3b8',
-            cursor: 'pointer',
-            padding: '2px 4px',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '2px',
-            marginLeft: 'auto',
-            marginRight: isSelected ? '4px' : '0px'
-          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          title={commentCount > 0 ? `${commentCount} comentario(s) abierto(s)` : 'Agregar o ver comentarios'}
+          aria-label={commentCount > 0 ? `Ver ${commentCount} comentarios abiertos` : 'Comentarios del elemento'}
         >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
           </svg>
-          {commentCount > 0 && (
-            <span style={{ fontSize: '9px', fontWeight: 'bold', backgroundColor: '#0284c7', color: '#fff', borderRadius: '9999px', padding: '0 4px', lineHeight: '14px' }}>
-              {commentCount}
-            </span>
-          )}
+          {commentCount > 0 && <span className="class-node__comment-count">{commentCount}</span>}
         </button>
         {isSelected && (
           <button
@@ -490,7 +476,7 @@ export const ClassNode: React.FC<Props> = ({
                   {attr.visibilidad === 'PK' ? (
                     <Key size={12} className="class-node__icon-pk" style={{ color: '#d4af37', marginRight: 4, verticalAlign: 'middle' }} />
                   ) : attr.visibilidad === 'FK' ? (
-                    <Link2 size={12} className="class-node__icon-fk" style={{ color: '#3b82f6', marginRight: 4, verticalAlign: 'middle' }} />
+                    <Link2 size={12} className="class-node__icon-fk" style={{ color: 'var(--info-strong)', marginRight: 4, verticalAlign: 'middle' }} />
                   ) : (
                     attr.visibilidad
                   )}

@@ -16,6 +16,8 @@ import backend.core.permissions.seeder
 import backend.modules.gestion_proyectos.versioning.models
 import backend.modules.gestion_modelado.models
 import backend.modules.gestion_asistencia_ia.models
+import backend.modules.gestion_proyectos.plantillas.models
+import backend.modules.gestion_notificaciones.models
 
 # Importar routers de los casos de uso
 from backend.modules.gestion_usuarios.registrar_usuario.controllers.user_controller import router as register_router
@@ -54,6 +56,9 @@ from backend.modules.gestion_asistencia_ia.generar_app_movil.controllers.app_mov
 from backend.modules.gestion_proyectos_asistida.repartir_roles.controllers.roles_controller import router as repartir_roles_router
 from backend.modules.gestion_proyectos_asistida.repartir_tareas.controllers.tareas_controller import router as repartir_tareas_router
 from backend.modules.gestion_asistencia_ia.gestionar_contexto_persistente.controllers.contexto_controller import router as contexto_ia_router
+from backend.modules.gestion_proyectos.plantillas.controllers.plantillas_controller import router as plantillas_router
+from backend.modules.gestion_notificaciones.controllers.notificaciones_controller import router as notificaciones_router
+import backend.modules.gestion_notificaciones.services.notificaciones_service  # noqa: F401  CU39: eventos que generan notificaciones
 from backend.modules.gestion_asistencia_ia.generar_seeders.controllers.seeders_controller import router as seeders_ia_router
 
 
@@ -126,6 +131,8 @@ app.include_router(repartir_roles_router)
 app.include_router(repartir_tareas_router)
 app.include_router(contexto_ia_router)
 app.include_router(seeders_ia_router)
+app.include_router(plantillas_router)
+app.include_router(notificaciones_router)
 
 
 @app.get("/")

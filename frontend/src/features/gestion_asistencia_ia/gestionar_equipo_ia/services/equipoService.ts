@@ -20,6 +20,8 @@ export interface GenerarEquipoRequest {
   proyecto_id: number;
   descripcion_proyecto: string;
   desarrolladores: HabilidadDesarrollador[];
+  /** false: la IA solo propone (las tareas se crean al aprobar) */
+  persistir?: boolean;
 }
 
 export interface TareaIA {
@@ -32,6 +34,9 @@ export interface TareaIA {
   descripcion: string | null;
   completada: boolean;
   orden: number;
+  /** CU37: estimación de esfuerzo */
+  estimacion_horas?: number | null;
+  complejidad?: string | null;
 }
 
 export async function generarTareasEquipo(req: GenerarEquipoRequest): Promise<TareaIA[]> {

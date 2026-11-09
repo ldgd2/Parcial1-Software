@@ -6,6 +6,14 @@ import {
   type TareaIA,
   type HabilidadDesarrollador,
 } from '../../services/equipoService';
+import {
+  crearVersion,
+  decidirPropuesta,
+  PropuestaYaDecididaError,
+} from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente/services/contextoService';
+import { EVENTO_VERSIONES_ACTUALIZADAS } from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente/hooks/useVersionesContexto';
+import { crearTareaManual } from '@/features/gestion_proyectos_asistida/repartir_tareas';
+import { etiquetaEsfuerzo, horasTotales } from '@/shared/utils/esfuerzo';
 import './GestorEquipoIA.css';
 
 interface ColaboradorInput {
@@ -18,12 +26,15 @@ interface Props {
   proyectoId: number;
   descripcionProyecto: string;
   colaboradoresIniciales?: { usuario_id: number; nombre: string }[];
+  /** Puede aprobar las tareas que propone la IA (en la sala: permiso de edición) */
+  puedeAprobar?: boolean;
 }
 
 export const GestorEquipoIA: React.FC<Props> = ({
   proyectoId,
   descripcionProyecto,
   colaboradoresIniciales = [],
+  puedeAprobar = true,
 }) => {
   const currentIdentity = getUserIdentity();
   const currentUserName = currentIdentity.nickname || localStorage.getItem('usuario_nombre') || 'Mi Usuario';
@@ -56,6 +67,10 @@ export const GestorEquipoIA: React.FC<Props> = ({
   const [error, setError] = useState('');
   const [generado, setGenerado] = useState(false);
   const [tabIndex, setTabIndex] = useState<'pendientes' | 'historial'>('pendientes');
+  // Tareas que propuso la IA, pendientes de aprobación (no se guardan hasta aprobar)
+  const [propuesta, setPropuesta] = useState<{ versionId: number; tareas: TareaIA[] } | null>(null);
+  const [decidiendo, setDecidiendo] = useState<null | 'aprobar' | 'rechazar'>(null);
+  const [aviso, setAviso] = useState('');
 
   const actualizarEtiqueta = (idx: number, value: string) => {
     setDevs(prev => prev.map((d, i) => (i === idx ? { ...d, etiquetasRaw: value } : d)));
@@ -89,19 +104,85 @@ export const GestorEquipoIA: React.FC<Props> = ({
         etiquetas: d.etiquetasRaw.split(',').map(e => e.trim()).filter(Boolean),
       }));
 
-      const resultado = await generarTareasEquipo({
+      // La IA solo PROPONE: nada se guarda hasta que alguien apruebe
+      const propuestas = await generarTareasEquipo({
         proyecto_id: proyectoId,
         descripcion_proyecto: descripcionProyecto,
         desarrolladores,
+        persistir: false,
       });
-      setTareas(resultado);
-      setGenerado(true);
+      if (!propuestas.length) throw new Error('La IA no propuso ninguna tarea');
+
+      setAviso('');
+      try {
+        const v = await crearVersion(proyectoId, {
+          intent: 'TAREAS',
+          cmd: 'Generar tareas con IA (Gestor de equipo)',
+          resumen: `La IA propone ${propuestas.length} tareas para el equipo`,
+          autor: currentUserName,
+          propuesta: { tipo: 'tareas', origen: 'gestor_equipo', tareas: propuestas },
+        });
+        setPropuesta({ versionId: v.id, tareas: propuestas });
+        window.dispatchEvent(new CustomEvent(EVENTO_VERSIONES_ACTUALIZADAS, { detail: { versionId: v.id } }));
+      } catch {
+        throw new Error('No se pudo registrar la propuesta en el historial, así que no se guardaron las tareas.');
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error desconocido');
     } finally {
       setLoading(false);
     }
   };
+
+  const handleDecidir = async (aceptar: boolean) => {
+    if (!propuesta) return;
+    setDecidiendo(aceptar ? 'aprobar' : 'rechazar');
+    setError('');
+    try {
+      const d = await decidirPropuesta(proyectoId, propuesta.versionId, aceptar, null, currentUserName);
+      if (aceptar) {
+        const lista: any[] = (d.propuesta as any)?.tareas ?? propuesta.tareas;
+        let creadas = 0;
+        for (let i = 0; i < lista.length; i++) {
+          const t = lista[i];
+          try {
+            await crearTareaManual({
+              proyecto_id: proyectoId,
+              usuario_id: t.usuario_id,
+              titulo: t.titulo || `Tarea ${i + 1}`,
+              descripcion: t.descripcion || null,
+              tipo: t.tipo || 'desarrollo',
+              area: t.area || 'general',
+              orden: t.orden || i + 1,
+              estimacion_horas: t.estimacion_horas ?? undefined,
+              complejidad: t.complejidad ?? undefined,
+            });
+            creadas++;
+          } catch (e) {
+            console.warn('No se pudo crear la tarea aprobada:', t?.titulo, e);
+          }
+        }
+        window.dispatchEvent(new Event('refetch_tareas_ia'));
+        setAviso(`Aprobada por ${d.decidida_por || currentUserName}: se crearon ${creadas} de ${lista.length} tareas.`);
+        await handleVerProgreso();
+      } else {
+        setAviso(`Rechazada por ${d.decidida_por || currentUserName}: no se creó ninguna tarea.`);
+      }
+      window.dispatchEvent(new CustomEvent(EVENTO_VERSIONES_ACTUALIZADAS, { detail: { versionId: propuesta.versionId } }));
+      setPropuesta(null);
+    } catch (e) {
+      if (e instanceof PropuestaYaDecididaError) {
+        setAviso(e.message);
+        setPropuesta(null);
+      } else {
+        setError(e instanceof Error ? e.message : 'No se pudo completar la acción');
+      }
+    } finally {
+      setDecidiendo(null);
+    }
+  };
+
+  const nombreDe = (uid: number) => devs.find(d => d.usuario_id === uid)?.nombre ?? `Usuario ${uid}`;
 
   const handleVerProgreso = async () => {
     setLoading(true);
@@ -275,6 +356,57 @@ export const GestorEquipoIA: React.FC<Props> = ({
         </button>
       </div>
 
+      {aviso && <div className="gestor-equipo__aviso" role="status">{aviso}</div>}
+
+      {propuesta && (
+        <div className="gestor-equipo__propuesta">
+          <div className="gestor-equipo__propuesta-head">
+            <span className="gestor-equipo__propuesta-titulo">Propuesta de la IA</span>
+            <span className="gestor-equipo__propuesta-estado">Pendiente</span>
+          </div>
+          <div className="gestor-equipo__propuesta-meta">
+            {propuesta.tareas.length} tareas
+            {horasTotales(propuesta.tareas) ? ` · ~${horasTotales(propuesta.tareas)} h en total` : ''} · Pedida por {currentUserName}
+          </div>
+          <ul className="gestor-equipo__propuesta-lista">
+            {propuesta.tareas.map((t, i) => (
+              <li key={i}>
+                <span className={`gestor-equipo__tarea-tipo gestor-equipo__tarea-tipo--${t.tipo}`}>
+                  {t.tipo === 'diagrama' ? 'UML' : 'DEV'}
+                </span>
+                <span className="gestor-equipo__propuesta-quien">{nombreDe(t.usuario_id)}</span>
+                <span>{t.titulo}</span>
+                {etiquetaEsfuerzo(t) && <span className="gestor-equipo__esfuerzo">{etiquetaEsfuerzo(t)}</span>}
+              </li>
+            ))}
+          </ul>
+          {puedeAprobar ? (
+            <div className="gestor-equipo__propuesta-acciones">
+              <button
+                type="button"
+                className="gestor-equipo__btn-secondary"
+                onClick={() => handleDecidir(false)}
+                disabled={!!decidiendo}
+              >
+                {decidiendo === 'rechazar' ? 'Rechazando…' : 'Rechazar'}
+              </button>
+              <button
+                type="button"
+                className="gestor-equipo__btn-primary"
+                onClick={() => handleDecidir(true)}
+                disabled={!!decidiendo}
+              >
+                {decidiendo === 'aprobar' ? 'Creando tareas…' : 'Aprobar'}
+              </button>
+            </div>
+          ) : (
+            <div className="gestor-equipo__propuesta-meta">
+              Esperando aprobación de alguien con permiso de edición.
+            </div>
+          )}
+        </div>
+      )}
+
       {generado && Object.keys(tareasPorUsuario).length > 0 && (
         <div className="gestor-equipo__resultado">
           <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
@@ -317,6 +449,7 @@ export const GestorEquipoIA: React.FC<Props> = ({
                         {t.tipo === 'diagrama' ? 'UML' : 'DEV'}
                       </span>
                       <span className="gestor-equipo__tarea-titulo">{t.titulo}</span>
+                      {etiquetaEsfuerzo(t) && <span className="gestor-equipo__esfuerzo">{etiquetaEsfuerzo(t)}</span>}
                     </div>
                   ))}
                 </div>

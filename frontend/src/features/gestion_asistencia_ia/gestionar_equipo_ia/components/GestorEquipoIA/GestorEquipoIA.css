@@ -1,7 +1,7 @@
 .gestor-equipo {
   background: var(--surface-color);
   border: 1px solid var(--border-color);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   padding: 18px;
   display: flex;
   flex-direction: column;
@@ -17,7 +17,7 @@
 .gestor-equipo__icon {
   width: 40px;
   height: 40px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--surface-color);
   border: 1px solid var(--border-color);
   display: flex;
@@ -45,10 +45,10 @@
 .gestor-equipo__error {
   background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #f87171;
+  color: var(--danger-text);
   font-size: 12px;
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
 }
 
 .gestor-equipo__section-label {
@@ -83,7 +83,7 @@
   flex: 1;
   background: var(--surface-color);
   border: 1px solid var(--border-color);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 6px 10px;
   font-size: 12px;
   color: var(--text-primary);
@@ -108,7 +108,7 @@
   flex: 1;
   background: var(--primary);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   color: var(--bg-color);
   font-size: 12px;
   font-weight: 700;
@@ -131,7 +131,7 @@
 .gestor-equipo__btn-secondary {
   background: var(--surface-color);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
@@ -157,7 +157,7 @@
 .gestor-equipo__dev-card {
   background: var(--surface-color);
   border: 1px solid var(--border-color);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   padding: 12px;
   display: flex;
   flex-direction: column;
@@ -185,14 +185,14 @@
 .gestor-equipo__bar-wrap {
   height: 3px;
   background: var(--border-color);
-  border-radius: 2px;
+  border-radius: var(--radius-md);
   overflow: hidden;
 }
 
 .gestor-equipo__bar {
   height: 100%;
   background: linear-gradient(90deg, var(--primary), var(--primary));
-  border-radius: 2px;
+  border-radius: var(--radius-md);
   transition: width 0.4s ease;
 }
 
@@ -221,7 +221,7 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   flex-shrink: 0;
 }
 
@@ -232,9 +232,102 @@
 
 .gestor-equipo__tarea-tipo--desarrollo {
   background: rgba(34, 197, 94, 0.1);
-  color: #4ade80;
+  color: var(--success-text);
 }
 
 .gestor-equipo__tarea-titulo {
   line-height: 1.4;
+}
+
+/* ── Propuesta de tareas de la IA (aprobar / rechazar) ─────────────── */
+
+.gestor-equipo__aviso {
+  margin-top: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--surface-color);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius-md);
+}
+
+.gestor-equipo__propuesta {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--bg-color);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-lg);
+}
+
+.gestor-equipo__propuesta-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.gestor-equipo__propuesta-titulo {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--primary);
+  text-transform: uppercase;
+}
+
+.gestor-equipo__propuesta-estado {
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--bg-color);
+  background: #d9b779;
+  border-radius: var(--radius-full);
+}
+
+.gestor-equipo__propuesta-meta {
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--secondary);
+}
+
+.gestor-equipo__propuesta-lista {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0;
+  padding: 0;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.gestor-equipo__propuesta-lista li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.gestor-equipo__propuesta-quien {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.gestor-equipo__propuesta-acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* CU37: estimación de esfuerzo */
+.gestor-equipo__esfuerzo {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 0 6px;
+  font-size: 10.5px;
+  color: var(--secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  white-space: nowrap;
 }

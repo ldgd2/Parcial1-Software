@@ -23,8 +23,17 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 
 from backend.core.config import settings
 from backend.core.database import Base
-from backend.modules.gestion_usuarios.models import Usuario, OTPCode
-from backend.modules.gestion_proyectos.models import Proyecto, ColaboradorProyecto
+# IMPORTANTE: importar TODOS los modelos. Si una tabla no está registrada aquí,
+# `alembic revision --autogenerate` cree que sobra en la BD y propone borrarla.
+import backend.core.permissions.models  # noqa: F401  permisos, roles
+import backend.modules.gestion_usuarios.models  # noqa: F401  usuarios, otp_codes, usuario_github, tareas_ia
+import backend.modules.gestion_proyectos.models  # noqa: F401  proyectos, colaboradores_proyecto
+import backend.modules.gestion_proyectos.versioning.models  # noqa: F401  git_objects, commits
+import backend.modules.gestion_modelado.models  # noqa: F401  diagram_elements, diagram_relations, diagram_element_comments
+import backend.modules.gestion_asistencia_ia.models  # noqa: F401  contextos_ia_proyecto, versiones, memorias
+import backend.modules.gestion_proyectos.plantillas.models  # noqa: F401  plantillas_proyecto
+import backend.modules.gestion_notificaciones.models  # noqa: F401  notificaciones, dispositivos_push
+import backend.modules.gestion_proyectos_asistida.models  # noqa: F401
 
 # Quitamos el set_main_option para evitar que ConfigParser falle al interpretar los % del password encodeado
 # config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)

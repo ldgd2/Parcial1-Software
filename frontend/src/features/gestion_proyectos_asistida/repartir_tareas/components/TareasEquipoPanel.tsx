@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { etiquetaEsfuerzo } from '@/shared/utils/esfuerzo';
 import { useTareasEquipo } from '../hooks/useTareasEquipo';
 
 interface Props {
@@ -160,6 +161,7 @@ export const TareasEquipoPanel: React.FC<Props> = ({
                       }`}
                     >
                       {tarea.titulo}
+                      {etiquetaEsfuerzo(tarea) && <small style={{ marginLeft: 6, opacity: 0.7 }}>({etiquetaEsfuerzo(tarea)})</small>}
                     </span>
                     {tarea.area && (
                       <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-700/60 text-slate-300 shrink-0 uppercase tracking-wider">

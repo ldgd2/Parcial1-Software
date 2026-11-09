@@ -1,4 +1,5 @@
 import React from 'react';
+import { X } from 'lucide-react';
 import type { QuotedMessage } from '../../types/chatTypes';
 import { getUserColor } from '../../utils/chatColors';
 
@@ -55,8 +56,9 @@ export const QuotedPreview: React.FC<QuotedPreviewProps> = ({
             onDismiss();
           }}
           title="Cancelar respuesta"
+          aria-label="Cancelar respuesta"
         >
-          ✕
+          <X size={14} aria-hidden="true" />
         </button>
       )}
     </div>

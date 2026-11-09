@@ -1,4 +1,3 @@
-export { RolesEquipoModal } from './components/RolesEquipoModal';
 export { useRepartirRoles } from './hooks/useRepartirRoles';
 export {
   rolesService,

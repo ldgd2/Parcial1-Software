@@ -22,8 +22,8 @@
 }
 
 .class-node--has-corrections {
-  border-color: #ef4444 !important;
-  box-shadow: 0 0 0 2px #ef4444, 0 8px 32px rgba(239, 68, 68, 0.3) !important;
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 0 2px var(--danger), 0 8px 32px rgba(239, 68, 68, 0.3) !important;
 }
 
 .class-node__select-bar {
@@ -35,7 +35,8 @@
 
 /* ── Header (franja coloreada según tipo) ─────────────────── */
 .class-node__header {
-  padding: 0.625rem 0.875rem;
+  /* Padding lateral amplio: deja sitio a los botones de comentario (izq.) y eliminar (der.) */
+  padding: 0.625rem 2.5rem;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -44,6 +45,55 @@
   user-select: none;
   cursor: grab;
   /* El background se aplica via node.color en el style inline */
+}
+
+/* Botón de comentarios: píldora oscura translúcida, legible sobre cualquier node.color */
+.class-node__comment-btn {
+  position: absolute;
+  top: 0.375rem;
+  left: 0.375rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 22px;
+  min-width: 22px;
+  padding: 0 5px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: var(--radius-full);
+  background: rgba(0, 0, 0, 0.4);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0.85;
+  transition: background 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
+}
+
+.class-node:hover .class-node__comment-btn,
+.class-node__comment-btn:focus-visible {
+  opacity: 1;
+}
+
+.class-node__comment-btn:hover {
+  background: rgba(0, 0, 0, 0.6);
+  transform: scale(1.08);
+}
+
+/* Con comentarios abiertos: azul sólido + contador, siempre a plena opacidad */
+.class-node__comment-btn--active {
+  opacity: 1;
+  background: #0369a1;
+  border-color: var(--info);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.25);
+}
+
+.class-node__comment-btn--active:hover {
+  background: #075985;
+}
+
+.class-node__comment-count {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 .class-node__stereotype {
@@ -84,7 +134,7 @@
   right: 0.375rem;
   background: rgba(230, 163, 163, 0.15);
   border: 1px solid rgba(230, 163, 163, 0.3);
-  color: #e6a3a3;
+  color: var(--danger-soft);
   font-size: 0.6rem;
   width: 18px;
   height: 18px;
@@ -164,7 +214,7 @@
 }
 
 .class-node__type {
-  color: var(--secondary, #a0aec0);
+  color: var(--secondary);
   font-style: italic;
 }
 
@@ -177,7 +227,7 @@
 
 /* ── Inline edit inputs ───────────────────────────────────── */
 .class-node__vis-select {
-  background: var(--bg-color, #1a1f2e);
+  background: var(--bg-color);
   border: 1px solid var(--border-color);
   color: var(--primary);
   font-size: 0.72rem;
@@ -207,7 +257,7 @@
 .class-node__field-input::placeholder { color: rgba(148, 137, 121, 0.4); }
 
 .class-node__field-input--type {
-  color: var(--secondary, #a0aec0);
+  color: var(--secondary);
   flex: 0.7;
 }
 
@@ -227,7 +277,7 @@
   flex-shrink: 0;
   transition: color 0.15s;
 }
-.class-node__row-delete:hover { color: #e6a3a3; }
+.class-node__row-delete:hover { color: var(--danger-soft); }
 
 /* ── CU9: Connect mode highlight ──────────────────────────── */
 .class-node--connectable {
@@ -239,7 +289,7 @@
   box-shadow: 0 0 0 2px rgba(245, 166, 35, 0.4), 0 0 20px rgba(245, 166, 35, 0.2);
 }
 .class-node--connect-source {
-  border-color: #4a7fd4 !important;
+  border-color: var(--info-strong) !important;
   box-shadow: 0 0 0 2px rgba(74, 127, 212, 0.5), 0 0 20px rgba(74, 127, 212, 0.3) !important;
   animation: source-pulse 1.2s ease infinite;
 }
@@ -252,7 +302,7 @@
 .class-node--note {
   background: #2a2510;
   border-color: #7a6a20;
-  border-radius: 0 12px 4px 4px;
+  border-radius: 0 var(--radius-xl) var(--radius-md) var(--radius-md);
   position: absolute;
   cursor: grab;
   min-width: 140px;
@@ -291,7 +341,7 @@
   padding: 3px 8px;
   font-size: 0.68rem;
   margin: 4px 0.875rem;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
 }
 
 /* ── DiagramCanvas connecting cursor ──────────────────────── */
@@ -316,7 +366,7 @@
   color: var(--primary);
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--primary);
-  border-radius: 10px;
+  border-radius: var(--radius-full);
   padding: 1px 6px;
   display: inline-flex;
   align-items: center;
@@ -331,7 +381,7 @@
   color: var(--text-secondary);
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   padding: 1px 5px;
   letter-spacing: 0.03em;
 }

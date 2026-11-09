@@ -7,7 +7,7 @@ from sqlalchemy.future import select
 from backend.core.config import settings
 from backend.core.websockets.connection_manager import manager
 from backend.modules.gestion_proyectos.models import Proyecto, ColaboradorProyecto
-from backend.modules.gestion_usuarios.models import TareaIA, Usuario
+from backend.modules.gestion_usuarios.models import TareaIA, Usuario, estimar_tarea
 from backend.modules.gestion_proyectos_asistida.repartir_tareas.schemas.request import (
     RepartirTareasRequest,
     CrearTareaRequest,
@@ -41,6 +41,17 @@ def _clean_json(text: str) -> str:
     return cleaned
 
 
+async def _anfitrion_id(proyecto_id: int, db: AsyncSession) -> Optional[int]:
+    """Usuario anfitrión del proyecto (Proyecto no tiene `creador_id`; el dueño es el colaborador anfitrión)."""
+    from backend.modules.gestion_proyectos.models import ColaboradorProyecto
+    res = await db.execute(
+        select(ColaboradorProyecto.usuario_id)
+        .where(ColaboradorProyecto.proyecto_id == proyecto_id, ColaboradorProyecto.rol_proyecto == "anfitrion")
+        .limit(1)
+    )
+    return res.scalar_one_or_none()
+
+
 async def _llamar_ia_tareas(prompt: str, provider: Optional[str] = None, api_key: Optional[str] = None) -> dict:
     target_provider = (provider or settings.AI_PROVIDER or "kimi").lower().strip()
     if target_provider == "openroute":
@@ -72,7 +83,7 @@ async def _llamar_ia_tareas(prompt: str, provider: Optional[str] = None, api_key
                                 "content": (
                                     "Role: Senior Agile Lead. Distribute actionable development & modeling tasks. "
                                     "Output STRICT MINIFIED JSON ONLY: "
-                                    "{\"tareas\":[{\"usuario_id\":int,\"tipo\":\"diagrama\"|\"desarrollo\",\"area\":str,\"titulo\":str,\"descripcion\":str,\"orden\":int}]}"
+                                    "{\"tareas\":[{\"usuario_id\":int,\"tipo\":\"diagrama\"|\"desarrollo\",\"area\":str,\"titulo\":str,\"descripcion\":str,\"orden\":int,\"estimacion_horas\":int,\"complejidad\":\"baja\"|\"media\"|\"alta\"}]}"
                                 ),
                             },
                             {"role": "user", "content": prompt},
@@ -115,7 +126,7 @@ async def _llamar_ia_tareas(prompt: str, provider: Optional[str] = None, api_key
                 "messages": [
                     {
                         "role": "system",
-                        "content": "Role: Senior Agile Lead. Distribute actionable development & modeling tasks. Output STRICT MINIFIED JSON: {\"tareas\":[{\"usuario_id\":int,\"tipo\":\"diagrama\"|\"desarrollo\",\"area\":str,\"titulo\":str,\"descripcion\":str,\"orden\":int}]}"
+                        "content": "Role: Senior Agile Lead. Distribute actionable development & modeling tasks. Output STRICT MINIFIED JSON: {\"tareas\":[{\"usuario_id\":int,\"tipo\":\"diagrama\"|\"desarrollo\",\"area\":str,\"titulo\":str,\"descripcion\":str,\"orden\":int,\"estimacion_horas\":int,\"complejidad\":\"baja\"|\"media\"|\"alta\"}]}"
                     },
                     {"role": "user", "content": prompt}
                 ],
@@ -170,7 +181,8 @@ async def ejecutar_reparticion_tareas(
     # Obtener usuarios válidos en la base de datos para no violar Foreign Key
     res_all_users = await db.execute(select(Usuario.id))
     valid_uids = set(res_all_users.scalars().all())
-    default_uid = proyecto.creador_id if proyecto.creador_id in valid_uids else (next(iter(valid_uids)) if valid_uids else 1)
+    anfitrion_id = await _anfitrion_id(proyecto.id, db)
+    default_uid = anfitrion_id if anfitrion_id in valid_uids else (next(iter(valid_uids)) if valid_uids else 1)
 
     # 2. Cargar colaboradores y sus roles guardados en el proyecto
     result_colabs = await db.execute(
@@ -231,7 +243,8 @@ async def ejecutar_reparticion_tareas(
         f"Instructions: Create concrete development & modeling tasks assigned according to each member's Role & Areas. "
         f"Field 'tipo': 'diagrama' | 'desarrollo'. "
         f"Field 'area': 'backend' | 'frontend' | 'base_de_datos' | 'testing' | 'modelado'. "
-        f"Output JSON: {{\"tareas\":[{{\"usuario_id\":int,\"tipo\":str,\"area\":str,\"titulo\":str,\"descripcion\":str,\"orden\":int}}]}}"
+        f"Field 'estimacion_horas': realistic effort in hours (1-40). Field 'complejidad': 'baja' | 'media' | 'alta'. "
+        f"Output JSON: {{\"tareas\":[{{\"usuario_id\":int,\"tipo\":str,\"area\":str,\"titulo\":str,\"descripcion\":str,\"orden\":int,\"estimacion_horas\":int,\"complejidad\":str}}]}}"
     )
 
     resultado_ia = await _llamar_ia_tareas(prompt, req.provider, req.api_key)
@@ -274,6 +287,9 @@ async def ejecutar_reparticion_tareas(
                 completada=False,
                 orden=item.get("orden", idx + 1),
             )
+            nueva_tarea.estimacion_horas, nueva_tarea.complejidad = estimar_tarea(
+                nueva_tarea.tipo, titulo, item.get("descripcion"), item.get("estimacion_horas"), item.get("complejidad")
+            )
             nuevas_entidades.append(nueva_tarea)
     else:
         # Fallback heurístico si no responde la IA
@@ -289,14 +305,18 @@ async def ejecutar_reparticion_tareas(
                 descripcion=f"Diseño y construcción de componentes correspondientes al área de {area_principal}.",
                 completada=False,
                 orden=idx + 1,
+                estimacion_horas=estimar_tarea("diagrama" if idx == 0 else "desarrollo")[0],
+                complejidad="media",
             ))
 
-    if nuevas_entidades:
-        await insertar_tareas(nuevas_entidades, db)
+    # Con persistir=False la IA solo propone: las tareas se crean al aprobar la propuesta
+    if req.persistir:
+        if nuevas_entidades:
+            await insertar_tareas(nuevas_entidades, db)
 
-    # Notificar WebSocket para sincronización en tiempo real
-    if proyecto.codigo_acceso:
-        await manager.broadcast_to_sala({"type": "tareas_actualizadas"}, proyecto.codigo_acceso)
+        # Notificar WebSocket para sincronización en tiempo real
+        if proyecto.codigo_acceso:
+            await manager.broadcast_to_sala({"type": "tareas_actualizadas"}, proyecto.codigo_acceso)
 
     resp_tareas = [
         TareaResponse(
@@ -309,6 +329,8 @@ async def ejecutar_reparticion_tareas(
             descripcion=t.descripcion,
             completada=t.completada,
             orden=t.orden,
+            estimacion_horas=t.estimacion_horas,
+            complejidad=t.complejidad,
         )
         for t in nuevas_entidades
     ]
@@ -317,7 +339,11 @@ async def ejecutar_reparticion_tareas(
         proyecto_id=req.proyecto_id,
         tareas_generadas=len(resp_tareas),
         tareas=resp_tareas,
-        resumen=f"Se generaron y asignaron {len(resp_tareas)} tareas correctamente en el proyecto.",
+        resumen=(
+            f"Se generaron y asignaron {len(resp_tareas)} tareas correctamente en el proyecto."
+            if req.persistir else
+            f"La IA propone {len(resp_tareas)} tareas para el equipo."
+        ),
     )
 
 
@@ -360,11 +386,7 @@ async def registrar_tarea_manual(req: CrearTareaRequest, db: AsyncSession) -> Ta
     res_u = await db.execute(select(Usuario.id).where(Usuario.id == req.usuario_id))
     valid_uid = res_u.scalar_one_or_none()
     if not valid_uid:
-        res_p = await db.execute(select(Proyecto).where(Proyecto.id == req.proyecto_id))
-        proj = res_p.scalar_one_or_none()
-        if proj and proj.creador_id:
-            res_creador = await db.execute(select(Usuario.id).where(Usuario.id == proj.creador_id))
-            valid_uid = res_creador.scalar_one_or_none()
+        valid_uid = await _anfitrion_id(req.proyecto_id, db)
         if not valid_uid:
             first_u = await db.execute(select(Usuario.id).limit(1))
             valid_uid = first_u.scalar_one_or_none() or 1
@@ -378,6 +400,8 @@ async def registrar_tarea_manual(req: CrearTareaRequest, db: AsyncSession) -> Ta
         descripcion=req.descripcion,
         completada=False,
         orden=req.orden or 0,
+        estimacion_horas=req.estimacion_horas,
+        complejidad=req.complejidad,
     )
     guardadas = await insertar_tareas([nueva], db)
     t = guardadas[0]

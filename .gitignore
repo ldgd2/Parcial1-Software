@@ -42,8 +42,51 @@ Thumbs.db
 .agent/
 .agent/
 .gemini/
+
+# Caché y archivos compilados de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Base de datos local (SQLite, si aplica)
+*.sqlite
+*.db
+
+# Variables de entorno
+.env
+backend/.env
+frontend/.env
+.env.*
+!.env.example
+
+# Node.js y Frontend
+node_modules/
+dist/
+build/
+.npm/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Archivos de sistema y editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Agentes / Configuración local de Gemini (opcional pero recomendado)
+.agents/
+.agent/
+.agent/
+.gemini/
 # Backend Firebase service account (no versionar)
 backend/modules/gestion_asistencia_ia/notificaciones/config/diagramador-firebase-service.json
 # Flutter Firebase config JSON (no versionar)
 Movil/lib/assets/google-services.json
 docs/
+# CU39: credenciales de Firebase (nunca al repo)
+*firebase-service-account*.json
+backend/firebase*.json

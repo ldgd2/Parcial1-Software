@@ -1,7 +1,7 @@
 .modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  z-index: var(--z-modal);
   background: rgba(0, 0, 0, 0.75);
   display: flex;
   align-items: center;
@@ -15,8 +15,16 @@
   to { opacity: 1; }
 }
 
+.modal-overlay--top {
+  z-index: var(--z-modal-top);
+}
+
+/* Columna: cabecera y pie fijos, el cuerpo se desplaza si no cabe */
 .modal-panel {
   width: 100%;
+  max-height: calc(100vh - 2rem);
+  display: flex;
+  flex-direction: column;
   background: var(--surface-color);
   border: 1px solid var(--border-color);
   animation: panelIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
@@ -36,6 +44,10 @@
 }
 
 .modal-title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
   font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -56,6 +68,70 @@
 }
 .modal-close:hover { opacity: 1; transform: scale(1.2); }
 
+.modal-header {
+  flex-shrink: 0;
+  gap: 1rem;
+}
+
+.modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
 .modal-body {
   padding: 1.5rem;
+  overflow-y: auto;
+  min-height: 0;
 }
+
+/* Cuerpo a sangre, para layouts propios (p. ej. editor de dos paneles) */
+.modal-body--flush {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.modal-footer {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
+/* Botones estándar de modal (mismo estilo que ProyectoFormModal) */
+.modal-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.625rem 1.25rem;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, opacity 0.2s;
+}
+.modal-btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+
+.modal-btn--primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--text-on-primary);
+}
+.modal-btn--primary:hover:not(:disabled) { color: var(--text-on-primary); opacity: 0.85; }
+
+.modal-btn--danger:hover:not(:disabled) { border-color: var(--danger-soft); color: var(--danger-soft); }
+
+.modal-btn:disabled { opacity: 0.4; cursor: not-allowed; }

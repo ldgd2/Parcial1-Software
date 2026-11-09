@@ -3,7 +3,7 @@ from typing import List, Optional
 
 
 class TareaResponse(BaseModel):
-    id: int
+    id: Optional[int] = None   # None en una propuesta todavía no aprobada
     proyecto_id: int
     usuario_id: int
     tipo: str
@@ -12,6 +12,8 @@ class TareaResponse(BaseModel):
     descripcion: Optional[str] = None
     completada: bool
     orden: int
+    estimacion_horas: Optional[int] = None   # CU37
+    complejidad: Optional[str] = None        # baja | media | alta
 
     model_config = {"from_attributes": True}
 

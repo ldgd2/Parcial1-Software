@@ -14,8 +14,43 @@
   --secondary: #948979;
   --secondary-hover: #a39989;
   
-  --accent: #948979; 
-  --border-color: #393E46;
+  --accent: #948979;
+  /* Distinto de --surface-color para que los bordes sean visibles */
+  --border-color: #5c626d;
+
+  /* Texto atenuado legible (AA) sobre --bg-color y --surface-color */
+  --text-muted: #b8ad99;
+
+  /* Texto sobre fondos claros (--primary / --secondary) */
+  --text-on-primary: #222831;
+
+  /* Colores de estado */
+  --danger: #ef4444;
+  --danger-text: #f87171;
+  --danger-strong: #b91c1c;
+  --danger-soft: #e6a3a3;
+  --success: #10b981;
+  --success-text: #34d399;
+  --success-soft: #a3e6a3;
+  --warning: #f59e0b;
+  --warning-text: #fbbf24;
+  --warning-orange: #ed8936;
+  --info: #38bdf8;
+  --info-strong: #4a7fd4;
+
+  /* Escala de capas (z-index) — de menor a mayor */
+  --z-raised: 50;        /* navbars y dropdowns de tarjetas */
+  --z-sticky: 100;       /* paneles laterales, navbar del dashboard */
+  --z-toolbar: 200;      /* barra de menú del lienzo */
+  --z-dropdown: 500;     /* menús desplegables y popovers */
+  --z-floating: 800;     /* paneles flotantes (checklist) */
+  --z-cursors: 900;      /* cursores multijugador (bajo los modales) */
+  --z-modal: 1000;       /* modales base */
+  --z-modal-mid: 2000;   /* modales sobre modales base (permisos) */
+  --z-modal-high: 9999;  /* modales abiertos desde el lienzo, menú contextual */
+  --z-modal-top: 10000;  /* conflictos, overlay de carga */
+  --z-max: 99999;        /* modales que se abren encima de otros modales */
+  --z-toast: 100000;     /* notificaciones: siempre arriba */
   
   /* Radii - Minimalist hard/slight curves */
   --radius-sm: 0px;
@@ -60,6 +95,14 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
+}
+
+/* Foco visible para navegación con teclado.
+   :is() sube la especificidad para ganarle a `.clase { outline: none }`.
+   Los inputs de texto no se incluyen: ya marcan el foco con su borde. */
+:is(a, button, select, summary, [tabindex], [role="button"], input[type="checkbox"], input[type="radio"]):focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 /* Animations */

@@ -71,7 +71,7 @@
 .compartir-modal__copy-btn--copiado {
   background: rgba(163, 230, 163, 0.1);
   border-color: rgba(163, 230, 163, 0.4);
-  color: #a3e6a3;
+  color: var(--success-soft);
 }
 
 .compartir-modal__info {

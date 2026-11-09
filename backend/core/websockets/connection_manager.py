@@ -20,8 +20,10 @@ class ConnectionManager:
                 "chat_history": [] # Historial de mensajes tipo WhatsApp de la sala
             }
 
-    async def connect_host(self, websocket: WebSocket, sala_id: str, host_id: str = None, nickname: str = None):
-        await websocket.accept()
+    async def connect_host(self, websocket: WebSocket, sala_id: str, host_id: str = None, nickname: str = None, accept: bool = True):
+        # accept=False cuando el socket ya se aceptó para verificar el token del host
+        if accept:
+            await websocket.accept()
         self._init_sala(sala_id)
         self.salas[sala_id]["host"] = websocket
         if host_id and nickname:

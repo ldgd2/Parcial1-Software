@@ -1,3 +1,4 @@
+from backend.cli.async_runner import ejecutar_async
 import asyncio
 from backend.cli.console import console
 from rich.prompt import Prompt
@@ -17,4 +18,4 @@ async def async_ejecutar():
     input("\nPresiona Enter para continuar...")
 
 def ejecutar():
-    asyncio.run(async_ejecutar())
+    ejecutar_async(async_ejecutar())

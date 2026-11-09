@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useExportarGithub } from '@/features/gestion_asistencia_ia/exportar_github/hooks/useExportarGithub';
 import { UrlCopyCard } from '@/shared/components/ui/UrlCopyCard/UrlCopyCard';
+import { Modal } from '@/features/gestion_proyectos/administrar_proyecto/components/Modal/Modal';
 import './ExportModal.css';
 
 interface Props {
@@ -66,19 +67,58 @@ export const ExportModal: React.FC<Props> = ({
     URL.revokeObjectURL(url);
   };
 
-  return (
-    <div className="export-modal-overlay">
-      <div className="export-modal-card">
-        <div className="export-modal-header">
-          <div className="export-modal-title">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 22v-4a48 48 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
-            <h2>Exportar Monorepo (Backend + Flutter)</h2>
-          </div>
-          <button className="export-modal-close" onClick={onClose}>&times;</button>
-        </div>
+  const selectOnKey = (value: boolean) => (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setAutoDeploy(value);
+    }
+  };
 
+  const footer = !result ? (
+    <>
+      <button type="button" className="modal-btn" onClick={onClose}>
+        Cancelar
+      </button>
+      <button
+        type="submit"
+        form="export-github-form"
+        className="modal-btn modal-btn--primary"
+        disabled={isExporting || !githubUsername}
+      >
+        {isExporting ? (
+          <>
+            <span className="export-btn-spinner" />
+            <span>Procesando...</span>
+          </>
+        ) : (
+          <>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            <span>{autoDeploy ? 'Exportar & Desplegar' : 'Exportar a GitHub'}</span>
+          </>
+        )}
+      </button>
+    </>
+  ) : (
+    <button type="button" className="modal-btn" onClick={onClose}>
+      Cerrar
+    </button>
+  );
+
+  return (
+    <Modal
+      isOpen
+      onClose={onClose}
+      width="580px"
+      footer={footer}
+      title={
+        <>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M15 22v-4a48 48 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
+          Exportar monorepo (Backend + Flutter)
+        </>
+      }
+    >
         {!result ? (
-          <form onSubmit={handleExport} className="export-modal-body">
+          <form id="export-github-form" onSubmit={handleExport} className="export-modal-body">
             {!githubUsername ? (
               <div className="export-warning-banner">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -107,10 +147,14 @@ export const ExportModal: React.FC<Props> = ({
               </div>
             </div>
 
-            <div className="export-options-grid">
+            <div className="export-options-grid" role="radiogroup" aria-label="Modo de exportación">
               <div
                 className={`export-option-card ${autoDeploy ? 'active' : ''}`}
                 onClick={() => setAutoDeploy(true)}
+                onKeyDown={selectOnKey(true)}
+                role="radio"
+                aria-checked={autoDeploy}
+                tabIndex={0}
               >
                 <div className="option-radio">
                   <div className="option-radio-dot" />
@@ -127,6 +171,10 @@ export const ExportModal: React.FC<Props> = ({
               <div
                 className={`export-option-card ${!autoDeploy ? 'active' : ''}`}
                 onClick={() => setAutoDeploy(false)}
+                onKeyDown={selectOnKey(false)}
+                role="radio"
+                aria-checked={!autoDeploy}
+                tabIndex={0}
               >
                 <div className="option-radio">
                   <div className="option-radio-dot" />
@@ -139,29 +187,6 @@ export const ExportModal: React.FC<Props> = ({
                   <p>Genera la estructura completa con <strong>/backend</strong> (Spring Boot) y <strong>/frontend</strong> (Flutter) y sube el repositorio únicamente a tu cuenta de GitHub.</p>
                 </div>
               </div>
-            </div>
-
-            <div className="export-modal-footer">
-              <button type="button" className="export-btn-cancel" onClick={onClose}>
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="export-btn-submit"
-                disabled={isExporting || !githubUsername}
-              >
-                {isExporting ? (
-                  <>
-                    <span className="export-btn-spinner" />
-                    <span>Procesando...</span>
-                  </>
-                ) : (
-                  <>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                    <span>{autoDeploy ? 'Exportar & Desplegar' : 'Exportar a GitHub'}</span>
-                  </>
-                )}
-              </button>
             </div>
           </form>
         ) : (
@@ -220,18 +245,13 @@ export const ExportModal: React.FC<Props> = ({
             </div>
 
             {result.api_docs_md && (
-              <button className="export-btn-download" onClick={handleDownloadApiDocs}>
+              <button type="button" className="export-btn-download" onClick={handleDownloadApiDocs}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 <span>Descargar API_Docs.md</span>
               </button>
             )}
-
-            <button className="export-btn-cancel" style={{ width: '100%', marginTop: '1rem' }} onClick={onClose}>
-              Cerrar
-            </button>
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 };

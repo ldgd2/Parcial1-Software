@@ -107,29 +107,21 @@ export const ConnectPicker: React.FC<Props> = ({ x, y, onPick, onCancel }) => {
           const isExpanded = expandedGroups.includes(group.name);
           return (
             <div key={group.name} className="connect-picker__group">
-              <button 
-                className="connect-picker__group-header"
+              <button
+                type="button"
+                className={`connect-picker__group-header${isExpanded ? ' is-expanded' : ''}`}
                 onClick={() => toggleGroup(group.name)}
-                style={{ 
-                  width: '100%', 
-                  textAlign: 'left', 
-                  fontWeight: 'bold', 
-                  padding: '6px', 
-                  backgroundColor: 'var(--bg-secondary)', 
-                  border: 'none', 
-                  cursor: 'pointer',
-                  display: 'flex',
-                  justifyContent: 'space-between'
-                }}
+                aria-expanded={isExpanded}
               >
                 <span>{group.name}</span>
-                <span>{isExpanded ? '▼' : '▶'}</span>
+                <span className="connect-picker__chevron" aria-hidden="true">▶</span>
               </button>
               
               {isExpanded && (
                 <div className="connect-picker__group-content">
                   {group.options.map(opt => (
                     <button
+                      type="button"
                       key={opt.type}
                       id={`relation-${opt.type}`}
                       className="connect-picker__option"

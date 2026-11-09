@@ -16,6 +16,8 @@ class RepartirTareasRequest(BaseModel):
     colaboradores: Optional[List[DesarrolladorTareaInput]] = None
     provider: Optional[str] = None
     api_key: Optional[str] = None
+    # False: solo calcula la propuesta (no crea tareas); se crean al aprobarla
+    persistir: bool = True
 
 
 class CrearTareaRequest(BaseModel):
@@ -26,4 +28,6 @@ class CrearTareaRequest(BaseModel):
     titulo: str
     descripcion: Optional[str] = None
     orden: Optional[int] = 0
+    estimacion_horas: Optional[int] = None   # CU37 (si falta, se calcula)
+    complejidad: Optional[str] = None
 

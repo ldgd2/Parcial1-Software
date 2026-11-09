@@ -14,6 +14,8 @@ class RepartirRolesRequest(BaseModel):
     instrucciones: Optional[str] = None
     provider: Optional[str] = None
     api_key: Optional[str] = None
+    # False: solo calcula la propuesta (no guarda roles ni toca el lienzo); se aplica al aprobarla
+    persistir: bool = True
 
 
 class AsignarRolManualRequest(BaseModel):

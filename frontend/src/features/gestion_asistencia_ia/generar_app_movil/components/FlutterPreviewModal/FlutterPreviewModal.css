@@ -1,76 +1,20 @@
-.flutter-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(4px);
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
+/* Contenedor, cabecera y cierre los pone <Modal>; panel alto para el editor. */
+.flutter-modal-panel {
+  height: min(85vh, 900px);
 }
 
-.flutter-modal-card {
-  width: 950px;
-  max-width: 95vw;
-  height: 85vh;
-  background: var(--surface-color, #1e293b);
-  border: 1px solid var(--border-color, #334155);
-  border-radius: 14px;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
-}
-
-.flutter-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border-color, #334155);
-  background: rgba(15, 23, 42, 0.6);
-}
-
-.flutter-modal-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--text-primary, #f8fafc);
-}
-
-.flutter-modal-title h2 {
-  font-size: 1.15rem;
-  font-weight: 700;
-  margin: 0;
+.flutter-zip-btn {
+  padding: 0.45rem 0.9rem;
 }
 
 .flutter-badge {
   font-size: 0.75rem;
   font-weight: 600;
   background: rgba(56, 189, 248, 0.15);
-  color: #38bdf8;
+  color: var(--info);
   padding: 3px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   border: 1px solid rgba(56, 189, 248, 0.3);
-}
-
-.flutter-modal-close {
-  background: none;
-  border: none;
-  color: var(--text-secondary, #94a3b8);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px;
-  border-radius: 6px;
-  transition: color 0.15s, background 0.15s;
-}
-
-.flutter-modal-close:hover {
-  color: var(--text-primary, #f8fafc);
-  background: rgba(255, 255, 255, 0.05);
 }
 
 .flutter-modal-body {
@@ -81,7 +25,7 @@
 
 .flutter-files-sidebar {
   width: 280px;
-  border-right: 1px solid var(--border-color, #334155);
+  border-right: 1px solid var(--border-color);
   background: rgba(15, 23, 42, 0.4);
   display: flex;
   flex-direction: column;
@@ -94,14 +38,14 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--text-secondary, #94a3b8);
-  border-bottom: 1px solid var(--border-color, #334155);
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .flutter-file-item {
   padding: 10px 16px;
   font-size: 0.85rem;
-  color: var(--text-secondary, #94a3b8);
+  color: var(--text-secondary);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -112,13 +56,13 @@
 
 .flutter-file-item:hover {
   background: rgba(255, 255, 255, 0.04);
-  color: var(--text-primary, #f8fafc);
+  color: var(--text-primary);
 }
 
 .flutter-file-item.active {
   background: rgba(56, 189, 248, 0.1);
-  color: #38bdf8;
-  border-left-color: #38bdf8;
+  color: var(--info);
+  border-left-color: var(--info);
   font-weight: 600;
 }
 
@@ -132,7 +76,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: #0f172a;
+  background: var(--bg-color);
   overflow: hidden;
 }
 
@@ -141,14 +85,14 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
-  background: #1e293b;
-  border-bottom: 1px solid #334155;
+  background: var(--surface-color);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .flutter-current-file {
   font-family: monospace;
   font-size: 0.82rem;
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .flutter-editor-actions {
@@ -163,9 +107,9 @@
   gap: 6px;
   padding: 6px 12px;
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid #334155;
-  border-radius: 6px;
-  color: #f8fafc;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
   font-size: 0.78rem;
   cursor: pointer;
   transition: background 0.15s;
@@ -180,7 +124,7 @@
   margin: 0;
   padding: 16px;
   background: #0b1120;
-  color: #e2e8f0;
+  color: var(--text-secondary);
   font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
   font-size: 0.83rem;
   line-height: 1.5;
@@ -190,8 +134,8 @@
 
 .flutter-refine-box {
   padding: 12px 16px;
-  background: #1e293b;
-  border-top: 1px solid #334155;
+  background: var(--surface-color);
+  border-top: 1px solid var(--border-color);
   display: flex;
   gap: 8px;
   align-items: center;
@@ -200,10 +144,10 @@
 .flutter-refine-input {
   flex: 1;
   padding: 8px 12px;
-  background: #0f172a;
-  border: 1px solid #334155;
-  border-radius: 6px;
-  color: #f8fafc;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
   font-size: 0.82rem;
 }
 
@@ -211,7 +155,7 @@
   padding: 8px 16px;
   background: #2563eb;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   color: #ffffff;
   font-size: 0.82rem;
   font-weight: 600;
@@ -233,6 +177,6 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 

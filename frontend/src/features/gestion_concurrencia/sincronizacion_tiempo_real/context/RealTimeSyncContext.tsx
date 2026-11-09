@@ -127,6 +127,12 @@ export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: a
 
       ws.onopen = async () => {
         console.log('WebSocket connected');
+
+        // El host se identifica con su token en el PRIMER mensaje (no en la URL):
+        // el servidor verifica que sea anfitrión de esta sala antes de darle permisos.
+        if (!isGuest) {
+          ws?.send(JSON.stringify({ type: 'auth', token: TokenService.getToken() }));
+        }
         
         try {
           const { offlineSyncService } = await import('@/features/gestion_concurrencia/sincronizar_estado_local/services/OfflineSyncService');
@@ -259,7 +265,12 @@ export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: a
         }
       };
 
-      ws.onclose = () => {
+      ws.onclose = (event) => {
+        if (event.code === 1008) {
+          // El servidor rechazó el acceso como anfitrión: reintentar no lo cambiaría
+          console.warn('WebSocket rechazado por el servidor:', event.reason || 'sin permiso');
+          return;
+        }
         console.log('WebSocket disconnected. Reconnecting in 3 seconds...');
         reconnectTimeout = setTimeout(connect, 3000);
       };
@@ -307,6 +318,8 @@ export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: a
   };
 
   const broadcastDiagramEvent = (event: any) => {
+    // Aviso local para el historial de cambios manuales (gestionar_contexto_persistente)
+    window.dispatchEvent(new CustomEvent('diagram_local_change', { detail: event }));
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify({
         type: 'diagram_event',
