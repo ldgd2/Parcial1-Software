@@ -16,9 +16,10 @@ def main_menu():
         console.print("[3] Sistema (Servicios)")
         console.print("[4] Test API")
         console.print("[5] Usuarios")
+        console.print("[6] Notificaciones")
         console.print("[0] Salir")
         
-        opcion = Prompt.ask("\nSelecciona una opción", choices=["1", "2", "3", "4", "5", "0"], default="0")
+        opcion = Prompt.ask("\nSelecciona una opción", choices=["1", "2", "3", "4", "5", "6", "0"], default="0")
         
         if opcion == "1":
             menu_db()
@@ -34,6 +35,9 @@ def main_menu():
         elif opcion == "5":
             from backend.cli.modules.usuarios.menu import menu_usuarios
             menu_usuarios()
+        elif opcion == "6":
+            from backend.cli.modules.notificaciones.menu import menu_notificaciones
+            menu_notificaciones()
         elif opcion == "0":
             console.print("\n[bold green]Saliendo del Manager... ¡Hasta luego![/bold green]")
             break

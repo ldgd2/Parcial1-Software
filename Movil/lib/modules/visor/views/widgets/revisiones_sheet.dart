@@ -166,10 +166,10 @@ class _RevisionesSheetState extends State<RevisionesSheet> with SingleTickerProv
                                         notif.detalle,
                                         style: textos.cuerpoPequeno,
                                       ),
-                                      if (notif.autor != null) ...[
+                                      if (notif.autor != null && notif.autor!.isNotEmpty) ...[
                                         const SizedBox(height: 4),
                                         Text(
-                                          'Por: ${notif.autor}',
+                                          'Asignado a: ${notif.autor}',
                                           style: TextStyle(
                                             color: colores.secundario,
                                             fontSize: 10.5,
@@ -273,7 +273,7 @@ class _RevisionesSheetState extends State<RevisionesSheet> with SingleTickerProv
                 widget.roles.isEmpty
                     ? Center(
                         child: Text(
-                          'No hay asignaciones de rol por IA configuradas.',
+                          'No hay roles registrados en este proyecto.',
                           style: textos.cuerpoPequeno,
                         ),
                       )
@@ -305,33 +305,18 @@ class _RevisionesSheetState extends State<RevisionesSheet> with SingleTickerProv
                                       ),
                                     ),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                       decoration: BoxDecoration(
                                         color: colores.primario.withOpacity(0.15),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: Text(
-                                        '${(rol.scoreAdecuacion * 100).toInt()}% Match',
+                                        rol.rolAsignado,
                                         style: TextStyle(
                                           color: colores.primario,
-                                          fontSize: 10,
+                                          fontSize: 11,
                                           fontWeight: FontWeight.bold,
                                         ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Icon(Icons.psychology_outlined, size: 14, color: colores.primario),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      rol.rolAsignado,
-                                      style: TextStyle(
-                                        color: colores.primario,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 12,
                                       ),
                                     ),
                                   ],
