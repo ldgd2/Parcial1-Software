@@ -1,3 +1,4 @@
+from backend.cli.async_runner import ejecutar_async
 import asyncio
 from backend.cli.console import console, print_header
 from rich.prompt import Prompt
@@ -16,7 +17,7 @@ def menu_seeder():
             try:
                 cantidad = int(cantidad)
                 with console.status("[bold cyan]Ejecutando Seeders..."):
-                    asyncio.run(correr_master_seeder(cantidad))
+                    ejecutar_async(correr_master_seeder(cantidad))
                 console.print("\n[bold green]Proceso de Seeding completado exitosamente.[/bold green]")
             except ValueError:
                 console.print("[bold red]La cantidad debe ser un número entero.[/bold red]")

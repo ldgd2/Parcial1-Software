@@ -3,7 +3,7 @@ from typing import List, Optional
 
 
 class TareaResponse(BaseModel):
-    id: int
+    id: Optional[int] = None   # None en una propuesta todavía no aprobada
     proyecto_id: int
     usuario_id: int
     tipo: str

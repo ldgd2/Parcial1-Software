@@ -12,10 +12,12 @@ class GenerarEquipoRequest(BaseModel):
     proyecto_id: int
     descripcion_proyecto: str
     desarrolladores: List[HabilidadDesarrollador]
+    # False: la IA solo propone (no se guarda nada); las tareas se crean al aprobar
+    persistir: bool = True
 
 
 class TareaIAOut(BaseModel):
-    id: int
+    id: Optional[int] = None   # None en una propuesta todavía no aprobada
     proyecto_id: int
     usuario_id: int
     tipo: str

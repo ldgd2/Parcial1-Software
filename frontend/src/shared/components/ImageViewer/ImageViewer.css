@@ -6,7 +6,7 @@
     height: 100vh;
     background-color: rgba(15, 23, 42, 0.9); /* Theme dark background with opacity */
     backdrop-filter: blur(5px);
-    z-index: 9999;
+    z-index: var(--z-modal-high);
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -28,12 +28,12 @@
     justify-content: center;
     align-items: center;
     cursor: pointer;
-    z-index: 10000;
+    z-index: var(--z-modal-top);
     transition: all 0.2s ease;
 }
 
 .image-viewer-close:hover {
-    background: #ef4444;
+    background: var(--danger);
     color: white;
     transform: scale(1.05);
 }

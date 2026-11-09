@@ -6,10 +6,13 @@ import { calculateSafeNodePositions } from '../utils/layoutMerger';
 import { callGenerateDiagramAPI, fetchAiPromptConfig } from '../services/aiChatService';
 import { generateDeterministicHash } from '@/features/gestion_modelado/shared/utils/hashGenerator';
 import { parseUmlAttribute, parseUmlMethod } from '@/features/gestion_modelado/shared/utils/umlParser';
-import { repartirRolesEquipo, type ColaboradorRolOut } from '@/features/gestion_proyectos_asistida/repartir_roles';
+import { repartirRolesEquipo, asignarRolManual, type ColaboradorRolOut } from '@/features/gestion_proyectos_asistida/repartir_roles';
 import { repartirTareasEquipo, crearTareaManual, type TareaItem } from '@/features/gestion_proyectos_asistida/repartir_tareas';
-import type { ChatMessage, QuotedMessage, AiProvider, RoomUserMention, ParallelAiTask } from '../types/chatTypes';
+import type { ChatMessage, QuotedMessage, AiProvider, RoomUserMention, ParallelAiTask, PropuestaIA } from '../types/chatTypes';
 import type { NodeType } from '@/features/gestion_modelado/shared/types/types';
+import { guardarVersionDespues, decidirPropuesta as decidirPropuestaAPI, PropuestaYaDecididaError, crearVersion } from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente/services/contextoService';
+import { EVENTO_VERSIONES_ACTUALIZADAS } from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente/hooks/useVersionesContexto';
+import { pausarRegistroManual, marcarOrigenProximosCambios } from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente/utils/registroCambios';
 
 interface UseWhatsAppChatProps {
   codigoAcceso?: string;
@@ -19,6 +22,9 @@ interface UseWhatsAppChatProps {
 export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWhatsAppChatProps) {
   const { sendChatMessage, roomUsers, cursors } = useRealTimeSync();
   const { nodes, relations, addNode, updateNode, addRelation, deleteNode, deleteRelation } = useDiagram();
+  // Diagrama más reciente (para guardar la versión "después" una vez aplicada la respuesta de la IA)
+  const estadoActualRef = useRef({ nodes, relations });
+  estadoActualRef.current = { nodes, relations };
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
@@ -450,43 +456,40 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
             });
           }
 
+          // La IA solo PROPONE el reparto: no se guarda nada hasta que alguien apruebe
           const res = await repartirRolesEquipo({
             proyecto_id: proyectoId,
             colaboradores: devsList,
             instrucciones: userPrompt || undefined,
             provider: activeProvider,
-            api_key: activeApiKey || undefined
+            api_key: activeApiKey || undefined,
+            persistir: false
           });
-
-          // Actualizar nodos en el lienzo con los roles asignados
-          if (res.roles && res.roles.length > 0) {
-            res.roles.forEach((r: ColaboradorRolOut) => {
-              (r.clases_asignadas || []).forEach((className: string) => {
-                const nodeToUpdate = (nodes || []).find(n => n.nombre?.toLowerCase() === className.toLowerCase());
-                if (nodeToUpdate) {
-                  updateNode(nodeToUpdate.id, {
-                    responsable: r.nombre,
-                    responsabilidades: [r.rol_ia || 'Desarrollador', ...r.areas],
-                    version: nodeToUpdate.version + 1
-                  });
-                }
-              });
-            });
-          }
-
-          window.dispatchEvent(new Event('refetch_roles_ia'));
 
           const roleLines = res.roles.map((r: ColaboradorRolOut) =>
             `• *${r.nombre}*: ${r.rol_ia} [Áreas: ${r.areas.join(', ')}]\n  Clases: ${r.clases_asignadas.join(', ') || 'Generales'}`
           ).join('\n\n');
+          const summaryText = `Propuesta de roles y áreas para el equipo:\n\n${roleLines}\n\n${res.resumen}`;
 
-          const summaryText = `Roles arquitectónicos y áreas asignadas en el proyecto:\n\n${roleLines}\n\n${res.resumen}`;
+          const propuestaRoles = await registrarPropuesta(
+            'ROLES', userPromptMessage.text, summaryText,
+            { tipo: 'roles', roles: res.roles, resumen: res.resumen }
+          );
 
           const completedAiMessage: ChatMessage = {
             ...pendingAiMessage,
-            text: summaryText,
-            aiStatus: 'success',
+            text: propuestaRoles ? summaryText : `${summaryText}\n\n⚠ No se pudo registrar la propuesta en el historial, así que no se aplicó.`,
+            aiStatus: propuestaRoles ? 'success' : 'error',
             summary: summaryText,
+            propuesta: propuestaRoles
+              ? {
+                  ...propuestaRoles,
+                  tipo: 'roles',
+                  lineas: res.roles.map((r: ColaboradorRolOut) =>
+                    `${r.nombre} → ${r.rol_ia || 'Desarrollador'}${r.clases_asignadas?.length ? ` (${r.clases_asignadas.length} clase${r.clases_asignadas.length > 1 ? 's' : ''})` : ''}`
+                  ),
+                }
+              : undefined,
             timestamp: Date.now()
           };
 
@@ -549,27 +552,38 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
             });
           }
 
+          // La IA solo PROPONE las tareas: se crean al aprobar la propuesta
           const tareasRes = await repartirTareasEquipo({
             proyecto_id: proyectoId,
             descripcion_proyecto: userPrompt || 'Tareas de desarrollo y modelado derivadas de la arquitectura UML actual',
             colaboradores: devsList,
             provider: activeProvider,
-            api_key: activeApiKey || undefined
+            api_key: activeApiKey || undefined,
+            persistir: false
           });
-
-          window.dispatchEvent(new Event('refetch_tareas_ia'));
-          setTimeout(() => window.dispatchEvent(new Event('refetch_tareas_ia')), 800);
 
           const createdTasks = tareasRes.tareas;
           const taskLines = createdTasks.map((t: TareaItem, i: number) => `${i + 1}. [${(t.area || t.tipo).toUpperCase()}] ${t.titulo}${t.descripcion ? ` - ${t.descripcion}` : ''}`).join('\n');
-          const summaryText = `Tareas generadas y registradas en el proyecto (${createdTasks.length}):\n\n${taskLines}`;
+          const summaryText = `Propuesta de tareas para el equipo (${createdTasks.length}):\n\n${taskLines}`;
+
+          const propuestaTareas = createdTasks.length
+            ? await registrarPropuesta('TAREAS', userPromptMessage.text, summaryText, { tipo: 'tareas', tareas: createdTasks })
+            : null;
 
           const completedAiMessage: ChatMessage = {
             ...pendingAiMessage,
-            text: summaryText,
-            aiStatus: 'success',
+            text: propuestaTareas || !createdTasks.length ? summaryText : `${summaryText}\n\n⚠ No se pudo registrar la propuesta en el historial, así que no se crearon las tareas.`,
+            aiStatus: propuestaTareas || !createdTasks.length ? 'success' : 'error',
             summary: summaryText,
             tasksCount: createdTasks.length,
+            propuesta: propuestaTareas
+              ? {
+                  ...propuestaTareas,
+                  tipo: 'tareas',
+                  tareas: createdTasks.length,
+                  lineas: createdTasks.map((t: TareaItem) => `[${(t.area || t.tipo || 'general').toUpperCase()}] ${t.titulo}`),
+                }
+              : undefined,
             timestamp: Date.now()
           };
 
@@ -690,11 +704,82 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
         contextString,
         activeProvider,
         activeApiKey || null,
-        proyectoId
+        proyectoId,
+        { nodes, relations },          // versión anterior al cambio (historial de la IA)
+        getUserIdentity().nickname
       );
 
-      // Inyectar en lienzo con reorganización semántica si es refactorización
-      await injectDiagramResult(result, currentOffset, isFixRequest);
+      // Los cambios de la IA no se aplican solos: si el backend registró la versión,
+      // quedan como PROPUESTA hasta que alguien con permiso de edición la apruebe.
+      const hayCambiosIA = !!(
+        result.nodes?.length || result.relations?.length ||
+        result.deletedNodes?.length || result.deletedRelations?.length ||
+        result.tasks?.length
+      );
+      let propuestaInfo: PropuestaIA | undefined;
+      if (result.version_id && proyectoId && proyectoId > 0 && hayCambiosIA) {
+        const existentes = new Set(nodes.map(n => (n.nombre || '').toLowerCase()));
+        const nombres: string[] = (result.nodes || []).map((n: any) => n.name || n.nombre).filter(Boolean);
+        propuestaInfo = {
+          versionId: result.version_id,
+          estado: 'pendiente',
+          solicitadaPor: getUserIdentity().nickname,
+          agregadas: nombres.filter(n => !existentes.has(n.toLowerCase())),
+          modificadas: nombres.filter(n => existentes.has(n.toLowerCase())),
+          eliminadas: (result.deletedNodes || [])
+            .map((d: any) => (typeof d === 'string' ? d : d?.name || d?.id || ''))
+            .filter(Boolean),
+          relaciones: (result.relations || []).length,
+          tareas: result.tasks?.length || 0,
+          offset: currentOffset,
+          refactor: isFixRequest,
+        };
+        window.dispatchEvent(new CustomEvent(EVENTO_VERSIONES_ACTUALIZADAS, { detail: { versionId: result.version_id } }));
+      } else if (!result.version_id && proyectoId && proyectoId > 0 && hayCambiosIA) {
+        // El backend no pudo registrar la propuesta: se registra desde aquí. Si tampoco se puede,
+        // no se aplica nada (la IA nunca cambia la pizarra sin aprobación).
+        const registrada = await registrarPropuesta(
+          'IA', userPromptMessage.text, result.summary || '',
+          { tipo: 'diagrama', ...result }
+        );
+        if (registrada) {
+          const existentes = new Set(nodes.map(n => (n.nombre || '').toLowerCase()));
+          const nombres: string[] = (result.nodes || []).map((n: any) => n.name || n.nombre).filter(Boolean);
+          propuestaInfo = {
+            ...registrada,
+            agregadas: nombres.filter(n => !existentes.has(n.toLowerCase())),
+            modificadas: nombres.filter(n => existentes.has(n.toLowerCase())),
+            eliminadas: (result.deletedNodes || [])
+              .map((d: any) => (typeof d === 'string' ? d : d?.name || d?.id || ''))
+              .filter(Boolean),
+            relaciones: (result.relations || []).length,
+            tareas: result.tasks?.length || 0,
+            offset: currentOffset,
+            refactor: isFixRequest,
+          };
+        } else {
+          throw new Error('No se pudo registrar la propuesta en el historial, así que no se aplicaron los cambios.');
+        }
+      } else if (hayCambiosIA && !(proyectoId && proyectoId > 0)) {
+        // Fuera de un proyecto no hay historial ni aprobación: se aplica directamente
+        marcarOrigenProximosCambios({ intent: 'IA', cmd: userPromptMessage.text.replace(/@diag/gi, '').trim() });
+        await injectDiagramResult(result, currentOffset, isFixRequest);
+      }
+
+      // Guardar cómo quedó la pizarra: se espera a que React aplique los cambios del lienzo
+      if (!propuestaInfo && result.version_id && proyectoId && proyectoId > 0) {
+        const versionId = result.version_id;
+        setTimeout(async () => {
+          try {
+            const { nodes: n, relations: r } = estadoActualRef.current;
+            await guardarVersionDespues(proyectoId, versionId, { nodes: n, relations: r });
+          } catch (verErr) {
+            console.warn('[useWhatsAppChat] No se pudo guardar la versión posterior:', verErr);
+          } finally {
+            window.dispatchEvent(new CustomEvent(EVENTO_VERSIONES_ACTUALIZADAS, { detail: { versionId } }));
+          }
+        }, 700);
+      }
 
       // Si generó tareas, persistir en base de datos para que aparezcan en el checklist
       let tasksList: any[] = Array.isArray(result.tasks) ? [...result.tasks] : [];
@@ -716,7 +801,8 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
       }
 
       const tasksCount = tasksList.length;
-      if (tasksCount > 0 && proyectoId && proyectoId > 0) {
+      // Con propuesta, las tareas se crean al aprobarla (no antes)
+      if (tasksCount > 0 && proyectoId && proyectoId > 0 && !propuestaInfo) {
         let currentUid = 1;
         try {
           const stored = localStorage.getItem('user');
@@ -774,6 +860,7 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
         aiStatus: 'success',
         summary: summaryText,
         tasksCount,
+        propuesta: propuestaInfo,
         timestamp: Date.now()
       };
 
@@ -837,6 +924,161 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
   }, [replyingTo, sendChatMessage, executeParallelAi]);
 
   // Lista de usuarios y bot para menciones (@)
+  // ── Propuestas de la IA: aprobar / rechazar ───────────────────────────
+  const injectRef = useRef(injectDiagramResult);
+  injectRef.current = injectDiagramResult;
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+
+  const updateNodeRef = useRef(updateNode);
+  updateNodeRef.current = updateNode;
+
+  /** Registra una propuesta en el historial (pendiente). Devuelve los datos base o null si falla. */
+  const registrarPropuesta = useCallback(async (
+    intent: string, pedido: string, resumen: string, propuesta: Record<string, any>
+  ): Promise<Pick<PropuestaIA, 'versionId' | 'estado' | 'solicitadaPor' | 'agregadas' | 'modificadas' | 'eliminadas' | 'relaciones' | 'offset' | 'refactor'> | null> => {
+    if (!proyectoId || proyectoId <= 0) return null;
+    const autor = getUserIdentity().nickname;
+    try {
+      const { nodes: n, relations: r } = estadoActualRef.current;
+      const v = await crearVersion(proyectoId, {
+        intent,
+        cmd: pedido.replace(/@diag/gi, '').trim(),
+        resumen: resumen.slice(0, 2000),
+        autor,
+        estado_antes: { nodes: n, relations: r },
+        propuesta,
+      });
+      window.dispatchEvent(new CustomEvent(EVENTO_VERSIONES_ACTUALIZADAS, { detail: { versionId: v.id } }));
+      return {
+        versionId: v.id, estado: 'pendiente', solicitadaPor: autor,
+        agregadas: [], modificadas: [], eliminadas: [], relaciones: 0, offset: 0, refactor: false,
+      };
+    } catch (e) {
+      console.warn('[useWhatsAppChat] No se pudo registrar la propuesta:', e);
+      return null;
+    }
+  }, [proyectoId]);
+
+  /** Aprobada una propuesta de roles: responsables en la pizarra y roles guardados en el proyecto */
+  const aplicarRoles = useCallback(async (roles: ColaboradorRolOut[]) => {
+    if (!proyectoId) return;
+    const actuales = estadoActualRef.current.nodes;
+    roles.forEach(r => {
+      (r.clases_asignadas || []).forEach(className => {
+        const nodo = actuales.find(n => n.nombre?.toLowerCase() === className.toLowerCase());
+        if (nodo) {
+          updateNodeRef.current(nodo.id, {
+            responsable: r.nombre,
+            responsabilidades: [r.rol_ia || 'Desarrollador', ...(r.areas || [])],
+            version: nodo.version + 1
+          });
+        }
+      });
+    });
+    for (const r of roles) {
+      try {
+        await asignarRolManual({
+          proyecto_id: proyectoId,
+          usuario_id: r.usuario_id,
+          rol_ia: r.rol_ia || 'Desarrollador',
+          areas: r.areas || [],
+          responsabilidades: r.responsabilidades || []
+        });
+      } catch (e) {
+        console.warn('No se pudo guardar el rol de', r.nombre, e);
+      }
+    }
+    window.dispatchEvent(new Event('refetch_roles_ia'));
+  }, [proyectoId]);
+
+  /** Aprobada una propuesta con tareas: se crean en el proyecto */
+  const crearTareasPropuestas = useCallback(async (tareas: any[]) => {
+    if (!proyectoId) return;
+    let uidActual = 1;
+    try {
+      const u = JSON.parse(localStorage.getItem('user') || 'null');
+      if (u?.id && Number(u.id) > 0) uidActual = Number(u.id);
+    } catch {}
+    for (let i = 0; i < tareas.length; i++) {
+      const t = tareas[i];
+      try {
+        await crearTareaManual({
+          proyecto_id: proyectoId,
+          usuario_id: Number(t.usuario_id) > 0 ? Number(t.usuario_id) : uidActual,
+          titulo: t.titulo || `Tarea ${i + 1}`,
+          descripcion: t.descripcion || null,
+          tipo: t.tipo || 'desarrollo',
+          area: t.area || 'general',
+          orden: t.orden || i + 1
+        });
+      } catch (e) {
+        console.warn('No se pudo crear la tarea propuesta:', t?.titulo, e);
+      }
+    }
+    window.dispatchEvent(new Event('refetch_tareas_ia'));
+    setTimeout(() => window.dispatchEvent(new Event('refetch_tareas_ia')), 800);
+  }, [proyectoId]);
+
+  const decidirPropuesta = useCallback(async (messageId: string, aceptar: boolean) => {
+    const msg = messagesRef.current.find(m => m.id === messageId);
+    const p = msg?.propuesta;
+    if (!msg || !p || p.estado !== 'pendiente' || !proyectoId) return;
+
+    const publicar = (cambios: Partial<PropuestaIA>) => {
+      const actualizado: ChatMessage = { ...msg, propuesta: { ...p, ...cambios } };
+      setMessages(prev => prev.map(m => (m.id === messageId ? actualizado : m)));
+      sendChatMessage(actualizado);   // toda la sala ve la decisión
+    };
+
+    const quien = getUserIdentity().nickname;
+    const { nodes: n, relations: r } = estadoActualRef.current;
+    let detalle;
+    try {
+      detalle = await decidirPropuestaAPI(proyectoId, p.versionId, aceptar, aceptar ? { nodes: n, relations: r } : null, quien);
+    } catch (err) {
+      if (err instanceof PropuestaYaDecididaError) {
+        // Otra persona la decidió primero: solo se refleja su decisión
+        publicar({ estado: err.estado, decididaPor: err.decididaPor });
+        return;
+      }
+      throw err;
+    }
+
+    if (aceptar && detalle.propuesta) {
+      // Se aplica en la pizarra de toda la sala; la versión ya está registrada (no duplicar como manual)
+      pausarRegistroManual(3000);
+      const prop: any = detalle.propuesta;
+      if (prop.tipo === 'roles') {
+        await aplicarRoles(prop.roles || []);
+      } else if (prop.tipo === 'tareas') {
+        await crearTareasPropuestas(prop.tareas || []);
+      } else {
+        await injectRef.current(prop, p.offset ?? 0, !!p.refactor);
+        if (Array.isArray(prop.tasks) && prop.tasks.length) await crearTareasPropuestas(prop.tasks);
+      }
+      const versionId = p.versionId;
+      setTimeout(async () => {
+        try {
+          const { nodes: n2, relations: r2 } = estadoActualRef.current;
+          await guardarVersionDespues(proyectoId, versionId, { nodes: n2, relations: r2 });
+        } catch (verErr) {
+          console.warn('[useWhatsAppChat] No se pudo guardar la versión posterior:', verErr);
+        } finally {
+          window.dispatchEvent(new CustomEvent(EVENTO_VERSIONES_ACTUALIZADAS, { detail: { versionId } }));
+        }
+      }, 700);
+    } else {
+      window.dispatchEvent(new CustomEvent(EVENTO_VERSIONES_ACTUALIZADAS, { detail: { versionId: p.versionId } }));
+    }
+
+    publicar({
+      estado: aceptar ? 'aprobada' : 'rechazada',
+      decididaPor: detalle.decidida_por || quien,
+      decididaEn: Date.now(),
+    });
+  }, [proyectoId, sendChatMessage, aplicarRoles, crearTareasPropuestas]);
+
   const getMentionableUsers = useCallback((): RoomUserMention[] => {
     const mentions: RoomUserMention[] = [
       { id: 'bot_diag', name: 'diag', color: '#25D366', isAi: true }
@@ -891,6 +1133,7 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
     setReplyingTo,
     sendMessage,
     inFlightTasks,
-    getMentionableUsers
+    getMentionableUsers,
+    decidirPropuesta
   };
 }

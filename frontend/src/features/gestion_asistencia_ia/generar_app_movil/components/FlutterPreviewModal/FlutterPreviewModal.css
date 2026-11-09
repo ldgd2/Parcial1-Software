@@ -3,7 +3,7 @@
   inset: 0;
   background: rgba(0, 0, 0, 0.75);
   backdrop-filter: blur(4px);
-  z-index: 1000;
+  z-index: var(--z-modal);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -49,7 +49,7 @@
   font-size: 0.75rem;
   font-weight: 600;
   background: rgba(56, 189, 248, 0.15);
-  color: #38bdf8;
+  color: var(--info);
   padding: 3px 8px;
   border-radius: 6px;
   border: 1px solid rgba(56, 189, 248, 0.3);
@@ -117,8 +117,8 @@
 
 .flutter-file-item.active {
   background: rgba(56, 189, 248, 0.1);
-  color: #38bdf8;
-  border-left-color: #38bdf8;
+  color: var(--info);
+  border-left-color: var(--info);
   font-weight: 600;
 }
 

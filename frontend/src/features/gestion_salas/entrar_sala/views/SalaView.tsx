@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DiagramProvider, useDiagram } from '@/features/gestion_modelado/shared/context/DiagramContext';
-import { RealTimeSyncProvider, useRealTimeSync } from '@/features/gestion_concurrencia/sincronizacion_tiempo_real/context/RealTimeSyncContext';
+import { RealTimeSyncProvider, useRealTimeSync, getUserIdentity } from '@/features/gestion_concurrencia/sincronizacion_tiempo_real/context/RealTimeSyncContext';
+import { useRegistroCambiosManuales } from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente';
 import { Menustrip } from '@/features/gestion_modelado/lienzo_principal/components/Menustrip/Menustrip';
 import { Toolbar } from '@/features/gestion_modelado/insertar_elemento/components/Toolbar/Toolbar';
 import { DiagramCanvas } from '@/features/gestion_modelado/lienzo_principal/components/DiagramCanvas/DiagramCanvas';
@@ -18,7 +19,13 @@ import './SalaView.css';
 
 const SalaContent: React.FC<{ sala: SalaInfo }> = ({ sala }) => {
   const { loadDiagram, getDiagramState, isDirty } = useDiagram();
-  const { roomUsers } = useRealTimeSync();
+  const { roomUsers, isReadOnly } = useRealTimeSync();
+  // Historial: registra los cambios que se hacen a mano en la pizarra (con su versión anterior)
+  useRegistroCambiosManuales({
+    proyectoId: sala.proyecto_id,
+    autor: getUserIdentity().nickname,
+    habilitado: !isReadOnly,
+  });
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -120,6 +127,7 @@ const SalaContent: React.FC<{ sala: SalaInfo }> = ({ sala }) => {
       >
         <GestorEquipoIA
           proyectoId={sala.proyecto_id}
+          puedeAprobar={!isReadOnly}
           descripcionProyecto={sala.proyecto_nombre}
           colaboradoresIniciales={(() => {
             let currentUid = 1;

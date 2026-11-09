@@ -9,7 +9,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 10000;
+  z-index: var(--z-modal-top);
   padding: 1rem;
 }
 
@@ -125,7 +125,7 @@
 }
 
 .conflict-diff-card.server h4 {
-  color: #4a7fd4;
+  color: var(--info-strong);
 }
 
 .conflict-diff-card pre {
@@ -164,7 +164,7 @@
 
 .conflict-btn.server-btn {
   background-color: rgba(74, 127, 212, 0.1);
-  color: #4a7fd4;
+  color: var(--info-strong);
   border: 1px solid rgba(74, 127, 212, 0.3);
 }
 

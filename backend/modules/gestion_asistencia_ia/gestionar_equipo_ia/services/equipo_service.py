@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from backend.core.config import settings
-from backend.modules.gestion_usuarios.models import TareaIA
+from backend.modules.gestion_usuarios.models import TareaIA, Usuario
 from backend.modules.gestion_asistencia_ia.gestionar_equipo_ia.schemas.request import (
     GenerarEquipoRequest,
     HabilidadDesarrollador,
@@ -200,12 +200,15 @@ async def generar_y_persistir_tareas(req: GenerarEquipoRequest, db: AsyncSession
             completada=False,
             orden=item.get("orden", idx + 1),
         )
-        db.add(tarea)
+        if req.persistir:
+            db.add(tarea)
         nuevas_tareas.append(tarea)
 
-    await db.commit()
-    for t in nuevas_tareas:
-        await db.refresh(t)
+    # Con persistir=False la IA solo propone: las tareas se crean al aprobar la propuesta
+    if req.persistir:
+        await db.commit()
+        for t in nuevas_tareas:
+            await db.refresh(t)
 
     return nuevas_tareas
 

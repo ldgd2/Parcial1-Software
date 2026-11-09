@@ -42,7 +42,9 @@ async def generar_diagrama(
             provider=request.provider,
             api_key=request.api_key,
             proyecto_id=request.proyecto_id,
-            db=db
+            db=db,
+            estado_antes=request.estado_antes,
+            autor=request.autor or getattr(current_user, "nombre", None),
         )
         return PromptResponse(
             nodes=resultado.get("nodes", []),
@@ -51,7 +53,8 @@ async def generar_diagrama(
             deletedNodes=resultado.get("deletedNodes"),
             deletedRelations=resultado.get("deletedRelations"),
             tasks=resultado.get("tasks"),
-            provider_used=resultado.get("provider_used", settings.AI_PROVIDER)
+            provider_used=resultado.get("provider_used", settings.AI_PROVIDER),
+            version_id=resultado.get("version_id"),
         )
     except HTTPException as http_exc:
         logger.error(f"[POST /prompt/generar] HTTPException {http_exc.status_code}: {http_exc.detail}")

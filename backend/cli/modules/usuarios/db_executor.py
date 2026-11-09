@@ -1,6 +1,6 @@
 import asyncio
 from backend.core.database import AsyncSessionLocal
-from backend.modules.gestion_usuarios.models import Usuario
+from backend.modules.gestion_usuarios.models import Usuario, UsuarioRegistrado
 
 async def get_all_usuarios():
     from sqlalchemy import select
@@ -9,8 +9,14 @@ async def get_all_usuarios():
         return result.scalars().all()
 
 async def create_usuario_db(nombre, email):
+    from sqlalchemy import select
+    from backend.core.permissions.models import Rol
     async with AsyncSessionLocal() as session:
-        nuevo = Usuario(nombre=nombre, email=email, is_active=True, tipo="registrado")
+        # Mismo rol que asigna el registro de la app: sin rol, todo endpoint con permisos da 403.
+        rol = (await session.execute(select(Rol).where(Rol.nombre == "registrado"))).scalars().first()
+        # El tipo lo pone la identidad polimórfica ('usuarioregistrado'), igual que el registro de la app.
+        # Un tipo inventado como "registrado" hace que SQLAlchemy no pueda volver a leer la fila.
+        nuevo = UsuarioRegistrado(nombre=nombre, email=email, is_active=True, rol_id=rol.id if rol else None)
         session.add(nuevo)
         await session.commit()
         await session.refresh(nuevo)

@@ -49,7 +49,9 @@ async def generar_diagrama_desde_prompt(
     provider: Optional[str] = None,
     api_key: Optional[str] = None,
     proyecto_id: Optional[int] = None,
-    db: Optional[Any] = None
+    db: Optional[Any] = None,
+    estado_antes: Optional[dict] = None,
+    autor: Optional[str] = None
 ) -> dict:
     """
     Orquestador único y genérico para generación/refactorización de diagramas UML.
@@ -126,16 +128,34 @@ async def generar_diagrama_desde_prompt(
             from backend.modules.gestion_asistencia_ia.gestionar_contexto_persistente.services.contexto_service import ContextoService
             from backend.modules.gestion_asistencia_ia.gestionar_contexto_persistente.schemas.request import RegistrarInteraccionRequest
             service = ContextoService(db)
-            await service.registrar_interaccion(
+            # La respuesta queda como propuesta pendiente si cambia el diagrama
+            hay_cambios = bool(
+                resultado.get("nodes") or resultado.get("relations")
+                or resultado.get("deletedNodes") or resultado.get("deletedRelations")
+                or resultado.get("tasks")
+            )
+            propuesta = {
+                "nodes": resultado.get("nodes") or [],
+                "relations": resultado.get("relations") or [],
+                "deletedNodes": resultado.get("deletedNodes") or [],
+                "deletedRelations": resultado.get("deletedRelations") or [],
+                "tasks": resultado.get("tasks") or [],
+                "summary": resultado.get("summary") or "",
+            } if hay_cambios else None
+            registro = await service.registrar_interaccion(
                 RegistrarInteraccionRequest(
                     proyecto_id=proyecto_id,
                     user_prompt=prompt,
                     ai_summary=resultado.get("summary"),
                     added_nodes=[n.get("name") for n in resultado.get("nodes", []) if n.get("name")],
                     deleted_nodes=resultado.get("deletedNodes") or [],
-                    diagram_dsl=context or ""
+                    diagram_dsl=context or "",
+                    estado_antes=estado_antes,
+                    autor=autor,
+                    propuesta=propuesta,
                 )
             )
+            resultado["version_id"] = registro.version_id
         except Exception as reg_err:
             print(f"[ContextoPersistente] Advertencia al persistir interacción: {reg_err}")
 

@@ -152,7 +152,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #10b981;
+  background: var(--success);
   box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
   margin-left: auto;
 }
@@ -191,13 +191,13 @@
 .config-banner--success {
   background: rgba(16, 185, 129, 0.12);
   border: 1px solid rgba(16, 185, 129, 0.3);
-  color: #34d399;
+  color: var(--success-text);
 }
 
 .config-banner--error {
   background: rgba(239, 68, 68, 0.12);
   border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #f87171;
+  color: var(--danger-text);
 }
 
 /* Pane Header */
@@ -289,7 +289,7 @@
 .status-pill.active {
   background: rgba(16, 185, 129, 0.12);
   border: 1px solid rgba(16, 185, 129, 0.3);
-  color: #34d399;
+  color: var(--success-text);
 }
 
 /* Info Boxes */
@@ -301,7 +301,7 @@
   border-radius: 8px;
   background: rgba(16, 185, 129, 0.08);
   border: 1px solid rgba(16, 185, 129, 0.25);
-  color: #34d399;
+  color: var(--success-text);
 }
 
 .info-box-warning {
@@ -312,7 +312,7 @@
   border-radius: 8px;
   background: rgba(245, 158, 11, 0.08);
   border: 1px solid rgba(245, 158, 11, 0.25);
-  color: #fbbf24;
+  color: var(--warning-text);
 }
 
 .info-box-success strong, .info-box-warning strong {
@@ -384,7 +384,7 @@
   border-radius: var(--radius-md, 6px);
   background: rgba(239, 68, 68, 0.15);
   border: 1px solid rgba(239, 68, 68, 0.35);
-  color: #f87171;
+  color: var(--danger-text);
   font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -548,13 +548,13 @@
 
 .pref-badge.active {
   background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
+  color: var(--success-text);
   border-color: rgba(16, 185, 129, 0.3);
 }
 
 .pref-badge.danger {
   background: rgba(239, 68, 68, 0.15);
-  color: #f87171;
+  color: var(--danger-text);
   border-color: rgba(239, 68, 68, 0.3);
 }
 

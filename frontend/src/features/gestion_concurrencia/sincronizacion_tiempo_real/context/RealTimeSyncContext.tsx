@@ -307,6 +307,8 @@ export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: a
   };
 
   const broadcastDiagramEvent = (event: any) => {
+    // Aviso local para el historial de cambios manuales (gestionar_contexto_persistente)
+    window.dispatchEvent(new CustomEvent('diagram_local_change', { detail: event }));
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify({
         type: 'diagram_event',

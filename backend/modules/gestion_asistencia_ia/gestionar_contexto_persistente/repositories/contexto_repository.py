@@ -1,7 +1,7 @@
-from typing import Optional
+from typing import Any, Dict, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from backend.modules.gestion_asistencia_ia.models import ContextoIAProyecto
+from sqlalchemy import select, update, func
+from backend.modules.gestion_asistencia_ia.models import ContextoIAProyecto, VersionContextoIA
 
 
 class ContextoRepository:
@@ -55,3 +55,82 @@ class ContextoRepository:
         await self.db.refresh(contexto)
         return contexto
 
+    # ─── Versiones (antes/después de cada interacción de la IA) ─────────────
+
+    async def agregar_version(self, **campos: Any) -> VersionContextoIA:
+        """Agrega la versión sin confirmar: se guarda en el mismo commit que `update()`."""
+        version = VersionContextoIA(**campos)
+        self.db.add(version)
+        await self.db.flush()  # asigna el id
+        return version
+
+    async def crear_version(self, **campos: Any) -> VersionContextoIA:
+        version = VersionContextoIA(**campos)
+        self.db.add(version)
+        await self.db.commit()
+        await self.db.refresh(version)
+        return version
+
+    async def listar_versiones(
+        self, proyecto_id: int, limite: int, antes_de_id: Optional[int] = None
+    ) -> List[VersionContextoIA]:
+        """Más recientes primero. Pide `limite + 1` para saber si hay más páginas."""
+        stmt = select(VersionContextoIA).where(VersionContextoIA.proyecto_id == proyecto_id)
+        if antes_de_id is not None:
+            stmt = stmt.where(VersionContextoIA.id < antes_de_id)
+        stmt = stmt.order_by(VersionContextoIA.id.desc()).limit(limite + 1)
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
+
+    async def obtener_version(self, proyecto_id: int, version_id: int) -> Optional[VersionContextoIA]:
+        stmt = select(VersionContextoIA).where(
+            VersionContextoIA.id == version_id,
+            VersionContextoIA.proyecto_id == proyecto_id,
+        )
+        result = await self.db.execute(stmt)
+        return result.scalars().first()
+
+    async def decidir_propuesta(
+        self,
+        proyecto_id: int,
+        version_id: int,
+        estado: str,
+        por: Optional[str],
+        por_id: Optional[int],
+        estado_antes: Optional[Dict[str, Any]],
+    ) -> Optional[VersionContextoIA]:
+        """
+        Aprueba o rechaza una propuesta solo si sigue pendiente (una sola sentencia,
+        así dos personas no pueden decidir la misma propuesta). None si ya estaba decidida.
+        """
+        valores: Dict[str, Any] = dict(
+            estado_propuesta=estado, decidida_por=por, decidida_por_id=por_id, decidida_en=func.now()
+        )
+        if estado_antes is not None:
+            valores["estado_antes"] = estado_antes
+        stmt = (
+            update(VersionContextoIA)
+            .where(
+                VersionContextoIA.id == version_id,
+                VersionContextoIA.proyecto_id == proyecto_id,
+                VersionContextoIA.estado_propuesta == "pendiente",
+            )
+            .values(**valores)
+            .returning(VersionContextoIA.id)
+            .execution_options(synchronize_session=False)
+        )
+        result = await self.db.execute(stmt)
+        cambiada = result.scalar_one_or_none()
+        await self.db.commit()
+        if cambiada is None:
+            return None
+        version = await self.obtener_version(proyecto_id, version_id)
+        if version is not None:
+            await self.db.refresh(version)
+        return version
+
+    async def guardar_despues(self, version: VersionContextoIA, estado: Dict[str, Any]) -> VersionContextoIA:
+        version.estado_despues = estado
+        await self.db.commit()
+        await self.db.refresh(version)
+        return version

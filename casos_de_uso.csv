@@ -28,3 +28,21 @@ Ciclo 3,CU27,Asignación estructurada por roles,APROBADO,ALTA,ALTO,Anfitrión / 
 Ciclo 3,CU10,Notificar despliegue,APROBADO,ALTA,ALTO,API Deployer / Anfitrión
 Ciclo 3,CU25,Exportar a XML,APROBADO,NORMAL,NORMAL,Anfitrión
 Ciclo 3,CU26,Importar desde XML,APROBADO,NORMAL,NORMAL,Anfitrión
+
+Ciclo 4,CU28,Aprobar propuestas de la IA,EN PRUEBAS,CRÍTICA,ALTO,Anfitrión / Colaborador / API IA
+Ciclo 4,CU29,Historial de versiones y restauración,EN PRUEBAS,ALTA,ALTO,Anfitrión / Colaborador
+Ciclo 4,CU30,Chat privado con asistente IA,DESCARTADO,ALTA,NORMAL,Usuario / API IA
+Ciclo 4,CU31,Memoria persistente del proyecto (IA),PENDIENTE,ALTA,ALTO,API IA
+Ciclo 4,CU32,Revisión del diagrama por IA,PENDIENTE,ALTA,NORMAL,Anfitrión / Colaborador / API IA
+Ciclo 4,CU33,Sugerencias de IA en el chat y comentarios de cambios,PENDIENTE,ALTA,NORMAL,Anfitrión / Colaborador / API IA
+Ciclo 4,CU34,Resumen de cambios en lenguaje natural,PENDIENTE,NORMAL,NORMAL,Usuario / API IA
+Ciclo 4,CU35,Generar documentación del modelo,PENDIENTE,NORMAL,NORMAL,Anfitrión / API IA
+Ciclo 4,CU36,Generar diagrama desde requisitos,PENDIENTE,ALTA,ALTO,Usuario / API IA
+Ciclo 4,CU37,Estimar esfuerzo de tareas,PENDIENTE,NORMAL,NORMAL,Anfitrión / API IA
+
+Ciclo 5,CU38,Permisos persistentes por colaborador,PENDIENTE,CRÍTICA,ALTO,Anfitrión
+Ciclo 5,CU39,Notificaciones (Firebase),PENDIENTE,MEDIA,NORMAL,Usuario / API Firebase
+Ciclo 5,CU40,Actividad y contribución por miembro,PENDIENTE,MEDIA,NORMAL,Anfitrión
+Ciclo 5,CU41,Exportar diagrama a imagen o PDF,PENDIENTE,NORMAL,NORMAL,Anfitrión / Colaborador
+Ciclo 5,CU42,Plantillas de proyecto,PENDIENTE,NORMAL,NORMAL,Usuario
+Ciclo 5,CU43,Validar permisos en el backend,PENDIENTE,ALTA,ALTO,Sistema

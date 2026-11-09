@@ -1,0 +1,132 @@
+/* Vista previa de solo lectura de una versión del diagrama.
+   Imita el aspecto de ClassNode y del lienzo (DiagramCanvas). */
+
+.diagram-preview {
+  --dp-lienzo: #1a1e24;
+  --dp-nodo: var(--bg-color, #222831);
+  --dp-borde: var(--border-color, #393E46);
+  --diff-agregado: #8fbf8f;
+  --diff-agregado-bg: rgba(143, 191, 143, 0.14);
+  --diff-eliminado: #d48a8a;
+  --diff-eliminado-bg: rgba(212, 138, 138, 0.14);
+  --diff-modificado: #d9b779;
+  --diff-modificado-bg: rgba(217, 183, 121, 0.14);
+
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 220px;
+  overflow: hidden;
+  background-color: var(--dp-lienzo);
+  background-image: radial-gradient(rgba(223, 208, 184, 0.07) 1px, transparent 1px);
+  background-size: 18px 18px;
+  border: 1px solid var(--dp-borde);
+  border-radius: var(--radius-lg, 8px);
+  user-select: none;
+}
+
+.diagram-preview__vacio {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--secondary, #948979);
+}
+
+.diagram-preview__lienzo {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+
+/* ── Relaciones ─────────────────────────────────────────────────── */
+
+.diagram-preview__relaciones {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+
+.diagram-preview__relacion {
+  stroke: var(--secondary, #948979);
+  stroke-width: 1.6;
+}
+
+.diagram-preview__relacion--punteada { stroke-dasharray: 6 4; }
+
+.diagram-preview__relacion.diagram-preview--agregado { stroke: var(--diff-agregado); stroke-width: 2.4; }
+.diagram-preview__relacion.diagram-preview--eliminado { stroke: var(--diff-eliminado); stroke-width: 2.4; stroke-dasharray: 5 4; }
+
+.diagram-preview__punta-hueca { fill: var(--dp-lienzo); stroke: var(--secondary, #948979); stroke-width: 1.4; }
+.diagram-preview__punta-llena { fill: var(--secondary, #948979); stroke: var(--secondary, #948979); }
+.diagram-preview__punta-linea { fill: none; stroke: var(--secondary, #948979); stroke-width: 1.4; }
+
+/* ── Clases ─────────────────────────────────────────────────────── */
+
+.diagram-preview__nodo {
+  position: absolute;
+  background: var(--dp-nodo);
+  border: 1px solid var(--dp-borde);
+  border-radius: var(--radius-md, 4px);
+  font-family: var(--font-sans);
+  color: var(--text-primary, #fff);
+  overflow: hidden;
+}
+
+.diagram-preview__cabecera {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 4px 10px;
+}
+
+.diagram-preview__estereotipo {
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.diagram-preview__titulo {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.diagram-preview__seccion {
+  padding: 5px 0;
+  border-top: 1px solid var(--dp-borde);
+}
+
+.diagram-preview__fila {
+  padding: 0 10px;
+  line-height: 17px;
+  font-size: 0.72rem;
+  font-family: var(--mono, ui-monospace, Consolas, monospace);
+  color: var(--text-secondary, #DFD0B8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.diagram-preview__fila--vacia { font-style: italic; opacity: 0.5; font-family: var(--font-sans); }
+
+/* ── Resaltado de cambios ───────────────────────────────────────── */
+
+.diagram-preview__nodo.diagram-preview--agregado { border: 2px solid var(--diff-agregado); box-shadow: 0 0 0 3px var(--diff-agregado-bg); }
+.diagram-preview__nodo.diagram-preview--eliminado { border: 2px dashed var(--diff-eliminado); box-shadow: 0 0 0 3px var(--diff-eliminado-bg); }
+.diagram-preview__nodo.diagram-preview--modificado { border: 2px solid var(--diff-modificado); box-shadow: 0 0 0 3px var(--diff-modificado-bg); }
+
+.diagram-preview__fila.diagram-preview--agregado { background: var(--diff-agregado-bg); color: var(--diff-agregado); }
+.diagram-preview__fila.diagram-preview--eliminado { background: var(--diff-eliminado-bg); color: var(--diff-eliminado); text-decoration: line-through; }
+.diagram-preview__fila.diagram-preview--modificado { background: var(--diff-modificado-bg); color: var(--diff-modificado); }

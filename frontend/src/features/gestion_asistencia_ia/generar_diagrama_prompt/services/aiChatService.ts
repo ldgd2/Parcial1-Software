@@ -14,6 +14,8 @@ export interface GenerateDiagramResult {
     rol_sugerido?: string;
   }>;
   provider_used?: string;
+  /** Versión del historial creada para esta interacción (para guardar luego el "después") */
+  version_id?: number | null;
 }
 
 export async function callGenerateDiagramAPI(
@@ -21,7 +23,10 @@ export async function callGenerateDiagramAPI(
   context: string | null = null,
   provider: AiProvider = 'gemini',
   apiKey: string | null = null,
-  proyectoId?: number
+  proyectoId?: number,
+  /** Diagrama ({nodes, relations}) antes de aplicar la respuesta, para el historial de versiones */
+  estadoAntes?: { nodes: any[]; relations: any[] } | null,
+  autor?: string | null
 ): Promise<GenerateDiagramResult> {
   const payload: Record<string, any> = {
     prompt,
@@ -29,6 +34,13 @@ export async function callGenerateDiagramAPI(
     provider,
     include_tasks: true
   };
+
+  if (estadoAntes) {
+    payload.estado_antes = estadoAntes;
+  }
+  if (autor) {
+    payload.autor = autor;
+  }
 
   if (proyectoId && proyectoId > 0) {
     payload.proyecto_id = proyectoId;

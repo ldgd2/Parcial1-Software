@@ -34,7 +34,7 @@ export const ContextMemoryBadge: React.FC<Props> = ({ contexto, loading, onClick
       title={`Memoria persistente activa: ${dominio} (${eventosCount} eventos episódicos, ~${tokensAhorrados} tokens ahorrados)`}
     >
       {/* SVG Brain / Memory Chip Icon */}
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ stroke: 'var(--info)' }} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="4" y="4" width="16" height="16" rx="2" />
         <rect x="9" y="9" width="6" height="6" />
         <line x1="9" y1="1" x2="9" y2="4" />
@@ -52,7 +52,7 @@ export const ContextMemoryBadge: React.FC<Props> = ({ contexto, loading, onClick
       </span>
 
       {tokensAhorrados > 0 && (
-        <span style={{ color: '#4ade80', fontSize: '10px', fontWeight: 600 }}>
+        <span style={{ color: 'var(--success-text)', fontSize: '10px', fontWeight: 600 }}>
           +{tokensAhorrados > 1000 ? `${(tokensAhorrados / 1000).toFixed(1)}k` : tokensAhorrados} tok
         </span>
       )}
