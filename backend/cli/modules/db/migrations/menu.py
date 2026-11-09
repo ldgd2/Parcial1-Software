@@ -109,6 +109,106 @@ def menu_migrations():
         console.print("[4] Sellar versión en Head (Stamp Head)")
         console.print("[5] Ver estado (versión actual / heads)")
         console.print("[6] Ver historial")
+        console.print("[7] Fix estado de migraciones (auto‑repair)")
+        console.print("[0] Volver")
+
+        opcion = Prompt.ask("\nSelecciona una opción", choices=["1", "2", "3", "4", "5", "6", "7", "0"], default="0")
+
+        if opcion == "1":
+            estado = obtener_estado()
+            if estado and estado["actual"] and set(estado["actual"]) != set(estado["heads"]):
+                console.print("[yellow]La BD no está en head: aplica primero las migraciones pendientes ([2] Up).[/yellow]")
+            elif estado and len(estado["heads"]) > 1:
+                console.print("[yellow]Hay más de un head: resuélvelo antes de crear otra migración ([5]).[/yellow]")
+            else:
+                mensaje = Prompt.ask("Ingresa un mensaje para la migración")
+                if mensaje:
+                    with console.status("[bold cyan]Generando migración..."):
+                        ejecutar_comando_alembic(["revision", "--autogenerate", "-m", mensaje])
+                    console.print("[dim]Revisa el archivo generado en backend/alembic/versions antes de aplicarlo.[/dim]")
+            Prompt.ask("\nPresiona Enter para continuar")
+
+        elif opcion == "2":
+            estado = obtener_estado()
+            if estado and len(estado["heads"]) > 1:
+                console.print("[yellow]Hay más de un head: resuélvelo antes de aplicar ([5] Ver estado).[/yellow]")
+            else:
+                with console.status("[bold cyan]Aplicando migraciones..."):
+                    ejecutar_comando_alembic(["upgrade", "head"])
+                mostrar_estado()
+            Prompt.ask("\nPresiona Enter para continuar")
+
+        elif opcion == "3":
+            estado = mostrar_estado()
+            if estado and estado["actual"]:
+                if Confirm.ask("\n[bold red]¿Revertir la última migración? Puede borrar tablas o columnas con datos[/bold red]", default=False):
+                    with console.status("[bold cyan]Revertiendo migración..."):
+                        ejecutar_comando_alembic(["downgrade", "-1"])
+            elif estado is not None:
+                console.print("[yellow]No hay ninguna migración aplicada que revertir.[/yellow]")
+            Prompt.ask("\nPresiona Enter para continuar")
+
+        elif opcion == "4":
+            console.print(
+                "[dim]Stamp solo marca la BD como actualizada, sin ejecutar nada. "
+                "Úsalo cuando las tablas ya existen (por ejemplo, creadas con init_db).[/dim]"
+            )
+            if Confirm.ask("¿Sellar la BD en head?", default=False):
+                with console.status("[bold cyan]Sellando versión en Head..."):
+                    ejecutar_comando_alembic(["stamp", "head"])
+            Prompt.ask("\nPresiona Enter para continuar")
+
+        elif opcion == "5":
+            mostrar_estado()
+            Prompt.ask("\nPresiona Enter para continuar")
+
+        elif opcion == "6":
+            ejecutar_comando_alembic(["history", "--indicate-current"])
+            Prompt.ask("\nPresiona Enter para continuar")
+
+        elif opcion == "7":
+            # Auto‑repair migration state
+            estado = obtener_estado()
+            if not estado:
+                Prompt.ask("\nPresiona Enter para continuar")
+                continue
+            heads = estado["heads"]
+            if len(heads) <= 1:
+                console.print("[bold green]No hay problemas de heads detectados. Estado ya está limpio.[/bold green]")
+                Prompt.ask("\nPresiona Enter para continuar")
+                continue
+            console.print("[yellow]Detectados múltiples heads. Intentando reparación automática...[/yellow]")
+            # Archivo de revisión obsoleto (hardcoded para este proyecto)
+            obsolete = os.path.join(BACKEND_DIR, "alembic", "versions", "e3f4a5b6c7d8_create_plantillas_proyecto.py")
+            if os.path.isfile(obsolete):
+                try:
+                    os.remove(obsolete)
+                    console.print(f"[dim]Archivo obsoleto removido: {os.path.basename(obsolete)}[/dim]")
+                except Exception as e:
+                    console.print(f"[bold red]Error al eliminar el archivo obsoleto:[/bold red] {e}")
+            else:
+                console.print("[dim]Archivo obsoleto no encontrado; quizás ya fue removido.[/dim]")
+            # Re‑stamp a head
+            ok, _ = ejecutar_comando_alembic(["stamp", "head"], mostrar=True)
+            if ok:
+                console.print("[bold green]Stamp a head ejecutado con éxito.[/bold green]")
+            else:
+                console.print("[bold red]Falló el stamp a head. Revisa los mensajes anteriores.[/bold red]")
+            # Mostrar nuevo estado
+            mostrar_estado()
+            Prompt.ask("\nPresiona Enter para continuar")
+
+        elif opcion == "0":
+            break
+
+    while True:
+        print_header("MANAGER > BASE DE DATOS > MIGRACIONES")
+        console.print("[1] Crear nueva migración (Make)")
+        console.print("[2] Aplicar migraciones (Up)")
+        console.print("[3] Revertir última migración (Down)")
+        console.print("[4] Sellar versión en Head (Stamp Head)")
+        console.print("[5] Ver estado (versión actual / heads)")
+        console.print("[6] Ver historial")
         console.print("[0] Volver")
 
         opcion = Prompt.ask("\nSelecciona una opción", choices=["1", "2", "3", "4", "5", "6", "0"], default="0")
