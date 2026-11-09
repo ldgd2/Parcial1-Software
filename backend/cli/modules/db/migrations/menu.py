@@ -167,6 +167,15 @@ def menu_migrations():
             Prompt.ask("\nPresiona Enter para continuar")
 
         elif opcion == "7":
+    # Auto‑repair migration state using the dedicated fix_state helper
+    from .fix_state import fix_state
+    console.print("[dim]Ejecutando reparación automática del estado de migraciones...[/dim]")
+    fix_state()
+    # Mostrar estado actualizado
+    estado = obtener_estado()
+    if estado:
+        mostrar_estado()
+    Prompt.ask("\nPresiona Enter para continuar")
             # Auto‑repair migration state
             # 1. Eliminar archivo de revisión obsoleto (hardcoded)
             obsolete = os.path.join(BACKEND_DIR, "alembic", "versions", "e3f4a5b6c7d8_create_plantillas_proyecto.py")
