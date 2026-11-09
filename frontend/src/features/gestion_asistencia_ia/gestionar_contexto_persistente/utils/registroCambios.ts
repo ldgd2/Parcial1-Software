@@ -50,3 +50,10 @@ export function tomarOrigenPendiente(): OrigenCambio | null {
   origenPendiente = null;
   return o;
 }
+
+/** Se emite cuando termina una ráfaga de cambios o se aplica una propuesta (detail: {nodes, relations}). */
+export const EVENTO_DIAGRAMA_ESTABLE = 'diagrama_estable';
+
+export function avisarDiagramaEstable(estado: { nodes: any[]; relations: any[] }) {
+  window.dispatchEvent(new CustomEvent(EVENTO_DIAGRAMA_ESTABLE, { detail: estado }));
+}

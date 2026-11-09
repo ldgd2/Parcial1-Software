@@ -11,13 +11,13 @@ export const AVAILABLE_COMMANDS: SlashCommand[] = [
   {
     command: 'roles',
     label: '/roles',
-    description: 'Repartir roles de arquitectura y asignar clases a colaboradores',
+    description: 'Proponer roles de arquitectura y clases por colaborador (se aplican al aprobar)',
     example: '@diag /roles distribuye segun frontend y backend'
   },
   {
     command: 'tareas',
     label: '/tareas',
-    description: 'Generar backlog de tareas y registrarlas en el proyecto',
+    description: 'Proponer tareas para el equipo (se crean al aprobar)',
     example: '@diag /tareas crea tareas para modelar y programar'
   },
   {
@@ -37,6 +37,48 @@ export const AVAILABLE_COMMANDS: SlashCommand[] = [
     label: '/limpiar',
     description: 'Limpiar elementos no conectados o notas obsoletas',
     example: '@diag /limpiar quita clases no utilizadas'
+  },
+  {
+    command: 'revisar',
+    label: '/revisar',
+    description: 'Revisión completa del diagrama con la IA; lo que corrige llega como propuesta',
+    example: '@diag /revisar enfócate en las claves foráneas'
+  },
+  {
+    command: 'requisitos',
+    label: '/requisitos',
+    description: 'Generar el diagrama desde requisitos en texto (o adjuntando un PDF desde el menú +)',
+    example: '/requisitos El sistema registra clientes que hacen pedidos de productos…'
+  },
+  {
+    command: 'resumen',
+    label: '/resumen',
+    description: 'Resumen de lo que cambió: hoy, ayer, semana, N dias o un rango de fechas',
+    example: '/resumen ayer'
+  },
+  {
+    command: 'documentar',
+    label: '/documentar',
+    description: 'Descargar el diccionario de datos del modelo (Markdown)',
+    example: '/documentar'
+  },
+  {
+    command: 'ayuda',
+    label: '/ayuda',
+    description: 'Ver el resumen de comandos y cómo usar el chat',
+    example: '/ayuda'
+  },
+  {
+    command: 'sugerencias',
+    label: '/sugerencias',
+    description: 'Revisar el diagrama ahora y listar lo que se puede mejorar',
+    example: '/sugerencias'
+  },
+  {
+    command: 'recordar',
+    label: '/recordar',
+    description: 'Guardar algo en la memoria del proyecto (la IA lo tendrá en cuenta)',
+    example: '/recordar entidades/cliente: el email es único'
   }
 ];
 
@@ -70,6 +112,26 @@ const renderCommandIcon = (command: string) => {
           <circle cx="12" cy="12" r="10" />
           <line x1="12" y1="16" x2="12" y2="12" />
           <line x1="12" y1="8" x2="12.01" y2="8" />
+        </svg>
+      );
+    case 'ayuda':
+      return (
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+      );
+    case 'sugerencias':
+      return (
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z" />
+        </svg>
+      );
+    case 'recordar':
+      return (
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
         </svg>
       );
     case 'limpiar':

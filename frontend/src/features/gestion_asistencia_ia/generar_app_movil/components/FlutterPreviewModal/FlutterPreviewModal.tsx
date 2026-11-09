@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppMovil } from '../../hooks/useAppMovil';
 import { descargarZipAppMovil } from '../../services/appMovilService';
+import { Modal } from '@/features/gestion_proyectos/administrar_proyecto/components/Modal/Modal';
 import './FlutterPreviewModal.css';
 
 interface Props {
@@ -73,50 +74,41 @@ export const FlutterPreviewModal: React.FC<Props> = ({
   };
 
   return (
-    <div className="flutter-modal-overlay">
-      <div className="flutter-modal-card">
-        <div className="flutter-modal-header">
-          <div className="flutter-modal-title">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
-              <line x1="12" y1="18" x2="12.01" y2="18" />
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      width="950px"
+      className="flutter-modal-panel"
+      bodyClassName="modal-body--flush"
+      title={
+        <>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+            <line x1="12" y1="18" x2="12.01" y2="18" />
+          </svg>
+          App móvil Flutter
+        </>
+      }
+      headerActions={
+        <>
+          <span className="flutter-badge">{listaArchivos.length} archivos</span>
+          <button
+            type="button"
+            className="modal-btn modal-btn--primary flutter-zip-btn"
+            onClick={handleDescargarZip}
+            disabled={downloadingZip || listaArchivos.length === 0}
+            title="Descargar proyecto completo en ZIP"
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
-            <h2>App Móvil Flutter</h2>
-            <span className="flutter-badge">
-              {listaArchivos.length} archivos generados
-            </span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <button
-              className="flutter-action-btn"
-              onClick={handleDescargarZip}
-              disabled={downloadingZip || listaArchivos.length === 0}
-              style={{
-                background: 'var(--primary, #2563eb)',
-                color: '#fff',
-                borderColor: 'var(--primary, #2563eb)',
-                padding: '6px 12px',
-                borderRadius: '6px',
-                cursor: 'pointer'
-              }}
-              title="Descargar proyecto completo en ZIP"
-            >
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              <span>{downloadingZip ? 'Comprimiendo...' : 'Descargar ZIP'}</span>
-            </button>
-            <button className="flutter-modal-close" onClick={onClose} title="Cerrar">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
+            <span>{downloadingZip ? "Comprimiendo..." : "Descargar ZIP"}</span>
+          </button>
+        </>
+      }
+    >
         {loading ? (
           <div className="flutter-empty-view">
             <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" strokeWidth="2">
@@ -196,14 +188,13 @@ export const FlutterPreviewModal: React.FC<Props> = ({
                 </button>
               </form>
               {refinementSuccess && (
-                <div style={{ padding: '6px 16px', fontSize: '0.75rem', color: 'var(--success)', background: '#064e3b' }}>
+                <div style={{ padding: '6px 16px', fontSize: '0.75rem', color: 'var(--success)', background: 'rgba(16, 185, 129, 0.12)' }}>
                   {refinementSuccess}
                 </div>
               )}
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 };

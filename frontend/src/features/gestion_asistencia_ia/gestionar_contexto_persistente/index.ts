@@ -1,6 +1,7 @@
 export { ContextMemoryBadge } from './components/ContextMemoryBadge';
 export { ContextModal } from './components/ContextModal';
 export { DiagramPreview } from './components/DiagramPreview';
+export { MemoriaPanel, EVENTO_MEMORIA_ACTUALIZADA } from './components/MemoriaPanel';
 export { useContextoPersistente } from './hooks/useContextoPersistente';
 export { useVersionesContexto, EVENTO_VERSIONES_ACTUALIZADAS } from './hooks/useVersionesContexto';
 export { compararVersiones, restaurarVersion } from './utils/versionDiff';

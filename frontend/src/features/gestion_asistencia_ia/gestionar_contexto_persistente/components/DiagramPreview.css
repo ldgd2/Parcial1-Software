@@ -3,8 +3,8 @@
 
 .diagram-preview {
   --dp-lienzo: #1a1e24;
-  --dp-nodo: var(--bg-color, #222831);
-  --dp-borde: var(--border-color, #393E46);
+  --dp-nodo: var(--bg-color);
+  --dp-borde: var(--border-color);
   --diff-agregado: #8fbf8f;
   --diff-agregado-bg: rgba(143, 191, 143, 0.14);
   --diff-eliminado: #d48a8a;
@@ -34,7 +34,7 @@
   padding: 24px;
   text-align: center;
   font-size: 0.8rem;
-  color: var(--secondary, #948979);
+  color: var(--secondary);
 }
 
 .diagram-preview__lienzo {
@@ -54,7 +54,7 @@
 }
 
 .diagram-preview__relacion {
-  stroke: var(--secondary, #948979);
+  stroke: var(--secondary);
   stroke-width: 1.6;
 }
 
@@ -63,9 +63,9 @@
 .diagram-preview__relacion.diagram-preview--agregado { stroke: var(--diff-agregado); stroke-width: 2.4; }
 .diagram-preview__relacion.diagram-preview--eliminado { stroke: var(--diff-eliminado); stroke-width: 2.4; stroke-dasharray: 5 4; }
 
-.diagram-preview__punta-hueca { fill: var(--dp-lienzo); stroke: var(--secondary, #948979); stroke-width: 1.4; }
-.diagram-preview__punta-llena { fill: var(--secondary, #948979); stroke: var(--secondary, #948979); }
-.diagram-preview__punta-linea { fill: none; stroke: var(--secondary, #948979); stroke-width: 1.4; }
+.diagram-preview__punta-hueca { fill: var(--dp-lienzo); stroke: var(--secondary); stroke-width: 1.4; }
+.diagram-preview__punta-llena { fill: var(--secondary); stroke: var(--secondary); }
+.diagram-preview__punta-linea { fill: none; stroke: var(--secondary); stroke-width: 1.4; }
 
 /* ── Clases ─────────────────────────────────────────────────────── */
 
@@ -75,7 +75,7 @@
   border: 1px solid var(--dp-borde);
   border-radius: var(--radius-md, 4px);
   font-family: var(--font-sans);
-  color: var(--text-primary, #fff);
+  color: var(--text-primary);
   overflow: hidden;
 }
 
@@ -113,7 +113,7 @@
   line-height: 17px;
   font-size: 0.72rem;
   font-family: var(--mono, ui-monospace, Consolas, monospace);
-  color: var(--text-secondary, #DFD0B8);
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

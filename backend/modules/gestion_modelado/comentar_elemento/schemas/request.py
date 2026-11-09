@@ -8,6 +8,8 @@ class CrearComentarioRequest(BaseModel):
     elemento_tipo: str = Field("node", description="Tipo de elemento: node o relation")
     texto: str = Field(..., min_length=1, description="Contenido del comentario o nota técnica")
     autor_nombre: Optional[str] = Field("Colaborador", description="Nombre del usuario o autor")
+    # Comentario que deja la IA al aplicarse una propuesta aprobada: se firma "IA (aprobado por …)"
+    autor_ia: bool = Field(False, description="El comentario lo escribe la IA en nombre de quien aprobó")
 
 
 class ActualizarComentarioRequest(BaseModel):

@@ -23,17 +23,114 @@
   transform-origin: 0 0;
 }
 
-.diagram-canvas__zoom-badge {
+/* ── Herramienta mano ─────────────────────────────────────────── */
+.diagram-canvas--hand,
+.diagram-canvas--hand .diagram-canvas__inner,
+.diagram-canvas--hand .diagram-canvas__inner * {
+  cursor: grab !important;
+}
+
+.diagram-canvas--grabbing,
+.diagram-canvas--grabbing .diagram-canvas__inner,
+.diagram-canvas--grabbing .diagram-canvas__inner * {
+  cursor: grabbing !important;
+}
+
+/* ── Barras de desplazamiento (se superponen al lienzo) ───────── */
+.diagram-canvas__scrollbar {
   position: absolute;
-  bottom: 1rem;
-  right: 1rem;
+  z-index: 5;
+  border-radius: var(--radius-full);
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.diagram-canvas__scrollbar:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.diagram-canvas__scrollbar--h {
+  left: 4px;
+  bottom: 4px;
+  height: 8px;
+}
+
+.diagram-canvas__scrollbar--v {
+  top: 4px;
+  right: 4px;
+  width: 8px;
+}
+
+.diagram-canvas__scroll-thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: rgba(223, 208, 184, 0.35);
+  cursor: default;
+  transition: background 0.15s ease;
+}
+
+.diagram-canvas__scrollbar:hover .diagram-canvas__scroll-thumb,
+.diagram-canvas__scroll-thumb:active {
+  background: rgba(223, 208, 184, 0.6);
+}
+
+/* ── Controles de navegación (abajo a la izquierda) ───────────── */
+.diagram-canvas__hud {
+  position: absolute;
+  left: 16px;
+  bottom: 20px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
   background: var(--surface-color);
   border: 1px solid var(--border-color);
-  color: var(--text-secondary);
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  padding: 0.3rem 0.6rem;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
   font-family: var(--font-sans);
-  pointer-events: none;
+  user-select: none;
+}
+
+.diagram-canvas__hud-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 6px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.diagram-canvas__hud-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.diagram-canvas__hud-btn.is-active {
+  background: var(--primary);
+  color: var(--text-on-primary);
+}
+
+.diagram-canvas__hud-zoom {
+  min-width: 52px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.diagram-canvas__hud-sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--border-color);
 }

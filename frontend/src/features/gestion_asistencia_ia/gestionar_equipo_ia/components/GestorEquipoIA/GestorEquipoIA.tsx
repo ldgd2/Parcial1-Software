@@ -13,6 +13,7 @@ import {
 } from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente/services/contextoService';
 import { EVENTO_VERSIONES_ACTUALIZADAS } from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente/hooks/useVersionesContexto';
 import { crearTareaManual } from '@/features/gestion_proyectos_asistida/repartir_tareas';
+import { etiquetaEsfuerzo, horasTotales } from '@/shared/utils/esfuerzo';
 import './GestorEquipoIA.css';
 
 interface ColaboradorInput {
@@ -153,6 +154,8 @@ export const GestorEquipoIA: React.FC<Props> = ({
               tipo: t.tipo || 'desarrollo',
               area: t.area || 'general',
               orden: t.orden || i + 1,
+              estimacion_horas: t.estimacion_horas ?? undefined,
+              complejidad: t.complejidad ?? undefined,
             });
             creadas++;
           } catch (e) {
@@ -362,7 +365,8 @@ export const GestorEquipoIA: React.FC<Props> = ({
             <span className="gestor-equipo__propuesta-estado">Pendiente</span>
           </div>
           <div className="gestor-equipo__propuesta-meta">
-            {propuesta.tareas.length} tareas · Pedida por {currentUserName}
+            {propuesta.tareas.length} tareas
+            {horasTotales(propuesta.tareas) ? ` · ~${horasTotales(propuesta.tareas)} h en total` : ''} · Pedida por {currentUserName}
           </div>
           <ul className="gestor-equipo__propuesta-lista">
             {propuesta.tareas.map((t, i) => (
@@ -372,6 +376,7 @@ export const GestorEquipoIA: React.FC<Props> = ({
                 </span>
                 <span className="gestor-equipo__propuesta-quien">{nombreDe(t.usuario_id)}</span>
                 <span>{t.titulo}</span>
+                {etiquetaEsfuerzo(t) && <span className="gestor-equipo__esfuerzo">{etiquetaEsfuerzo(t)}</span>}
               </li>
             ))}
           </ul>
@@ -444,6 +449,7 @@ export const GestorEquipoIA: React.FC<Props> = ({
                         {t.tipo === 'diagrama' ? 'UML' : 'DEV'}
                       </span>
                       <span className="gestor-equipo__tarea-titulo">{t.titulo}</span>
+                      {etiquetaEsfuerzo(t) && <span className="gestor-equipo__esfuerzo">{etiquetaEsfuerzo(t)}</span>}
                     </div>
                   ))}
                 </div>

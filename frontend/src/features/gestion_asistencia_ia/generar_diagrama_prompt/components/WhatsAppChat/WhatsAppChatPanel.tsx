@@ -1,4 +1,6 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
+import { Lightbulb, HelpCircle, ArrowDown, Sparkles, History } from 'lucide-react';
+import { EVENTO_ABRIR_HISTORIAL, tomarPeticionHistorial } from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente/utils/abrirHistorial';
 import { useWhatsAppChat } from '../../hooks/useWhatsAppChat';
 import { ChatBubble } from './ChatBubble';
 import { ChatInputBar } from './ChatInputBar';
@@ -16,6 +18,13 @@ import {
   type EstadoDiagramaVersion,
   type VersionResumen
 } from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente';
+import { correccionesDelDiagrama } from '../../hooks/useWhatsAppChat';
+import {
+  sugerenciasAutoActivas,
+  setSugerenciasAuto,
+  EVENTO_AJUSTE_SUGERENCIAS,
+} from '../../hooks/useSugerenciasAutomaticas';
+import { AyudaComandos } from './AyudaComandos';
 import './WhatsAppChat.css';
 
 interface WhatsAppChatPanelProps {
@@ -41,11 +50,43 @@ export const WhatsAppChatPanel: React.FC<WhatsAppChatPanelProps> = ({
     sendMessage,
     inFlightTasks,
     getMentionableUsers,
-    decidirPropuesta
-  } = useWhatsAppChat({ codigoAcceso, proyectoId });
+    decidirPropuesta,
+    enviarRequisitosPdf,
+    enviarImagenDiagrama,
+    detenerIA
+  } = useWhatsAppChat({ codigoAcceso, proyectoId, proyectoNombre });
+
+  // CU36: requisitos en PDF (se adjuntan desde el menú "+" de la barra de entrada)
+  const [avisoPdf, setAvisoPdf] = useState<string | null>(null);
+  const handleAttachPdf = useCallback(async (archivo: File) => {
+    setAvisoPdf(`Leyendo ${archivo.name}…`);
+    const error = await enviarRequisitosPdf(archivo);
+    setAvisoPdf(error);
+    if (!error) setTimeout(() => setAvisoPdf(null), 100);
+  }, [enviarRequisitosPdf]);
+
+  // Imagen o bosquejo UML → la IA lo digitaliza y llega como propuesta
+  const handleAttachImage = useCallback(async (archivo: File) => {
+    const error = await enviarImagenDiagrama(archivo);
+    if (error) setAvisoPdf(error);
+  }, [enviarImagenDiagrama]);
+
+  // Borrador para la barra de entrada (atajos del chat vacío)
+  const [draft, setDraft] = useState<{ text: string; nonce: number } | null>(null);
+  const usarAtajo = (text: string) => setDraft({ text, nonce: Date.now() });
 
   // Versión a mostrar al abrir el historial desde una propuesta del chat
   const [versionInicial, setVersionInicial] = useState<number | null>(null);
+
+  const [verAyuda, setVerAyuda] = useState(false);
+
+  // CU33: sugerencias automáticas en el chat (por usuario y proyecto)
+  const [sugAuto, setSugAuto] = useState(() => (proyectoId ? sugerenciasAutoActivas(proyectoId) : true));
+  useEffect(() => {
+    const leer = () => setSugAuto(proyectoId ? sugerenciasAutoActivas(proyectoId) : true);
+    window.addEventListener(EVENTO_AJUSTE_SUGERENCIAS, leer);
+    return () => window.removeEventListener(EVENTO_AJUSTE_SUGERENCIAS, leer);
+  }, [proyectoId]);
 
   const {
     contexto,
@@ -56,8 +97,23 @@ export const WhatsAppChatPanel: React.FC<WhatsAppChatPanelProps> = ({
     guardarInteraccion
   } = useContextoPersistente({ proyectoId });
 
+  // Abrir el historial si lo pidieron desde fuera (menú HERRAMIENTAS)
+  useEffect(() => {
+    const abrir = () => { if (tomarPeticionHistorial()) setIsContextModalOpen(true); };
+    abrir();
+    window.addEventListener(EVENTO_ABRIR_HISTORIAL, abrir);
+    return () => window.removeEventListener(EVENTO_ABRIR_HISTORIAL, abrir);
+  }, [setIsContextModalOpen]);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const currentIdentity = getUserIdentity();
+
+  // Scroll inteligente: solo se baja solo si ya estabas al final;
+  // si estabas leyendo arriba, se avisa con "↓ N nuevos".
+  const atBottomRef = useRef(true);
+  const prevCountRef = useRef(messages.length);
+  const [unseen, setUnseen] = useState(0);
 
   const diagram = useDiagram();
   const { isReadOnly } = useRealTimeSync();
@@ -89,12 +145,38 @@ export const WhatsAppChatPanel: React.FC<WhatsAppChatPanelProps> = ({
     window.dispatchEvent(new CustomEvent(EVENTO_VERSIONES_ACTUALIZADAS, { detail: {} }));
   }, [diagram, guardarInteraccion, currentIdentity.nickname]);
 
-  // Desplazar automáticamente al fondo cuando lleguen mensajes nuevos
+  const scrollToBottom = useCallback((smooth = true) => {
+    messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
+    atBottomRef.current = true;
+    setUnseen(0);
+  }, []);
+
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    atBottomRef.current = atBottom;
+    if (atBottom) setUnseen(0);
+  }, []);
+
+  // Al abrir el chat, ir al último mensaje
   useEffect(() => {
-    if (messagesEndRef.current && isOpen) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (isOpen) scrollToBottom(false);
+  }, [isOpen, scrollToBottom]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const nuevos = messages.length - prevCountRef.current;
+    prevCountRef.current = messages.length;
+    const ultimo = messages[messages.length - 1];
+    const esPropio = !!ultimo && ultimo.senderId === currentIdentity.id;
+    if (atBottomRef.current || esPropio) {
+      // Al enviar tú, o si ya estabas abajo: seguir el hilo
+      scrollToBottom();
+    } else if (nuevos > 0) {
+      setUnseen(u => u + nuevos);
     }
-  }, [messages, inFlightTasks, isOpen]);
+  }, [messages, inFlightTasks, isOpen, currentIdentity.id, scrollToBottom]);
 
   if (!isOpen) return null;
 
@@ -103,44 +185,113 @@ export const WhatsAppChatPanel: React.FC<WhatsAppChatPanelProps> = ({
 
   return (
     <div className="whatsapp-chat-panel">
-      {/* Header del Chat estilo WhatsApp */}
+      {/* Fila 1: identidad de la sala + cerrar */}
       <div className="whatsapp-chat-header">
         <div className="whatsapp-chat-header__left">
-          <div className="whatsapp-chat-header__avatar">
-            <IconUsers size={20} color="#fff" />
+          <div className="whatsapp-chat-header__avatar" aria-hidden="true">
+            <IconUsers size={18} />
           </div>
           <div className="whatsapp-chat-header__info">
-            <span className="whatsapp-chat-header__title">
+            <span className="whatsapp-chat-header__title" title={proyectoNombre}>
               {proyectoNombre}
             </span>
             <span className="whatsapp-chat-header__subtitle">
-              {onlineCount} {onlineCount === 1 ? 'colaborador' : 'colaboradores'} en línea • @diag activo
+              <span className="whatsapp-chat-header__online" aria-hidden="true" />
+              {onlineCount} {onlineCount === 1 ? 'colaborador' : 'colaboradores'} en línea
             </span>
           </div>
         </div>
 
-        <div className="whatsapp-chat-header__actions">
-          {/* Badge de Memoria Persistente de la IA */}
+        <button
+          type="button"
+          className="whatsapp-header-btn"
+          onClick={onClose}
+          title="Cerrar chat"
+          aria-label="Cerrar chat"
+        >
+          <IconClose size={20} />
+        </button>
+      </div>
+
+      {/* Fila 2: herramientas de la IA */}
+      <div className="chat-toolbar">
+        <div className="chat-toolbar__memoria">
           <ContextMemoryBadge
             contexto={contexto}
             loading={loadingContexto}
             onClick={() => setIsContextModalOpen(true)}
           />
-
-          {/* Cerrar panel */}
+        </div>
+        {proyectoId ? (
           <button
             type="button"
-            className="whatsapp-header-btn"
-            onClick={onClose}
-            title="Cerrar chat"
+            className={`chat-toolbar__btn${sugAuto ? ' is-on' : ''}`}
+            onClick={() => setSugerenciasAuto(proyectoId, !sugAuto)}
+            title={sugAuto ? 'Sugerencias automáticas activadas: la IA avisa mejoras mientras diagramas' : 'Sugerencias automáticas desactivadas'}
+            aria-pressed={sugAuto}
           >
-            <IconClose size={20} />
+            <Lightbulb size={14} aria-hidden="true" />
+            <span>{sugAuto ? 'Auto' : 'Off'}</span>
           </button>
-        </div>
+        ) : null}
+        <button
+          type="button"
+          className="chat-toolbar__btn"
+          onClick={() => setIsContextModalOpen(true)}
+          title="Historial del proyecto: cambios manuales y de la IA, versiones y memoria"
+        >
+          <History size={14} aria-hidden="true" />
+          <span>Historial</span>
+        </button>
+        <button
+          type="button"
+          className={`chat-toolbar__btn chat-toolbar__btn--icon${verAyuda ? ' is-on' : ''}`}
+          onClick={() => setVerAyuda(v => !v)}
+          title="Cómo usar el chat"
+          aria-label="Cómo usar el chat"
+          aria-pressed={verAyuda}
+        >
+          <HelpCircle size={15} aria-hidden="true" />
+        </button>
       </div>
 
-      {/* Lista de Mensajes */}
-      <div className="whatsapp-messages-scroll">
+      {avisoPdf && (
+        <div className="chat-aviso" role="status">
+          {avisoPdf}
+          <button type="button" onClick={() => setAvisoPdf(null)} aria-label="Cerrar">
+            <IconClose size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* Lista de mensajes (la ayuda se superpone, no empuja el hilo) */}
+      <div className="chat-thread">
+      {verAyuda && <AyudaComandos onCerrar={() => setVerAyuda(false)} />}
+      <div className="whatsapp-messages-scroll" ref={scrollRef} onScroll={handleScroll}>
+        {messages.length === 0 && (
+          <div className="chat-empty">
+            <div className="chat-empty__icon" aria-hidden="true"><Sparkles size={22} /></div>
+            <p className="chat-empty__title">Chat de la sala con @diag</p>
+            <p className="chat-empty__text">
+              Pide cambios a la IA con <code>@diag</code> o usa <code>/</code> para comandos.
+              Todo llega como propuesta y nadie la aplica sin aprobar.
+            </p>
+            <div className="chat-empty__chips">
+              <button type="button" className="chat-empty__chip" onClick={() => usarAtajo('@diag crea un diagrama de clases para ')}>
+                @diag crea un diagrama…
+              </button>
+              <button type="button" className="chat-empty__chip" onClick={() => usarAtajo('@diag /revisar')}>
+                /revisar
+              </button>
+              <button type="button" className="chat-empty__chip" onClick={() => usarAtajo('@diag /roles')}>
+                /roles
+              </button>
+              <button type="button" className="chat-empty__chip" onClick={() => usarAtajo('@diag /tareas')}>
+                /tareas
+              </button>
+            </div>
+          </div>
+        )}
         {messages.map(msg => (
           <ChatBubble
             key={msg.id}
@@ -149,6 +300,13 @@ export const WhatsAppChatPanel: React.FC<WhatsAppChatPanelProps> = ({
             onReply={quote => setReplyingTo(quote)}
             puedeDecidir={!isReadOnly}
             onDecidirPropuesta={decidirPropuesta}
+            onAplicarSugerencia={pedido => sendMessage(`@diag ${pedido}`)}
+            onDetener={
+              msg.isAi && msg.aiStatus === 'pending' && msg.replyTo &&
+              inFlightTasks.some(t => t.promptMessageId === msg.replyTo!.id)
+                ? () => detenerIA(msg.replyTo!.id)
+                : undefined
+            }
             onVerPropuesta={versionId => {
               setVersionInicial(versionId);
               setIsContextModalOpen(true);
@@ -157,14 +315,24 @@ export const WhatsAppChatPanel: React.FC<WhatsAppChatPanelProps> = ({
         ))}
         <div ref={messagesEndRef} />
       </div>
+      {unseen > 0 && (
+        <button type="button" className="chat-nuevos" onClick={() => scrollToBottom()}>
+          <ArrowDown size={14} aria-hidden="true" />
+          {unseen} {unseen === 1 ? 'nuevo' : 'nuevos'}
+        </button>
+      )}
+      </div>
 
-      {/* Barra de entrada tipo WhatsApp */}
+      {/* Barra de entrada */}
       <ChatInputBar
         onSendMessage={sendMessage}
         replyingTo={replyingTo}
         onCancelReply={() => setReplyingTo(null)}
         mentionableUsers={mentionable}
         geminiKey={geminiKey}
+        onAttachPdf={proyectoId ? handleAttachPdf : undefined}
+        onImageSelected={handleAttachImage}
+        draft={draft}
       />
 
       {/* Modal de Memoria Persistente de la IA */}
@@ -175,6 +343,7 @@ export const WhatsAppChatPanel: React.FC<WhatsAppChatPanelProps> = ({
           setVersionInicial(null);
         }}
         versionInicial={versionInicial}
+        correccionesDiagrama={correccionesDelDiagrama(diagram.getDiagramState(), diagram.nodes)}
         contexto={contexto}
         onReiniciar={reiniciarMemoria}
         proyectoId={proyectoId}

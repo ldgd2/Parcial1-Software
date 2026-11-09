@@ -7,7 +7,8 @@ import type {
   EstadoDiagramaVersion,
   VersionDetalle,
   VersionResumen,
-  VersionesPagina
+  VersionesPagina,
+  MemoriaItem
 } from '../types';
 
 function getAuthHeaders(): HeadersInit {
@@ -205,3 +206,38 @@ export async function decidirPropuesta(
   }
   return response.json();
 }
+
+// ─── Memoria del proyecto (estilo Engram) ───────────────────────────────
+
+async function pedirMemoria<T>(url: string, init: RequestInit): Promise<T> {
+  const response = await fetch(`${API_URL}${url}`, { ...init, headers: getAuthHeaders() });
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new Error(data?.detail || `Error de memoria: ${response.statusText}`);
+  }
+  return (response.status === 204 ? (undefined as T) : response.json());
+}
+
+export const listarMemorias = (proyectoId: number, incluirHistorial = false) =>
+  pedirMemoria<MemoriaItem[]>(`/api/ia/contexto/${proyectoId}/memorias?incluir_historial=${incluirHistorial}`, { method: 'GET' });
+
+/** `texto` acepta "tema/sub: contenido" o texto libre (igual que /recordar). */
+export const crearMemoria = (
+  proyectoId: number,
+  datos: { texto?: string; tipo?: string; topic_key?: string; titulo?: string; que?: string; aprendido?: string; autor?: string | null }
+) => pedirMemoria<MemoriaItem>(`/api/ia/contexto/${proyectoId}/memorias`, { method: 'POST', body: JSON.stringify(datos) });
+
+export const editarMemoria = (
+  proyectoId: number,
+  memoriaId: number,
+  datos: { tipo?: string; titulo?: string; que?: string; por_que?: string; donde?: string; aprendido?: string }
+) => pedirMemoria<MemoriaItem>(`/api/ia/contexto/${proyectoId}/memorias/${memoriaId}`, { method: 'PUT', body: JSON.stringify(datos) });
+
+export const eliminarMemoria = (proyectoId: number, memoriaId: number) =>
+  pedirMemoria<void>(`/api/ia/contexto/${proyectoId}/memorias/${memoriaId}`, { method: 'DELETE' });
+
+export const resolverConflictoMemoria = (proyectoId: number, memoriaId: number, mantenerNueva: boolean) =>
+  pedirMemoria<MemoriaItem>(`/api/ia/contexto/${proyectoId}/memorias/${memoriaId}/resolver`, {
+    method: 'POST',
+    body: JSON.stringify({ mantener_nueva: mantenerNueva })
+  });

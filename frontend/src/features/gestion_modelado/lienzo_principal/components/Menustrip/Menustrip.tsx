@@ -14,6 +14,10 @@ import type { SalaInfo } from '@/features/gestion_modelado/shared/types/types';
 import { XmiExporter } from '@/features/gestion_interoperabilidad_frontend/utils/xmi/core/XmiExporter';
 import { XmiImporter } from '@/features/gestion_interoperabilidad_frontend/utils/xmi/core/XmiImporter';
 import { useExportarGithub } from '@/features/gestion_asistencia_ia/exportar_github/hooks/useExportarGithub';
+import { exportarPdf, exportarPng, exportarSvg } from '@/features/gestion_modelado/shared/utils/exportarDiagrama';
+import { EVENTO_GUARDAR_PLANTILLA } from '@/features/gestion_proyectos/plantillas/plantillas';
+import { pedirAbrirHistorial } from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente/utils/abrirHistorial';
+import { CampanaNotificaciones } from '@/features/gestion_notificaciones/CampanaNotificaciones';
 import './Menustrip.css';
 
 interface Props {
@@ -235,6 +239,11 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
         { label: 'Exportar JSON', action: exportarJSON },
         { label: 'Importar JSON', action: () => jsonFileInputRef.current?.click() },
         { separator: true, action: () => {} },
+        { label: 'Exportar imagen (PNG)', action: () => { setOpenMenu(null); exportarPng(getDiagramState(), sala.proyecto_nombre).catch(e => showNotification('error', e.message)); } },
+        { label: 'Exportar imagen (SVG)', action: () => { setOpenMenu(null); exportarSvg(getDiagramState(), sala.proyecto_nombre); } },
+        { label: 'Exportar PDF', action: () => { setOpenMenu(null); if (!exportarPdf(getDiagramState(), sala.proyecto_nombre)) showNotification('error', 'El navegador bloqueó la ventana. Permite ventanas emergentes para exportar a PDF.'); } },
+        { label: 'Guardar como plantilla', action: () => { setOpenMenu(null); window.dispatchEvent(new Event(EVENTO_GUARDAR_PLANTILLA)); } },
+        { separator: true, action: () => {} },
         { label: 'Importar desde EA (XML)', action: () => fileInputRef.current?.click() },
         { label: 'Detectar Errores BD (XML/Lienzo)', action: () => { setShowErrorModal(true); setOpenMenu(null); } },
         { label: 'Exportar a EA (XML)', action: exportarEA },
@@ -264,6 +273,7 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
       label: 'HERRAMIENTAS',
       items: [
         { label: 'Asistente IA (Chat)', action: () => { onOpenChat(); setOpenMenu(null); } },
+        { label: 'Historial del proyecto', action: () => { onOpenChat(); pedirAbrirHistorial(); setOpenMenu(null); } },
         { label: 'Detectar Errores Lógicos en BD', action: () => { setShowErrorModal(true); setOpenMenu(null); } },
         { label: 'Generar Seeders (Pruebas BD)', action: () => { setShowSeedersModal(true); setOpenMenu(null); } },
         { label: 'Permisos de Acceso', action: () => { setShowPermisos(true); setOpenMenu(null); } },
@@ -348,6 +358,7 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
             <span>{pendingGuests.length} en espera</span>
           </button>
         )}
+        <CampanaNotificaciones />
         <span className="menustrip__node-count">{nodes.length} clases</span>
 
         {/* Save indicator */}

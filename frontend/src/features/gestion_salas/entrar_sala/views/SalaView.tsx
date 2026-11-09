@@ -3,6 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { DiagramProvider, useDiagram } from '@/features/gestion_modelado/shared/context/DiagramContext';
 import { RealTimeSyncProvider, useRealTimeSync, getUserIdentity } from '@/features/gestion_concurrencia/sincronizacion_tiempo_real/context/RealTimeSyncContext';
 import { useRegistroCambiosManuales } from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente';
+import { useSugerenciasAutomaticas } from '@/features/gestion_asistencia_ia/generar_diagrama_prompt/hooks/useSugerenciasAutomaticas';
+import { EVENTO_SOLICITUD_IA } from '@/features/gestion_asistencia_ia/generar_diagrama_prompt/utils/solicitudesIA';
+import { GuardarPlantillaModal } from '@/features/gestion_proyectos/plantillas/GuardarPlantillaModal';
 import { Menustrip } from '@/features/gestion_modelado/lienzo_principal/components/Menustrip/Menustrip';
 import { Toolbar } from '@/features/gestion_modelado/insertar_elemento/components/Toolbar/Toolbar';
 import { DiagramCanvas } from '@/features/gestion_modelado/lienzo_principal/components/DiagramCanvas/DiagramCanvas';
@@ -26,9 +29,21 @@ const SalaContent: React.FC<{ sala: SalaInfo }> = ({ sala }) => {
     autor: getUserIdentity().nickname,
     habilitado: !isReadOnly,
   });
+  // CU33: la IA sugiere mejoras en el chat mientras se diagrama
+  useSugerenciasAutomaticas({
+    proyectoId: sala.proyecto_id,
+    codigoAcceso: sala.codigo_acceso,
+    habilitado: !isReadOnly,
+  });
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
   const [isChatOpen, setIsChatOpen] = useState(false);
+  // "Solucionar con IA" (u otro pedido externo) abre el chat, que envía el pedido
+  useEffect(() => {
+    const abrir = () => setIsChatOpen(true);
+    window.addEventListener(EVENTO_SOLICITUD_IA, abrir);
+    return () => window.removeEventListener(EVENTO_SOLICITUD_IA, abrir);
+  }, []);
   const [isGestorOpen, setIsGestorOpen] = useState(false);
   const isGuest = new URLSearchParams(window.location.search).get('guest') === 'true';
   const isHost = sala.rol_proyecto === 'anfitrion';
@@ -95,10 +110,22 @@ const SalaContent: React.FC<{ sala: SalaInfo }> = ({ sala }) => {
   return (
     <div className="sala-view">
       <Menustrip sala={sala} onSave={handleSave} saving={saving} onOpenChat={() => setIsChatOpen(true)} />
+      <GuardarPlantillaModal nombreProyecto={sala.proyecto_nombre} />
 
       <div className="sala-view__workspace">
         <Toolbar />
-        <DiagramCanvas onCanvasClick={() => {}} proyectoId={sala.proyecto_id} />
+        {/* El panel de tareas se ancla al área del lienzo: al abrir el chat o
+            el panel de propiedades el lienzo se encoge y el panel se mueve con él. */}
+        <div className="sala-view__canvas-area">
+          <DiagramCanvas onCanvasClick={() => {}} proyectoId={sala.proyecto_id} />
+          {sala.proyecto_id > 0 && !isGuest && (
+            <ChecklistPanel
+              proyectoId={sala.proyecto_id}
+              isHost={isHost}
+              onOpenGestor={() => setIsGestorOpen(true)}
+            />
+          )}
+        </div>
         <MultiplayerCursors />
         <ChatPanel
           isOpen={isChatOpen}
@@ -108,14 +135,6 @@ const SalaContent: React.FC<{ sala: SalaInfo }> = ({ sala }) => {
           proyectoNombre={sala.proyecto_nombre}
         />
         <PropertiesPanel />
-        {sala.proyecto_id > 0 && !isGuest && (
-          <ChecklistPanel
-            proyectoId={sala.proyecto_id}
-            isHost={isHost}
-            isChatOpen={isChatOpen}
-            onOpenGestor={() => setIsGestorOpen(true)}
-          />
-        )}
         <ConflictModal />
       </div>
 

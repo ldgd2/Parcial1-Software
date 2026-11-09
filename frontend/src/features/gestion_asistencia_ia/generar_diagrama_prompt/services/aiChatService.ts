@@ -26,7 +26,11 @@ export async function callGenerateDiagramAPI(
   proyectoId?: number,
   /** Diagrama ({nodes, relations}) antes de aplicar la respuesta, para el historial de versiones */
   estadoAntes?: { nodes: any[]; relations: any[] } | null,
-  autor?: string | null
+  autor?: string | null,
+  /** Para el botón "Detener": corta la petición (el backend cancela la llamada a la IA) */
+  signal?: AbortSignal,
+  /** Correcciones del diagrama: la IA las recibe en su memoria */
+  correcciones?: Array<{ id: string; target: string; text: string; estado: string }>
 ): Promise<GenerateDiagramResult> {
   const payload: Record<string, any> = {
     prompt,
@@ -41,6 +45,9 @@ export async function callGenerateDiagramAPI(
   if (autor) {
     payload.autor = autor;
   }
+  if (correcciones) {
+    payload.correcciones = correcciones;
+  }
 
   if (proyectoId && proyectoId > 0) {
     payload.proyecto_id = proyectoId;
@@ -52,7 +59,8 @@ export async function callGenerateDiagramAPI(
 
   return await apiFetch<GenerateDiagramResult>('/prompt/generar', {
     method: 'POST',
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    signal
   });
 }
 

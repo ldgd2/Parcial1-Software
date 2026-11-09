@@ -12,6 +12,8 @@ import { NotifProvider, useNotif } from '@/features/gestion_proyectos/shared/con
 import { proyectoService } from '@/features/gestion_proyectos/shared/utils/proyectoService';
 import type { Proyecto } from '@/features/gestion_proyectos/shared/utils/types';
 import { apiFetch, API_URL } from '@/shared/lib/api';
+import { salaService } from '@/features/gestion_salas/shared/services/salaService';
+import { obtenerPlantilla, prepararLienzo } from '@/features/gestion_proyectos/plantillas/plantillas';
 import { GestorEquipoIA } from '@/features/gestion_asistencia_ia/gestionar_equipo_ia/components/GestorEquipoIA/GestorEquipoIA';
 import './DashboardView.css';
 
@@ -106,13 +108,24 @@ const DashboardContent: React.FC = () => {
     checkBackendAndAuth();
   }, [checkBackendAndAuth]);
 
-  const handleCrear = async (nombre: string, descripcion: string) => {
+  const handleCrear = async (nombre: string, descripcion: string, plantillaId?: string) => {
     const nuevo = await proyectoService.crear(nombre, descripcion);
     setProyectos(prev => [nuevo, ...prev]);
+    // CU42: si eligió plantilla, el lienzo nace con sus clases (ids nuevos)
+    let conPlantilla = '';
+    if (plantillaId) {
+      try {
+        const plantilla = await obtenerPlantilla(plantillaId);
+        await salaService.guardarLienzo(nuevo.id, prepararLienzo(plantilla.lienzo) as any);
+        conPlantilla = ` con la plantilla "${plantilla.nombre}"`;
+      } catch {
+        notificar({ tipo: 'error', titulo: 'Plantilla', mensaje: 'El proyecto se creó, pero no se pudo aplicar la plantilla.' });
+      }
+    }
     notificar({
       tipo: 'exito',
       titulo: 'Proyecto creado',
-      mensaje: `"${nuevo.nombre}" listo. Comparte el enlace para colaborar.`,
+      mensaje: `"${nuevo.nombre}" listo${conPlantilla}. Comparte el enlace para colaborar.`,
     });
     // Auto-open share
     setTimeout(() => setProyectoCompartir(nuevo), 400);

@@ -63,6 +63,8 @@ export interface MemoriaSecciones {
   correcciones_abiertas: Array<{ target: string; text: string }>;
   total_correcciones_abiertas: number;
   diagrama_dsl: string;
+  /** Memoria del proyecto elegida para el pedido (reglas fijas + relevantes) */
+  memorias?: Array<{ tipo: string; topic_key: string; titulo: string; que: string; aprendido: string }>;
 }
 
 // ─── Versiones del diagrama antes/después de cada interacción de la IA ──────
@@ -99,4 +101,27 @@ export interface VersionDetalle extends VersionResumen {
 export interface VersionesPagina {
   items: VersionResumen[];
   hay_mas: boolean;
+}
+
+// ─── Memoria del proyecto (estilo Engram) ───────────────────────────────
+
+export type TipoMemoria = 'decision' | 'restriccion' | 'convencion' | 'correccion' | 'rechazo';
+
+export interface MemoriaItem {
+  id: number;
+  tipo: TipoMemoria;
+  topic_key: string;
+  titulo: string;
+  que: string;
+  por_que: string;
+  donde: string;
+  aprendido: string;
+  origen: 'manual' | 'aprobacion' | 'rechazo' | string;
+  autor?: string | null;
+  vigente: boolean;
+  en_conflicto: boolean;
+  reemplaza_id?: number | null;
+  version_id?: number | null;
+  creada: number;
+  actualizada: number;
 }

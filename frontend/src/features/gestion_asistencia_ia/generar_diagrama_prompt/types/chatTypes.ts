@@ -16,16 +16,34 @@ export interface ChatMessage {
   timestamp: number;
   replyTo?: QuotedMessage;
   isAi?: boolean;
-  aiStatus?: 'pending' | 'success' | 'error';
+  aiStatus?: 'pending' | 'success' | 'error' | 'cancelled';
   provider?: AiProvider;
   summary?: string;
   tasksCount?: number;
   /** Cambios de la IA pendientes de aprobación (no se aplican solos) */
   propuesta?: PropuestaIA;
+  /** Sugerencias de mejora sobre el diagrama (CU33); cada una se puede pedir a @diag */
+  sugerencias?: SugerenciaIA[];
+  /** Archivo generado (p. ej. /documentar): cualquiera de la sala lo puede descargar */
+  archivo?: { nombre: string; contenido: string };
+  /** Pedido nacido de "Solucionar con IA": la corrección que resuelve */
+  correccion?: { nodoId: string; id: string; clase: string };
+}
+
+export interface SugerenciaIA {
+  /** tipo:clase:atributo — evita repetir la misma sugerencia */
+  clave: string;
+  severidad: string;
+  texto: string;
+  detalle: string;
+  /** Pedido que se envía a @diag al pulsar "Aplicar" */
+  pedido: string;
 }
 
 export interface PropuestaIA {
   versionId: number;
+  /** Corrección que se marca resuelta al aprobar */
+  correccion?: { nodoId: string; id: string; clase: string };
   /** Qué se aplica al aprobar (por defecto, cambios del diagrama) */
   tipo?: 'diagrama' | 'roles' | 'tareas';
   /** Resumen legible para roles / tareas ("Ana → Backend Lead (3 clases)") */

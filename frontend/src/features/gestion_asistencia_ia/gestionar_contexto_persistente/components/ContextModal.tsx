@@ -3,6 +3,9 @@ import type { ContextoIAResponse, EstadoDiagramaVersion, VersionDetalle, Version
 import { useVersionesContexto } from '../hooks/useVersionesContexto';
 import { compararVersiones } from '../utils/versionDiff';
 import { DiagramPreview } from './DiagramPreview';
+import { MemoriaPanel } from './MemoriaPanel';
+import { ContribucionPanel } from './ContribucionPanel';
+import { exportarPdf, exportarPng, exportarSvg } from '@/features/gestion_modelado/shared/utils/exportarDiagrama';
 import './ContextModal.css';
 
 interface Props {
@@ -18,9 +21,11 @@ interface Props {
   onRestaurar?: (estado: EstadoDiagramaVersion, version: VersionResumen, lado: Lado) => Promise<void>;
   /** Abrir directamente en esta versión (p. ej. desde una propuesta del chat) */
   versionInicial?: number | null;
+  /** Correcciones del diagrama en vivo (Panel de propiedades de cada clase) */
+  correccionesDiagrama?: Array<{ id: string; target: string; text: string; estado: string }>;
 }
 
-type Pestana = 'historial' | 'correcciones' | 'memoria';
+type Pestana = 'historial' | 'proyecto' | 'actividad' | 'correcciones' | 'memoria';
 type Filtro = 'todo' | 'ia' | 'manual';
 
 /** Cambios hechos por personas: ediciones a mano y restauraciones */
@@ -54,6 +59,20 @@ function chipsDelta(delta: string): Array<{ tipo: '+' | '~' | '-'; texto: string
 
 const ETIQUETA_LADO: Record<Lado, string> = { antes: 'Antes', despues: 'Después' };
 
+/** Qué hizo el cambio, en palabras: "Manual", "Restaurado", "IA · Revisión"… */
+const NOMBRES_INTENT: Record<string, string> = {
+  IA: '', CREAR: 'Creación', MODIFICAR: 'Edición', REFACTOR: 'Refactor', REFACTORIZAR: 'Refactor',
+  ELIMINAR: 'Eliminación', REVISAR: 'Revisión', LIMPIAR: 'Limpieza', OPTIMIZAR: 'Optimización',
+  REQUISITOS: 'Requisitos', IMAGEN: 'Imagen', ROLES: 'Roles', TAREAS: 'Tareas', EXPLICAR: 'Explicación',
+};
+function etiquetaOrigen(intent: string): { texto: string; clase: 'ia' | 'manual' } {
+  const i = (intent || '').toUpperCase();
+  if (i === 'MANUAL') return { texto: 'Manual', clase: 'manual' };
+  if (i === 'RESTAURAR') return { texto: 'Restaurado', clase: 'manual' };
+  const nombre = i in NOMBRES_INTENT ? NOMBRES_INTENT[i] : i.charAt(0) + i.slice(1).toLowerCase();
+  return { texto: nombre ? `IA · ${nombre}` : 'IA', clase: 'ia' };
+}
+
 export const ContextModal: React.FC<Props> = ({
   isOpen,
   onClose,
@@ -63,6 +82,7 @@ export const ContextModal: React.FC<Props> = ({
   puedeRestaurar = false,
   onRestaurar,
   versionInicial = null,
+  correccionesDiagrama,
 }) => {
   const [pestana, setPestana] = useState<Pestana>('historial');
   const [filtro, setFiltro] = useState<Filtro>('todo');
@@ -146,7 +166,7 @@ export const ContextModal: React.FC<Props> = ({
   if (!isOpen) return null;
 
   const eventosMemoria = contexto?.historial_comprimido || [];
-  const correcciones = contexto?.correcciones || [];
+  const correcciones = correccionesDiagrama ?? contexto?.correcciones ?? [];
   const secciones = contexto?.memoria_secciones;
   const tokensAhorrados = contexto?.tokens_ahorrados_estimados || 0;
   const sinVersiones = !cargando && versiones.length === 0;
@@ -186,23 +206,24 @@ export const ContextModal: React.FC<Props> = ({
     <ul className="context-modal__timeline" aria-label="Historial de cambios">
       {visibles.length === 0 && (
         <li className="context-modal__nota context-modal__nota--centro">
-          {filtro === 'manual' ? 'Todavía no hay cambios manuales.' : 'Todavía no hay cambios hechos con la IA.'}
+          {filtro === 'manual' ? 'Todavía no hay cambios manuales.' : filtro === 'ia' ? 'Todavía no hay cambios hechos con la IA.' : 'Todavía no hay cambios.'}
         </li>
       )}
       {visibles.map(v => {
         const chips = chipsDelta(v.delta);
         const activa = v.id === seleccion;
+        const origen = etiquetaOrigen(v.intent);
         return (
           <li key={v.id}>
             <button
               type="button"
-              className={`context-modal__evento${activa ? ' is-active' : ''}`}
+              className={`context-modal__evento context-modal__evento--${origen.clase}${activa ? ' is-active' : ''}`}
               onClick={() => { setSeleccion(v.id); setLado('antes'); }}
               aria-current={activa ? 'true' : undefined}
             >
               <span className="context-modal__evento-meta">
-                <span className={`context-modal__intent${esManual(v.intent) ? ' context-modal__intent--manual' : ''}`}>
-                  {v.intent === 'MANUAL' ? 'MANUAL' : v.intent === 'RESTAURAR' ? 'RESTAURAR' : `IA · ${v.intent}`}
+                <span className={`context-modal__intent context-modal__intent--${origen.clase}`}>
+                  {origen.texto}
                 </span>
                 <span>{formatoHora(v.ts)}</span>
                 {v.autor && <span className="context-modal__autor">· {v.autor}</span>}
@@ -246,7 +267,7 @@ export const ContextModal: React.FC<Props> = ({
           <li key={i}>
             <div className="context-modal__evento is-static">
               <span className="context-modal__evento-meta">
-                <span className="context-modal__intent">{ev.intent}</span>
+                <span className={`context-modal__intent context-modal__intent--${etiquetaOrigen(ev.intent).clase}`}>{etiquetaOrigen(ev.intent).texto}</span>
                 <span>{formatoHora(ev.ts)}</span>
               </span>
               <span className="context-modal__evento-cmd">{ev.cmd}</span>
@@ -302,6 +323,23 @@ export const ContextModal: React.FC<Props> = ({
               />
             )}
           </div>
+
+          {estadoMostrado && (estadoMostrado.nodes || []).length > 0 && (
+            <div className="context-modal__exportar" role="group" aria-label="Exportar esta versión">
+              <span>Exportar esta versión:</span>
+              {(() => {
+                const nombre = `version_${resumenSel.id}_${ladoEfectivo}`;
+                const est = { nodes: estadoMostrado.nodes || [], relations: estadoMostrado.relations || [] };
+                return (
+                  <>
+                    <button type="button" onClick={() => exportarPng(est, nombre).catch(() => {})}>PNG</button>
+                    <button type="button" onClick={() => exportarSvg(est, nombre)}>SVG</button>
+                    <button type="button" onClick={() => exportarPdf(est, nombre)}>PDF</button>
+                  </>
+                );
+              })()}
+            </div>
+          )}
 
           {resumenSel.resumen && <p className="context-modal__resumen-ia">{resumenSel.resumen}</p>}
 
@@ -446,14 +484,16 @@ export const ContextModal: React.FC<Props> = ({
       >
         <header className="context-modal__header">
           <div className="context-modal__header-texto">
-            <h3 id="context-modal-titulo">Historial y memoria de la IA</h3>
+            <h3 id="context-modal-titulo">Historial del proyecto</h3>
             <p>{contexto?.dominio || 'Sistema de Software'}</p>
           </div>
           <div className="context-modal__metricas">
             <span className="context-modal__metrica"><strong>{versiones.length}{hayMas ? '+' : ''}</strong> cambios</span>
-            <span className="context-modal__metrica" title="Estimación: compara el tamaño de la memoria con el de enviar el chat completo">
-              <strong>~{formatoTokens(tokensAhorrados)}</strong> tokens ahorrados (est.)
-            </span>
+            {pestana === 'memoria' && (
+              <span className="context-modal__metrica" title="Estimación: compara el tamaño de la memoria con el de enviar el chat completo">
+                <strong>~{formatoTokens(tokensAhorrados)}</strong> tokens ahorrados (est.)
+              </span>
+            )}
           </div>
           <button type="button" className="context-modal__cerrar" onClick={onClose} aria-label="Cerrar">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -464,9 +504,11 @@ export const ContextModal: React.FC<Props> = ({
 
         <nav className="context-modal__tabs" role="tablist">
           {([
-            ['historial', 'Historial'],
+            ['historial', 'Cambios'],
+            ['actividad', 'Actividad del equipo'],
             ['correcciones', `Correcciones${correcciones.length ? ` · ${correcciones.length}` : ''}`],
-            ['memoria', 'Memoria inyectada'],
+            ['proyecto', 'Memoria del proyecto'],
+            ['memoria', 'Contexto de la IA'],
           ] as Array<[Pestana, string]>).map(([id, texto]) => (
             <button
               key={id}
@@ -517,9 +559,24 @@ export const ContextModal: React.FC<Props> = ({
             )
           )}
 
+          {pestana === 'actividad' && (
+            pid ? <ContribucionPanel proyectoId={pid} onVerVersion={id => { setPestana('historial'); setFiltro('todo'); setSeleccion(id); setLado('antes'); }} /> : <div className="context-modal__vacio">Abre el modal desde una sala para ver la actividad.</div>
+          )}
+
+          {pestana === 'proyecto' && (
+            pid ? (
+              <MemoriaPanel proyectoId={pid} puedeEditar={puedeRestaurar} />
+            ) : (
+              <div className="context-modal__vacio">Abre el modal desde una sala para ver la memoria del proyecto.</div>
+            )
+          )}
+
           {pestana === 'correcciones' && (
             correcciones.length === 0 ? (
-              <div className="context-modal__vacio">No hay correcciones ni pendientes registrados.</div>
+              <div className="context-modal__vacio">
+                No hay correcciones. Para agregar una: selecciona una clase → Panel de propiedades → Correcciones.
+                La IA recibe las abiertas en cada pedido.
+              </div>
             ) : (
               <ul className="context-modal__correcciones">
                 {correcciones.map((c, i) => (
@@ -546,6 +603,25 @@ export const ContextModal: React.FC<Props> = ({
                   <section className="context-modal__seccion">
                     <h5>Dominio</h5>
                     <p>{secciones.dominio}</p>
+                  </section>
+                  <section className="context-modal__seccion context-modal__seccion--ancha">
+                    <h5>
+                      Memoria del proyecto
+                      <span className="context-modal__contador">reglas fijas + las más relevantes para cada pedido</span>
+                    </h5>
+                    {!secciones.memorias?.length ? (
+                      <p className="context-modal__nota">Todavía no hay memorias guardadas.</p>
+                    ) : (
+                      <ul className="context-modal__acciones">
+                        {secciones.memorias.map((m, i) => (
+                          <li key={i}>
+                            <span className="context-modal__intent">{m.tipo}</span>
+                            <span className="context-modal__accion-cmd"><code>{m.topic_key}</code> {m.que}</span>
+                            {m.aprendido && <span className="context-modal__accion-resumen">→ {m.aprendido}</span>}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </section>
                   <section className="context-modal__seccion">
                     <h5>Resumen acumulado</h5>
@@ -622,9 +698,11 @@ export const ContextModal: React.FC<Props> = ({
         </div>
 
         <footer className="context-modal__footer">
-          <button type="button" className="context-modal__btn context-modal__btn--peligro" onClick={() => setConfirmacion({ tipo: 'reiniciar' })}>
-            Reiniciar memoria
-          </button>
+          {pestana === 'proyecto' || pestana === 'memoria' ? (
+            <button type="button" className="context-modal__btn context-modal__btn--peligro" onClick={() => setConfirmacion({ tipo: 'reiniciar' })}>
+              Reiniciar memoria de la IA
+            </button>
+          ) : <span />}
           {aviso && <span className="context-modal__aviso" role="status">{aviso}</span>}
           <button type="button" className="context-modal__btn context-modal__btn--primario" onClick={onClose}>
             Cerrar

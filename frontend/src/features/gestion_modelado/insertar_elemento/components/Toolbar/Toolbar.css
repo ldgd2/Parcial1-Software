@@ -2,8 +2,8 @@
   display: flex;
   flex-direction: column;
   width: 240px;
-  background: var(--surface-color, #1a1e24);
-  border-right: 1px solid var(--border-color, #2d3748);
+  background: var(--surface-color);
+  border-right: 1px solid var(--border-color);
   flex-shrink: 0;
   overflow: hidden;
   font-family: 'Inter', system-ui, sans-serif;
@@ -12,14 +12,14 @@
 .toolbox-header {
   padding: 12px 16px;
   background: rgba(0, 0, 0, 0.2);
-  border-bottom: 1px solid var(--border-color, #2d3748);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .toolbox-title {
   font-size: 0.85rem;
   font-weight: 700;
   letter-spacing: 0.08em;
-  color: var(--text-primary, #e2e8f0);
+  color: var(--text-primary);
   text-transform: uppercase;
 }
 
@@ -34,7 +34,7 @@
 }
 .toolbox-content::-webkit-scrollbar-thumb {
   background: #4a5568;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
 }
 
 .toolbox-group {
@@ -49,7 +49,7 @@
   padding: 8px 12px;
   background: transparent;
   border: none;
-  color: var(--text-secondary, #a0aec0);
+  color: var(--text-secondary);
   font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
@@ -60,7 +60,7 @@
 
 .toolbox-group-header:hover {
   background: rgba(255, 255, 255, 0.03);
-  color: var(--text-primary, #e2e8f0);
+  color: var(--text-primary);
 }
 
 .toolbox-group-items {
@@ -79,8 +79,8 @@
   padding: 8px 12px;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 6px;
-  color: var(--text-secondary, #a0aec0);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
   cursor: pointer;
   text-align: left;
   transition: all 0.2s;
@@ -88,13 +88,13 @@
 
 .toolbox-item:hover {
   background: rgba(255, 255, 255, 0.05);
-  color: var(--primary, #78aaff);
+  color: var(--primary);
 }
 
 .toolbox-item--active {
   background: rgba(120, 170, 255, 0.15);
   border-color: rgba(120, 170, 255, 0.3);
-  color: var(--primary, #78aaff);
+  color: var(--primary);
 }
 
 .toolbox-item-icon {
@@ -115,7 +115,7 @@
 .toolbox-footer {
   padding: 12px;
   background: rgba(0, 0, 0, 0.2);
-  border-top: 1px solid var(--border-color, #2d3748);
+  border-top: 1px solid var(--border-color);
   font-size: 0.75rem;
   text-align: center;
 }
@@ -123,14 +123,14 @@
 .toolbox-status {
   display: inline-block;
   padding: 4px 12px;
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   font-weight: 600;
   letter-spacing: 0.05em;
 }
 
 .toolbox-status.idle {
   background: rgba(255, 255, 255, 0.1);
-  color: var(--text-secondary, #a0aec0);
+  color: var(--text-secondary);
 }
 
 .toolbox-status.connecting {

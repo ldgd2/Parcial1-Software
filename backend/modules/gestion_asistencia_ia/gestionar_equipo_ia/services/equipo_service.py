@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from backend.core.config import settings
-from backend.modules.gestion_usuarios.models import TareaIA, Usuario
+from backend.modules.gestion_usuarios.models import TareaIA, Usuario, estimar_tarea
 from backend.modules.gestion_asistencia_ia.gestionar_equipo_ia.schemas.request import (
     GenerarEquipoRequest,
     HabilidadDesarrollador,
@@ -39,11 +39,12 @@ def _construir_prompt(req: GenerarEquipoRequest, historial: list[TareaIA] = None
         f"3. Cada tarea debe tener un 'tipo': 'diagrama' (para hacer dentro del diagramador UML) "
         f"o 'desarrollo' (tarea de código/implementación fuera del diagramador).\n"
         f"4. Incluye una descripción clara de contexto para que el desarrollador sepa exactamente qué hacer y por qué.\n"
-        f"5. Asigna un 'orden' (entero) para priorizar las tareas de cada usuario.\n\n"
+        f"5. Asigna un 'orden' (entero) para priorizar las tareas de cada usuario.\n"
+        f"6. Estima el esfuerzo: 'estimacion_horas' (entero, 1 a 40) y 'complejidad' ('baja', 'media' o 'alta').\n\n"
         f"RESPONDE ÚNICAMENTE con un JSON válido con esta estructura:\n"
         f'{{"tareas": ['
-        f'{{"usuario_id": {first_id}, "titulo": "Modelar arquitectura en lienzo", "descripcion": "Crear entidades principales...", "tipo": "diagrama", "orden": 1}}, '
-        f'{{"usuario_id": {second_id}, "titulo": "Implementar servicios y controladores", "descripcion": "Desarrollar la lógica de negocio...", "tipo": "desarrollo", "orden": 1}}'
+        f'{{"usuario_id": {first_id}, "titulo": "Modelar arquitectura en lienzo", "descripcion": "Crear entidades principales...", "tipo": "diagrama", "orden": 1, "estimacion_horas": 3, "complejidad": "media"}}, '
+        f'{{"usuario_id": {second_id}, "titulo": "Implementar servicios y controladores", "descripcion": "Desarrollar la lógica de negocio...", "tipo": "desarrollo", "orden": 1, "estimacion_horas": 6, "complejidad": "alta"}}'
         f']}}'
     )
 
@@ -199,6 +200,9 @@ async def generar_y_persistir_tareas(req: GenerarEquipoRequest, db: AsyncSession
             descripcion=item.get("descripcion"),
             completada=False,
             orden=item.get("orden", idx + 1),
+        )
+        tarea.estimacion_horas, tarea.complejidad = estimar_tarea(
+            tarea.tipo, tarea.titulo, tarea.descripcion, item.get("estimacion_horas"), item.get("complejidad")
         )
         if req.persistir:
             db.add(tarea)

@@ -12,6 +12,15 @@
   overflow: hidden;
 }
 
+/* Contenedor del lienzo: referencia de posición para el panel de tareas */
+.sala-view__canvas-area {
+  position: relative;
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
+}
+
 /* Loading */
 .sala-view--loading,
 .sala-view--error {

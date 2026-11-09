@@ -42,6 +42,14 @@ class Settings(BaseSettings):
     # Dominio publico donde se sirven las apps desplegadas (ej: https://host.gerlextech.com)
     HOST_DOMAIN: str = "http://localhost"
 
+    # CU39: notificaciones push con Firebase (opcional: sin esto solo hay notificaciones dentro de la app)
+    FIREBASE_CREDENTIALS: str = ""      # ruta al JSON de la cuenta de servicio (Configuración > Cuentas de servicio)
+    FIREBASE_WEB_API_KEY: str = ""      # Configuración del proyecto > Tus apps > Web
+    FIREBASE_PROJECT_ID: str = ""
+    FIREBASE_SENDER_ID: str = ""
+    FIREBASE_APP_ID: str = ""
+    FIREBASE_VAPID_KEY: str = ""        # Cloud Messaging > Certificados push web
+
     @property
     def EFFECTIVE_HOST_DOMAIN(self) -> str:
         if self.HOST_DOMAIN and self.HOST_DOMAIN != "http://localhost":

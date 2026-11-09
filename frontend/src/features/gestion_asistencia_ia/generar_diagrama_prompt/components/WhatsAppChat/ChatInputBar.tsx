@@ -3,7 +3,8 @@ import type { QuotedMessage, RoomUserMention } from '../../types/chatTypes';
 import { QuotedPreview } from './QuotedPreview';
 import { MentionList } from './MentionList';
 import { CommandList, AVAILABLE_COMMANDS, type SlashCommand } from './CommandList';
-import { IconSend, IconMic, IconImage } from './ChatIcons';
+import { Plus, FileText, Image as ImageIcon } from 'lucide-react';
+import { IconSend, IconMic } from './ChatIcons';
 import { callTranscribeAudioAPI } from '../../services/aiChatService';
 
 interface ChatInputBarProps {
@@ -13,6 +14,10 @@ interface ChatInputBarProps {
   mentionableUsers: RoomUserMention[];
   geminiKey?: string;
   onImageSelected?: (file: File) => void;
+  /** Requisitos en PDF (CU36). Si no se pasa, no aparece en el menú "+". */
+  onAttachPdf?: (file: File) => void;
+  /** Texto para precargar en el campo (p. ej. desde los atajos del chat vacío). */
+  draft?: { text: string; nonce: number } | null;
 }
 
 export const ChatInputBar: React.FC<ChatInputBarProps> = ({
@@ -21,9 +26,40 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
   onCancelReply,
   mentionableUsers,
   geminiKey,
-  onImageSelected
+  onImageSelected,
+  onAttachPdf,
+  draft
 }) => {
   const [text, setText] = useState('');
+  const [showAttach, setShowAttach] = useState(false);
+  const attachRef = useRef<HTMLDivElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+  const hasAttachOptions = !!onImageSelected || !!onAttachPdf;
+
+  // Precargar un borrador y dejar el cursor al final
+  useEffect(() => {
+    if (!draft) return;
+    setText(draft.text);
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (el) { el.focus(); el.setSelectionRange(draft.text.length, draft.text.length); }
+    });
+  }, [draft]);
+
+  // Cerrar el menú "+" al hacer clic fuera o con Escape
+  useEffect(() => {
+    if (!showAttach) return;
+    const onDown = (e: MouseEvent) => {
+      if (attachRef.current && !attachRef.current.contains(e.target as Node)) setShowAttach(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowAttach(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [showAttach]);
   const [showMentions, setShowMentions] = useState(false);
   const [mentionFilter, setMentionFilter] = useState('');
   const [showCommands, setShowCommands] = useState(false);
@@ -253,22 +289,72 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
       )}
 
       <div className="whatsapp-input-bar">
-        {/* Adjuntar imagen */}
+        {/* Adjuntar: imagen y/o PDF de requisitos (solo opciones disponibles) */}
         <input
           type="file"
           ref={fileInputRef}
           onChange={handleFileChange}
           accept="image/*"
-          style={{ display: 'none' }}
+          hidden
         />
-        <button
-          type="button"
-          className="whatsapp-icon-btn"
-          onClick={() => fileInputRef.current?.click()}
-          title="Adjuntar imagen o bosquejo UML"
-        >
-          <IconImage size={20} />
-        </button>
+        <input
+          type="file"
+          ref={pdfInputRef}
+          accept="application/pdf,.pdf"
+          hidden
+          onChange={e => {
+            const archivo = e.target.files?.[0];
+            e.target.value = '';
+            if (archivo && onAttachPdf) onAttachPdf(archivo);
+          }}
+        />
+        {hasAttachOptions && (
+          <div className="chat-attach" ref={attachRef}>
+            <button
+              type="button"
+              className={`whatsapp-icon-btn${showAttach ? ' is-on' : ''}`}
+              onClick={() => setShowAttach(v => !v)}
+              title="Adjuntar"
+              aria-label="Adjuntar archivo"
+              aria-haspopup="menu"
+              aria-expanded={showAttach}
+            >
+              <Plus size={20} />
+            </button>
+            {showAttach && (
+              <div className="chat-attach__menu" role="menu">
+                {onAttachPdf && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="chat-attach__item"
+                    onClick={() => { setShowAttach(false); pdfInputRef.current?.click(); }}
+                  >
+                    <FileText size={16} />
+                    <span>
+                      <strong>PDF de requisitos</strong>
+                      <small>La IA lo convierte en una propuesta</small>
+                    </span>
+                  </button>
+                )}
+                {onImageSelected && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="chat-attach__item"
+                    onClick={() => { setShowAttach(false); fileInputRef.current?.click(); }}
+                  >
+                    <ImageIcon size={16} />
+                    <span>
+                      <strong>Imagen o bosquejo UML</strong>
+                      <small>La IA lo digitaliza como propuesta</small>
+                    </span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Dictar por voz */}
         <button
@@ -276,9 +362,10 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
           className={`whatsapp-icon-btn ${isRecording ? 'whatsapp-icon-btn--recording' : ''}`}
           onClick={handleToggleVoice}
           title={isRecording ? 'Detener grabación de voz' : 'Dictar requerimiento por voz'}
+          aria-label={isRecording ? 'Detener grabación de voz' : 'Dictar por voz'}
           disabled={isTranscribing}
         >
-          <IconMic size={20} color={isRecording ? '#FF5252' : 'currentColor'} />
+          <IconMic size={20} color={isRecording ? 'var(--danger-text)' : 'currentColor'} />
         </button>
 
         {/* Área de texto */}
@@ -300,8 +387,9 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
           onClick={handleSubmit}
           disabled={!text.trim() || isTranscribing}
           title="Enviar mensaje (Enter)"
+          aria-label="Enviar mensaje"
         >
-          <IconSend size={18} color="#fff" />
+          <IconSend size={18} />
         </button>
       </div>
     </div>

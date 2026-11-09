@@ -1,0 +1,153 @@
+/* Generador de seeders — contenedor, cabecera y pie los pone <Modal>. */
+
+.seeders-modal {
+  height: min(85vh, 780px);
+}
+
+.seeders__intro {
+  margin: 0;
+  padding: 1rem 1.5rem 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+/* ── Controles ───────────────────────────────────────────────── */
+.seeders__controles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.seeders__control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.seeders__label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+}
+
+.seeders__segmentado {
+  display: inline-flex;
+  padding: 2px;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+}
+
+.seeders__segmentado button {
+  padding: 0.45rem 0.9rem;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.seeders__segmentado button:hover:not(.is-active) {
+  color: var(--text-primary);
+  background: rgba(223, 208, 184, 0.08);
+}
+
+.seeders__segmentado button.is-active {
+  background: var(--primary);
+  color: var(--text-on-primary);
+}
+
+/* ── Estados ─────────────────────────────────────────────────── */
+.seeders__estado {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 3rem 1.5rem;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.seeders__estado p { margin: 0; }
+
+.seeders__estado--error {
+  color: var(--danger-soft);
+}
+
+.seeders__spin {
+  color: var(--primary);
+  animation: seeders-spin 0.9s linear infinite;
+}
+
+@keyframes seeders-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Resultado ───────────────────────────────────────────────── */
+.seeders__resumen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.8rem;
+}
+
+.seeders__resumen-texto {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+}
+
+.seeders__resumen-texto svg {
+  color: var(--success-text);
+  flex-shrink: 0;
+}
+
+.seeders__orden {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.seeders__codigo {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 1rem 1.5rem;
+  overflow: auto;
+  background: var(--bg-color);
+  color: var(--text-secondary);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  white-space: pre;
+  user-select: text;
+}
+
+/* Pie: el total queda a la izquierda, los botones a la derecha */
+.seeders__total {
+  margin-right: auto;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.seeders__total strong {
+  color: var(--text-primary);
+}

@@ -28,4 +28,6 @@ class CrearTareaRequest(BaseModel):
     titulo: str
     descripcion: Optional[str] = None
     orden: Optional[int] = 0
+    estimacion_horas: Optional[int] = None   # CU37 (si falta, se calcula)
+    complejidad: Optional[str] = None
 

@@ -1,7 +1,9 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { TokenService } from '@/shared/lib/TokenService';
+import { cerrarSesion } from '@/shared/lib/session';
 import { SettingsModal } from '../SettingsModal/SettingsModal';
+import { CampanaNotificaciones } from '@/features/gestion_notificaciones/CampanaNotificaciones';
+import { desactivarPushLocal } from '@/features/gestion_notificaciones/notificaciones';
 import './DashboardNavbar.css';
 
 interface Props {
@@ -12,8 +14,9 @@ export const DashboardNavbar: React.FC<Props> = ({ userName }) => {
   const navigate = useNavigate();
   const [showSettings, setShowSettings] = React.useState(false);
 
-  const handleLogout = () => {
-    TokenService.removeToken();
+  const handleLogout = async () => {
+    await desactivarPushLocal();
+    cerrarSesion();
     navigate('/login');
   };
 
@@ -31,6 +34,7 @@ export const DashboardNavbar: React.FC<Props> = ({ userName }) => {
         <span className="dash-navbar__name">DIAGRAMADOR</span>
       </div>
       <div className="dash-navbar__right">
+        <CampanaNotificaciones />
         <div className="dash-navbar__user">
           <div className="dash-navbar__avatar">{initials}</div>
           <span className="dash-navbar__username">{userName}</span>

@@ -22,9 +22,9 @@ export const ContextMemoryBadge: React.FC<Props> = ({ contexto, loading, onClick
         gap: '6px',
         padding: '3px 9px',
         borderRadius: '9999px',
-        backgroundColor: '#0f172a',
-        border: '1px solid #334155',
-        color: '#94a3b8',
+        backgroundColor: 'var(--bg-color)',
+        border: '1px solid var(--border-color)',
+        color: 'var(--text-muted)',
         fontSize: '11px',
         fontWeight: 500,
         cursor: 'pointer',
@@ -47,7 +47,7 @@ export const ContextMemoryBadge: React.FC<Props> = ({ contexto, loading, onClick
         <line x1="1" y1="14" x2="4" y2="14" />
       </svg>
 
-      <span style={{ color: '#e2e8f0', maxWidth: '130px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+      <span style={{ color: 'var(--text-secondary)', maxWidth: '130px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
         {loading ? 'Sincronizando...' : dominio}
       </span>
 

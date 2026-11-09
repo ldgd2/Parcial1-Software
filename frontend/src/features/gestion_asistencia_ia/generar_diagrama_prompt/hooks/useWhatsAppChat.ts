@@ -8,23 +8,56 @@ import { generateDeterministicHash } from '@/features/gestion_modelado/shared/ut
 import { parseUmlAttribute, parseUmlMethod } from '@/features/gestion_modelado/shared/utils/umlParser';
 import { repartirRolesEquipo, asignarRolManual, type ColaboradorRolOut } from '@/features/gestion_proyectos_asistida/repartir_roles';
 import { repartirTareasEquipo, crearTareaManual, type TareaItem } from '@/features/gestion_proyectos_asistida/repartir_tareas';
-import type { ChatMessage, QuotedMessage, AiProvider, RoomUserMention, ParallelAiTask, PropuestaIA } from '../types/chatTypes';
+import type { ChatMessage, QuotedMessage, AiProvider, RoomUserMention, ParallelAiTask, PropuestaIA, SugerenciaIA } from '../types/chatTypes';
 import type { NodeType } from '@/features/gestion_modelado/shared/types/types';
-import { guardarVersionDespues, decidirPropuesta as decidirPropuestaAPI, PropuestaYaDecididaError, crearVersion } from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente/services/contextoService';
+import { guardarVersionDespues, decidirPropuesta as decidirPropuestaAPI, PropuestaYaDecididaError, crearVersion, crearMemoria } from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente/services/contextoService';
+import { EVENTO_MEMORIA_ACTUALIZADA } from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente/components/MemoriaPanel';
 import { EVENTO_VERSIONES_ACTUALIZADAS } from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente/hooks/useVersionesContexto';
-import { pausarRegistroManual, marcarOrigenProximosCambios } from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente/utils/registroCambios';
+import { pausarRegistroManual, marcarOrigenProximosCambios, avisarDiagramaEstable } from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente/utils/registroCambios';
+import { compararVersiones } from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente/utils/versionDiff';
+import { crearComentarioElemento } from '@/features/gestion_modelado/comentar_elemento/services/comentarService';
+import { detectarProblemas } from '../services/sugerenciasService';
+import { crearMensajeSugerencias } from './useSugerenciasAutomaticas';
+import { textoAyudaComandos } from '../components/WhatsAppChat/AyudaComandos';
+import { EVENTO_SOLICITUD_IA, tomarSolicitudes, type CorreccionVinculada } from '../utils/solicitudesIA';
+import { parsePeriodo, resumenHistorial, diccionarioMarkdown, descargarTexto } from '../utils/comandosIA';
+import { listarVersiones } from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente/services/contextoService';
+import { apiFetch } from '@/shared/lib/api';
+import { digitalizarImagen } from '@/features/gestion_asistencia_ia/digitalizar_desde_imagen/services/digitalizarService';
+import { etiquetaEsfuerzo, horasTotales } from '@/shared/utils/esfuerzo';
 
 interface UseWhatsAppChatProps {
   codigoAcceso?: string;
   proyectoId?: number;
+  proyectoNombre?: string;
 }
 
-export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWhatsAppChatProps) {
+/** Correcciones del diagrama (por clase) en el formato de la memoria de la IA */
+export function correccionesDelDiagrama(
+  estado: { correcciones?: Record<string, any[]> },
+  nodos: Array<{ id: string; nombre: string }>
+): Array<{ id: string; target: string; text: string; estado: string }> {
+  const nombre = new Map(nodos.map(n => [n.id, n.nombre]));
+  return Object.entries(estado.correcciones || {}).flatMap(([nodoId, lista]) =>
+    (lista || []).map((c: any) => ({
+      id: String(c.id),
+      target: nombre.get(nodoId) || 'General',
+      text: String(c.texto || ''),
+      estado: c.estado === 'resuelta' ? 'resuelta' : 'abierta',
+    }))
+  ).filter(c => c.text);
+}
+
+export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId, proyectoNombre }: UseWhatsAppChatProps) {
   const { sendChatMessage, roomUsers, cursors } = useRealTimeSync();
-  const { nodes, relations, addNode, updateNode, addRelation, deleteNode, deleteRelation } = useDiagram();
+  const { nodes, relations, addNode, updateNode, addRelation, deleteNode, deleteRelation, getDiagramState, resolveCorreccion } = useDiagram();
+  const resolveCorreccionRef = useRef(resolveCorreccion);
+  resolveCorreccionRef.current = resolveCorreccion;
   // Diagrama más reciente (para guardar la versión "después" una vez aplicada la respuesta de la IA)
   const estadoActualRef = useRef({ nodes, relations });
   estadoActualRef.current = { nodes, relations };
+  // Botón "Detener": una cancelación por pedido en curso (clave: id del mensaje del usuario)
+  const cancelacionesRef = useRef(new Map<string, AbortController>());
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
@@ -349,7 +382,7 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
   }, [nodes, relations, addNode, updateNode, addRelation, deleteNode, deleteRelation]);
 
   // Ejecución asíncrona paralela de IA
-  const executeParallelAi = useCallback(async (userPromptMessage: ChatMessage) => {
+  const executeParallelAi = useCallback(async (userPromptMessage: ChatMessage, extra?: { requisitos?: string }) => {
     const taskId = `task_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const botMatch = userPromptMessage.text.match(/(?:@diag(?:\s+\/([a-zA-Z0-9_-]+))?(?:\s+([\s\S]*))?|^\/([a-zA-Z0-9_-]+)(?:\s+([\s\S]*))?)/i);
     const command = (botMatch?.[1] || botMatch?.[3] || '').toLowerCase().trim();
@@ -377,6 +410,8 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
     };
 
     setInFlightTasks(prev => [...prev, newTask]);
+    const ctrl = new AbortController();
+    cancelacionesRef.current.set(userPromptMessage.id, ctrl);
 
     // Mensaje preliminar de la IA tipo respuesta de WhatsApp
     const aiMessageId = `ai_reply_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -401,10 +436,124 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
     setMessages(prev => [...prev, pendingAiMessage]);
     sendChatMessage(pendingAiMessage);
 
+    // Si se pulsó "Detener": no se aplica ni se registra nada; toda la sala ve que se detuvo
+    const finalizarDetenido = () => {
+      cancelacionesRef.current.delete(userPromptMessage.id);
+      const detenido: ChatMessage = {
+        ...pendingAiMessage,
+        text: `Detenido por ${getUserIdentity().nickname}. No se aplicó ningún cambio.`,
+        aiStatus: 'cancelled',
+        timestamp: Date.now()
+      };
+      setMessages(prev => prev.map(m => (m.id === aiMessageId ? detenido : m)));
+      sendChatMessage(detenido);
+      setInFlightTasks(prev => prev.filter(t => t.taskId !== taskId));
+    };
+
     try {
       const devNames = (roomUsers && roomUsers.length > 0)
         ? roomUsers.map((u: any, i: number) => u.nickname || u.nombre || `Dev ${i + 1}`).join(', ')
         : (userPromptMessage.senderName || 'Colaborador');
+
+      // 0c. /resumen [hoy|ayer|semana|N dias|AAAA-MM-DD..AAAA-MM-DD] — CU34, sin IA
+      if (command === 'resumen' && proyectoId && proyectoId > 0) {
+        const periodo = parsePeriodo(userPrompt);
+        let texto: string;
+        try {
+          const todas: any[] = [];
+          let antes: number | undefined;
+          for (let pag = 0; pag < 5; pag++) {
+            const p = await listarVersiones(proyectoId, 100, antes);
+            todas.push(...p.items);
+            if (!p.hay_mas || !p.items.length || p.items[p.items.length - 1].ts < periodo.desde) break;
+            antes = p.items[p.items.length - 1].id;
+          }
+          texto = resumenHistorial(todas, periodo);
+        } catch {
+          texto = 'No pude leer el historial del proyecto.';
+        }
+        const listo: ChatMessage = { ...pendingAiMessage, text: texto, aiStatus: 'success', timestamp: Date.now() };
+        setMessages(prev => prev.map(m => (m.id === aiMessageId ? listo : m)));
+        sendChatMessage(listo);
+        setInFlightTasks(prev => prev.filter(t => t.taskId !== taskId));
+        return;
+      }
+
+      // 0d. /documentar — CU35: diccionario de datos en Markdown, sin IA
+      if (command === 'documentar' || command === 'diccionario') {
+        const nombre = proyectoNombre || `Proyecto ${proyectoId ?? ''}`.trim();
+        const doc = diccionarioMarkdown(estadoActualRef.current, nombre);
+        const archivo = `diccionario_${nombre.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'proyecto'}.md`;
+        let texto: string;
+        let adjunto: ChatMessage['archivo'];
+        if (!doc.clases) {
+          texto = 'El diagrama está vacío: no hay nada que documentar todavía.';
+        } else {
+          descargarTexto(archivo, doc.markdown);
+          texto = `Diccionario de datos: ${doc.clases} clase${doc.clases > 1 ? 's' : ''} y ${doc.relaciones} relación${doc.relaciones === 1 ? '' : 'es'}.`;
+          // adjunto para que cualquiera de la sala lo descargue (límite de tamaño razonable)
+          if (doc.markdown.length <= 150000) adjunto = { nombre: archivo, contenido: doc.markdown };
+        }
+        const listo: ChatMessage = { ...pendingAiMessage, text: texto, aiStatus: 'success', archivo: adjunto, timestamp: Date.now() };
+        setMessages(prev => prev.map(m => (m.id === aiMessageId ? listo : m)));
+        sendChatMessage(listo);
+        setInFlightTasks(prev => prev.filter(t => t.taskId !== taskId));
+        return;
+      }
+
+      // 0b. /ayuda: resumen de comandos (no llama a la IA)
+      if (command === 'ayuda' || command === 'comandos' || command === 'help') {
+        const ayuda: ChatMessage = { ...pendingAiMessage, text: textoAyudaComandos(), aiStatus: 'success', timestamp: Date.now() };
+        setMessages(prev => prev.map(m => (m.id === aiMessageId ? ayuda : m)));
+        sendChatMessage(ayuda);
+        setInFlightTasks(prev => prev.filter(t => t.taskId !== taskId));
+        return;
+      }
+
+      // 0a. /sugerencias: revisa el diagrama ahora (detector, sin IA) y lista lo que se puede mejorar
+      if (command === 'sugerencias' || command === 'sugerir') {
+        const { nodes: n, relations: r } = estadoActualRef.current;
+        const encontradas = await detectarProblemas(n, r);
+        const base = encontradas === null
+          ? { ...pendingAiMessage, text: 'No pude revisar el diagrama (¿iniciaste sesión?).', aiStatus: 'error' as const }
+          : !encontradas.length
+            ? { ...pendingAiMessage, text: 'Revisé el diagrama y no encontré problemas.', aiStatus: 'success' as const }
+            : {
+                ...crearMensajeSugerencias(encontradas.slice(0, 8), `Encontré ${encontradas.length} cosa${encontradas.length > 1 ? 's' : ''} para mejorar:`),
+                id: aiMessageId,
+                replyTo: pendingAiMessage.replyTo,
+              };
+        const listo: ChatMessage = { ...base, timestamp: Date.now() };
+        setMessages(prev => prev.map(m => (m.id === aiMessageId ? listo : m)));
+        sendChatMessage(listo);
+        setInFlightTasks(prev => prev.filter(t => t.taskId !== taskId));
+        return;
+      }
+
+      // 0. /recordar …: guarda una memoria del proyecto (no llama a la IA)
+      if ((command === 'recordar' || command === 'recuerda') && proyectoId && proyectoId > 0) {
+        let respuesta: string;
+        let estado: 'success' | 'error' = 'success';
+        if (!userPrompt) {
+          respuesta = 'Dime qué debo recordar. Por ejemplo:\n• /recordar los ids son UUID\n• /recordar entidades/cliente: el email es único\n• /recordar nunca borrar la clase Cliente';
+          estado = 'error';
+        } else {
+          try {
+            const m = await crearMemoria(proyectoId, { texto: userPrompt, autor: getUserIdentity().nickname });
+            const tipo = m.tipo === 'restriccion' ? 'regla' : m.tipo === 'convencion' ? 'convención' : m.tipo;
+            respuesta = `Lo recordaré como ${tipo} en «${m.topic_key}»:\n${m.que}`;
+            window.dispatchEvent(new Event(EVENTO_MEMORIA_ACTUALIZADA));
+          } catch (memErr) {
+            respuesta = `No pude guardar la memoria: ${memErr instanceof Error ? memErr.message : 'error desconocido'}`;
+            estado = 'error';
+          }
+        }
+        const recordado: ChatMessage = { ...pendingAiMessage, text: respuesta, aiStatus: estado, timestamp: Date.now() };
+        setMessages(prev => prev.map(m => (m.id === aiMessageId ? recordado : m)));
+        sendChatMessage(recordado);
+        setInFlightTasks(prev => prev.filter(t => t.taskId !== taskId));
+        return;
+      }
 
       // 1. Comando /roles o /role con persistencia directa en colaboradores_proyecto y diagrama
       if ((command === 'roles' || command === 'role') && proyectoId && proyectoId > 0) {
@@ -465,6 +614,7 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
             api_key: activeApiKey || undefined,
             persistir: false
           });
+          if (ctrl.signal.aborted) { finalizarDetenido(); return; }
 
           const roleLines = res.roles.map((r: ColaboradorRolOut) =>
             `• *${r.nombre}*: ${r.rol_ia} [Áreas: ${r.areas.join(', ')}]\n  Clases: ${r.clases_asignadas.join(', ') || 'Generales'}`
@@ -478,7 +628,7 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
 
           const completedAiMessage: ChatMessage = {
             ...pendingAiMessage,
-            text: propuestaRoles ? summaryText : `${summaryText}\n\n⚠ No se pudo registrar la propuesta en el historial, así que no se aplicó.`,
+            text: propuestaRoles ? summaryText : `${summaryText}\n\nNo se pudo registrar la propuesta en el historial, así que no se aplicó.`,
             aiStatus: propuestaRoles ? 'success' : 'error',
             summary: summaryText,
             propuesta: propuestaRoles
@@ -561,6 +711,7 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
             api_key: activeApiKey || undefined,
             persistir: false
           });
+          if (ctrl.signal.aborted) { finalizarDetenido(); return; }
 
           const createdTasks = tareasRes.tareas;
           const taskLines = createdTasks.map((t: TareaItem, i: number) => `${i + 1}. [${(t.area || t.tipo).toUpperCase()}] ${t.titulo}${t.descripcion ? ` - ${t.descripcion}` : ''}`).join('\n');
@@ -572,7 +723,7 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
 
           const completedAiMessage: ChatMessage = {
             ...pendingAiMessage,
-            text: propuestaTareas || !createdTasks.length ? summaryText : `${summaryText}\n\n⚠ No se pudo registrar la propuesta en el historial, así que no se crearon las tareas.`,
+            text: propuestaTareas || !createdTasks.length ? summaryText : `${summaryText}\n\nNo se pudo registrar la propuesta en el historial, así que no se crearon las tareas.`,
             aiStatus: propuestaTareas || !createdTasks.length ? 'success' : 'error',
             summary: summaryText,
             tasksCount: createdTasks.length,
@@ -581,7 +732,13 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
                   ...propuestaTareas,
                   tipo: 'tareas',
                   tareas: createdTasks.length,
-                  lineas: createdTasks.map((t: TareaItem) => `[${(t.area || t.tipo || 'general').toUpperCase()}] ${t.titulo}`),
+                  lineas: [
+                    ...createdTasks.map((t: TareaItem) => {
+                      const esf = etiquetaEsfuerzo(t);
+                      return `[${(t.area || t.tipo || 'general').toUpperCase()}] ${t.titulo}${esf ? ` (${esf})` : ''}`;
+                    }),
+                    ...(horasTotales(createdTasks) ? [`Total estimado: ~${horasTotales(createdTasks)} h`] : []),
+                  ],
                 }
               : undefined,
             timestamp: Date.now()
@@ -656,6 +813,8 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
       let effectivePrompt = userPromptMessage.text.replace(/@diag/gi, '').trim();
 
       let isFixRequest = /arregl|desastre|coheren|reorganiz|limpi|corrig/i.test(effectivePrompt);
+      // CU32: problemas que encuentra el detector (se muestran con "Aplicar" junto a la propuesta)
+      let sugerenciasRevision: SugerenciaIA[] | undefined;
 
       if (command === 'roles' || command === 'role') {
         effectivePrompt = `DISTRIBUCIÓN DE ROLES Y RESPONSABILIDADES:\n` +
@@ -686,6 +845,28 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
         effectivePrompt = `LIMPIEZA DE DIAGRAMA:\n` +
           `Identifica y elimina clases huérfanas, notas obsoletas o relaciones desconectadas que no aporten valor al modelo principal.\n` +
           (userPrompt ? `Instrucciones adicionales: ${userPrompt}` : '');
+      } else if (command === 'revisar') {
+        // CU32: detector (sin IA) + revisión de la IA; lo que corrige llega como propuesta
+        const detectados = await detectarProblemas(nodes, relations);
+        sugerenciasRevision = detectados?.length ? detectados.slice(0, 8) : undefined;
+        const lista = (detectados || []).slice(0, 12).map(d => `- ${d.texto}: ${d.detalle}`).join('\n');
+        effectivePrompt = `REVISIÓN COMPLETA DEL DIAGRAMA:\n` +
+          `Revisa claves primarias y foráneas, tipos, cardinalidades, normalización, nombres y relaciones faltantes o sobrantes.\n` +
+          (lista ? `Problemas ya detectados automáticamente:\n${lista}\n` : '') +
+          `Devuelve en 'nodes' SOLO las clases que cambian (con todos sus atributos) y en 'relations' solo las relaciones nuevas o corregidas.\n` +
+          `En 'summary' explica en viñetas breves cada problema y cómo lo corriges.\n` +
+          (userPrompt ? `Foco pedido por el usuario: ${userPrompt}` : '');
+      } else if (command === 'requisitos') {
+        // CU36: requisitos (texto pegado o PDF) → diagrama propuesto
+        const req = (extra?.requisitos || userPrompt || '').trim();
+        if (!req) {
+          throw new Error('Pega los requisitos después de /requisitos, o adjunta un PDF desde el menú + del chat.');
+        }
+        effectivePrompt = `GENERAR DIAGRAMA DESDE REQUISITOS:\n` +
+          `Identifica las entidades del dominio, sus atributos (con PK y FK), métodos principales y relaciones con cardinalidad.\n` +
+          `Si ya existen clases en el diagrama, reutilízalas y solo agrega o ajusta lo necesario.\n` +
+          `En 'summary' resume en 2-3 oraciones qué entidades salieron de los requisitos.\n\n` +
+          `REQUISITOS:\n${req.slice(0, 15000)}`;
       } else if (command) {
         effectivePrompt = `[COMANDO /${command}]\n${userPrompt || 'Ejecutar comando sobre el diagrama actual.'}`;
       } else {
@@ -706,8 +887,11 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
         activeApiKey || null,
         proyectoId,
         { nodes, relations },          // versión anterior al cambio (historial de la IA)
-        getUserIdentity().nickname
+        getUserIdentity().nickname,
+        ctrl.signal,
+        correccionesDelDiagrama(getDiagramState(), nodes)
       );
+      if (ctrl.signal.aborted) { finalizarDetenido(); return; }
 
       // Los cambios de la IA no se aplican solos: si el backend registró la versión,
       // quedan como PROPUESTA hasta que alguien con permiso de edición la apruebe.
@@ -722,6 +906,7 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
         const nombres: string[] = (result.nodes || []).map((n: any) => n.name || n.nombre).filter(Boolean);
         propuestaInfo = {
           versionId: result.version_id,
+          correccion: userPromptMessage.correccion,
           estado: 'pendiente',
           solicitadaPor: getUserIdentity().nickname,
           agregadas: nombres.filter(n => !existentes.has(n.toLowerCase())),
@@ -747,6 +932,7 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
           const nombres: string[] = (result.nodes || []).map((n: any) => n.name || n.nombre).filter(Boolean);
           propuestaInfo = {
             ...registrada,
+            correccion: userPromptMessage.correccion,
             agregadas: nombres.filter(n => !existentes.has(n.toLowerCase())),
             modificadas: nombres.filter(n => existentes.has(n.toLowerCase())),
             eliminadas: (result.deletedNodes || [])
@@ -861,6 +1047,7 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
         summary: summaryText,
         tasksCount,
         propuesta: propuestaInfo,
+        sugerencias: sugerenciasRevision,
         timestamp: Date.now()
       };
 
@@ -875,6 +1062,8 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
 
       setInFlightTasks(prev => prev.filter(t => t.taskId !== taskId));
     } catch (err: any) {
+      if (ctrl.signal.aborted) { finalizarDetenido(); return; }
+      cancelacionesRef.current.delete(userPromptMessage.id);
       const errorMsg = err?.message || 'Error al procesar la solicitud.';
       const failedAiMessage: ChatMessage = {
         ...pendingAiMessage,
@@ -896,7 +1085,7 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
   }, [provider, geminiKey, openrouterKey, kimiKey, nodes, relations, injectDiagramResult, sendChatMessage, roomUsers, proyectoId]);
 
   // Enviar mensaje en el chat grupal
-  const sendMessage = useCallback((rawText: string) => {
+  const sendMessage = useCallback((rawText: string, correccion?: CorreccionVinculada) => {
     const text = rawText.trim();
     if (!text) return;
 
@@ -910,7 +1099,8 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
       senderColor: userColor,
       text,
       timestamp: Date.now(),
-      replyTo: replyingTo || undefined
+      replyTo: replyingTo || undefined,
+      correccion
     };
 
     setMessages(prev => [...prev, newMessage]);
@@ -922,6 +1112,55 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
       executeParallelAi(newMessage);
     }
   }, [replyingTo, sendChatMessage, executeParallelAi]);
+
+  /** Botón "Detener" de la burbuja de la IA (solo para quien hizo el pedido) */
+  const detenerIA = useCallback((promptMessageId: string) => {
+    cancelacionesRef.current.get(promptMessageId)?.abort();
+  }, []);
+
+  /** CU36: sube un PDF de requisitos, extrae el texto y pide el diagrama (llega como propuesta). */
+  const enviarRequisitosPdf = useCallback(async (archivo: File): Promise<string | null> => {
+    if (!/\.pdf$/i.test(archivo.name) && archivo.type !== 'application/pdf') return 'El archivo debe ser un PDF.';
+    if (archivo.size > 10 * 1024 * 1024) return 'El PDF supera los 10 MB.';
+    let datos: { texto: string; paginas: number; truncado: boolean };
+    try {
+      const base64 = await new Promise<string>((ok, mal) => {
+        const lector = new FileReader();
+        lector.onload = () => ok(String(lector.result));
+        lector.onerror = () => mal(lector.error);
+        lector.readAsDataURL(archivo);
+      });
+      datos = await apiFetch('/prompt/extraer-texto-pdf', {
+        method: 'POST',
+        body: JSON.stringify({ pdf_base64: base64, nombre: archivo.name }),
+      });
+    } catch (e) {
+      return e instanceof Error ? e.message : 'No se pudo leer el PDF.';
+    }
+    const identity = getUserIdentity();
+    const mensaje: ChatMessage = {
+      id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      senderId: identity.id,
+      senderName: identity.nickname,
+      senderColor: getUserColor(identity.id || identity.nickname),
+      text: `/requisitos ${archivo.name} (${datos.paginas} pág.${datos.truncado ? ', se usó solo el inicio' : ''})`,
+      timestamp: Date.now(),
+    };
+    setMessages(prev => [...prev, mensaje]);
+    sendChatMessage(mensaje);
+    executeParallelAi(mensaje, { requisitos: datos.texto });
+    return null;
+  }, [sendChatMessage, executeParallelAi]);
+
+  // Pedidos a @diag que llegan desde fuera del chat ("Solucionar con IA" en una corrección)
+  useEffect(() => {
+    const enviarPendientes = () => {
+      tomarSolicitudes().forEach(s => sendMessage(`@diag ${s.texto}`, s.correccion));
+    };
+    enviarPendientes();   // por si el chat se abrió justo para esto
+    window.addEventListener(EVENTO_SOLICITUD_IA, enviarPendientes);
+    return () => window.removeEventListener(EVENTO_SOLICITUD_IA, enviarPendientes);
+  }, [sendMessage]);
 
   // Lista de usuarios y bot para menciones (@)
   // ── Propuestas de la IA: aprobar / rechazar ───────────────────────────
@@ -976,6 +1215,19 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
         }
       });
     });
+    // Comentario breve de la IA en cada clase asignada
+    const quien = getUserIdentity().nickname;
+    for (const r of roles) {
+      for (const className of (r.clases_asignadas || []).slice(0, 10)) {
+        const nodo = actuales.find(n => n.nombre?.toLowerCase() === className.toLowerCase());
+        if (!nodo) continue;
+        crearComentarioElemento({
+          proyecto_id: proyectoId, elemento_id: nodo.id, elemento_tipo: 'node', autor_ia: true, autor_nombre: quien,
+          texto: `Responsable: ${r.nombre} (${r.rol_ia || 'Desarrollador'}).`,
+        }).catch(() => {});
+      }
+    }
+    window.dispatchEvent(new Event('comentarios_actualizados'));
     for (const r of roles) {
       try {
         await asignarRolManual({
@@ -1010,7 +1262,9 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
           descripcion: t.descripcion || null,
           tipo: t.tipo || 'desarrollo',
           area: t.area || 'general',
-          orden: t.orden || i + 1
+          orden: t.orden || i + 1,
+          estimacion_horas: t.estimacion_horas ?? undefined,
+          complejidad: t.complejidad ?? undefined
         });
       } catch (e) {
         console.warn('No se pudo crear la tarea propuesta:', t?.titulo, e);
@@ -1018,6 +1272,50 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
     }
     window.dispatchEvent(new Event('refetch_tareas_ia'));
     setTimeout(() => window.dispatchEvent(new Event('refetch_tareas_ia')), 800);
+  }, [proyectoId]);
+
+  /** Comentario breve de la IA en cada clase / relación que cambió al aplicar una propuesta */
+  const comentarCambiosIA = useCallback(async (
+    antes: { nodes: any[]; relations: any[] },
+    despues: { nodes: any[]; relations: any[] },
+    pedidaPor: string,
+    aprobadaPor: string
+  ) => {
+    if (!proyectoId) return;
+    const cmp = compararVersiones(antes, despues);
+    const firma = pedidaPor ? ` (pedido por ${pedidaPor})` : '';
+    const recortar = (xs: string[]) => xs.slice(0, 4).map(x => x.replace(/^\S+\s/, '')).join(', ') + (xs.length > 4 ? '…' : '');
+    const comentarios: Array<{ id: string; tipo: 'node' | 'relation'; texto: string }> = [];
+    cmp.nodos.filter(c => c.estado !== 'eliminado').slice(0, 10).forEach(c => {
+      if (c.estado === 'agregado') {
+        const n = c.atributos.agregados.length;
+        comentarios.push({ id: c.id, tipo: 'node', texto: `Clase nueva${n ? ` con ${n} atributo${n > 1 ? 's' : ''}` : ''}${firma}.` });
+        return;
+      }
+      const partes: string[] = [];
+      if (c.renombradoDe) partes.push(`renombró ${c.renombradoDe} → ${c.nombre}`);
+      const agr = [...c.atributos.agregados, ...c.metodos.agregados];
+      const eli = [...c.atributos.eliminados, ...c.metodos.eliminados];
+      const mod = [...c.atributos.modificados, ...c.metodos.modificados].map(m => m.despues);
+      if (agr.length) partes.push(`agregó ${recortar(agr)}`);
+      if (mod.length) partes.push(`cambió ${recortar(mod)}`);
+      if (eli.length) partes.push(`quitó ${recortar(eli)}`);
+      if (partes.length) comentarios.push({ id: c.id, tipo: 'node', texto: `${partes.join('; ')}${firma}.`.replace(/^./, s => s.toUpperCase()) });
+    });
+    const nombres = new Map(despues.nodes.map((x: any) => [String(x.id), x.nombre]));
+    (despues.relations || []).filter((rel: any) => cmp.estadoRelacionPorId[String(rel.id)] === 'agregado').slice(0, 6).forEach((rel: any) => {
+      comentarios.push({
+        id: String(rel.id), tipo: 'relation',
+        texto: `Relación nueva ${nombres.get(String(rel.sourceId)) ?? ''} → ${nombres.get(String(rel.targetId)) ?? ''} (${rel.type || 'association'})${firma}.`,
+      });
+    });
+    await Promise.all(comentarios.map(c =>
+      crearComentarioElemento({
+        proyecto_id: proyectoId, elemento_id: c.id, elemento_tipo: c.tipo, texto: c.texto,
+        autor_ia: true, autor_nombre: aprobadaPor,
+      }).catch(err => console.warn('No se pudo crear el comentario de la IA:', err))
+    ));
+    if (comentarios.length) window.dispatchEvent(new Event('comentarios_actualizados'));
   }, [proyectoId]);
 
   const decidirPropuesta = useCallback(async (messageId: string, aceptar: boolean) => {
@@ -1057,16 +1355,29 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
         await injectRef.current(prop, p.offset ?? 0, !!p.refactor);
         if (Array.isArray(prop.tasks) && prop.tasks.length) await crearTareasPropuestas(prop.tasks);
       }
+      // "Solucionar con IA": la corrección queda resuelta al aplicar la propuesta aprobada
+      if (p.correccion) {
+        resolveCorreccionRef.current(p.correccion.nodoId, p.correccion.id, `IA (aprobado por ${quien})`);
+      }
       const versionId = p.versionId;
+      const antesDeAplicar = { nodes: n, relations: r };
       setTimeout(async () => {
+        const { nodes: n2, relations: r2 } = estadoActualRef.current;
         try {
-          const { nodes: n2, relations: r2 } = estadoActualRef.current;
           await guardarVersionDespues(proyectoId, versionId, { nodes: n2, relations: r2 });
         } catch (verErr) {
           console.warn('[useWhatsAppChat] No se pudo guardar la versión posterior:', verErr);
         } finally {
           window.dispatchEvent(new CustomEvent(EVENTO_VERSIONES_ACTUALIZADAS, { detail: { versionId } }));
         }
+        // CU33: la IA explica brevemente en cada elemento lo que cambió
+        if (prop.tipo !== 'roles' && prop.tipo !== 'tareas') {
+          await comentarCambiosIA(antesDeAplicar, { nodes: n2, relations: r2 }, msg.propuesta?.solicitadaPor || '', quien);
+          // reenviar la propuesta ya aprobada: el resto de la sala refresca los comentarios
+          const ultimo = messagesRef.current.find(m => m.id === messageId);
+          if (ultimo) sendChatMessage(ultimo);
+        }
+        avisarDiagramaEstable({ nodes: n2, relations: r2 });
       }, 700);
     } else {
       window.dispatchEvent(new CustomEvent(EVENTO_VERSIONES_ACTUALIZADAS, { detail: { versionId: p.versionId } }));
@@ -1077,7 +1388,7 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
       decididaPor: detalle.decidida_por || quien,
       decididaEn: Date.now(),
     });
-  }, [proyectoId, sendChatMessage, aplicarRoles, crearTareasPropuestas]);
+  }, [proyectoId, sendChatMessage, aplicarRoles, crearTareasPropuestas, comentarCambiosIA]);
 
   const getMentionableUsers = useCallback((): RoomUserMention[] => {
     const mentions: RoomUserMention[] = [
@@ -1119,6 +1430,110 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
     return mentions;
   }, [roomUsers, cursors]);
 
+  // ── Digitalizar un diagrama desde una imagen o bosquejo (menú "+" del chat) ──
+  // Mismo flujo que el resto de la IA: llega como PROPUESTA y nadie la aplica sin aprobar.
+  const enviarImagenDiagrama = useCallback(async (archivo: File): Promise<string | null> => {
+    if (!archivo.type.startsWith('image/')) return 'El archivo debe ser una imagen (PNG, JPG…).';
+    if (archivo.size > 8 * 1024 * 1024) return 'La imagen supera los 8 MB.';
+
+    let base64: string;
+    try {
+      base64 = await new Promise<string>((ok, mal) => {
+        const lector = new FileReader();
+        lector.onload = () => ok(String(lector.result));
+        lector.onerror = () => mal(lector.error);
+        lector.readAsDataURL(archivo);
+      });
+    } catch {
+      return 'No se pudo leer la imagen.';
+    }
+
+    const identity = getUserIdentity();
+    const mensaje: ChatMessage = {
+      id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      senderId: identity.id,
+      senderName: identity.nickname,
+      senderColor: getUserColor(identity.id || identity.nickname),
+      text: `Digitalizar diagrama desde imagen: ${archivo.name}`,
+      timestamp: Date.now(),
+    };
+    setMessages(prev => [...prev, mensaje]);
+    sendChatMessage(mensaje);
+
+    const aiMessageId = `ai_reply_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const pendiente: ChatMessage = {
+      id: aiMessageId,
+      senderId: 'bot_diag',
+      senderName: '@diag',
+      senderColor: '#25D366',
+      text: '',
+      timestamp: Date.now(),
+      replyTo: { id: mensaje.id, senderName: mensaje.senderName, text: mensaje.text, senderColor: mensaje.senderColor },
+      isAi: true,
+      aiStatus: 'pending',
+      provider,
+    };
+    setMessages(prev => [...prev, pendiente]);
+    sendChatMessage(pendiente);
+
+    const publicar = (m: ChatMessage) => {
+      setMessages(prev => prev.map(x => (x.id === aiMessageId ? m : x)));
+      sendChatMessage(m);
+    };
+
+    try {
+      const apiKey = provider === 'gemini' ? geminiKey : provider === 'openrouter' ? openrouterKey : provider === 'kimi' ? kimiKey : '';
+      const result = await digitalizarImagen(base64, undefined, provider, apiKey || undefined);
+      const nodos = result.nodes || [];
+      const relaciones = result.relations || [];
+
+      if (nodos.length === 0) {
+        publicar({ ...pendiente, text: 'No encontré clases ni tablas en la imagen. Prueba con una foto más nítida o un recorte del diagrama.', aiStatus: 'error', timestamp: Date.now() });
+        return null;
+      }
+
+      const resumen = `Encontré ${nodos.length} ${nodos.length === 1 ? 'elemento' : 'elementos'} y ${relaciones.length} ${relaciones.length === 1 ? 'relación' : 'relaciones'} en «${archivo.name}».`;
+      const offset = parallelCounterRef.current++;
+      const propuestaDatos = { tipo: 'diagrama', nodes: nodos, relations: relaciones, summary: resumen };
+
+      if (proyectoId && proyectoId > 0) {
+        const registrada = await registrarPropuesta('IMAGEN', mensaje.text, resumen, propuestaDatos);
+        if (!registrada) {
+          publicar({ ...pendiente, text: 'Digitalicé la imagen, pero no pude registrar la propuesta en el historial, así que no se aplicó nada.', aiStatus: 'error', timestamp: Date.now() });
+          return null;
+        }
+        const existentes = new Set(estadoActualRef.current.nodes.map(n => (n.nombre || '').toLowerCase()));
+        const nombres = nodos.map((n: any) => n.name || n.nombre).filter(Boolean) as string[];
+        publicar({
+          ...pendiente,
+          text: resumen,
+          aiStatus: 'success',
+          timestamp: Date.now(),
+          propuesta: {
+            ...registrada,
+            agregadas: nombres.filter(n => !existentes.has(n.toLowerCase())),
+            modificadas: nombres.filter(n => existentes.has(n.toLowerCase())),
+            eliminadas: [],
+            relaciones: relaciones.length,
+            tareas: 0,
+            offset,
+            refactor: false,
+          },
+        });
+      } else {
+        // Fuera de un proyecto no hay historial ni aprobación: se aplica directamente
+        marcarOrigenProximosCambios({ intent: 'IMAGEN', cmd: mensaje.text });
+        await injectDiagramResult(propuestaDatos, offset, false);
+        publicar({ ...pendiente, text: `${resumen} Ya están en la pizarra.`, aiStatus: 'success', timestamp: Date.now() });
+      }
+      return null;
+    } catch (err) {
+      const motivo = err instanceof Error ? err.message : 'Error al digitalizar la imagen';
+      publicar({ ...pendiente, text: `No pude digitalizar la imagen: ${motivo}`, aiStatus: 'error', timestamp: Date.now() });
+      return null;
+    }
+  }, [provider, geminiKey, openrouterKey, kimiKey, proyectoId, sendChatMessage, registrarPropuesta, injectDiagramResult]);
+
   return {
     messages,
     provider,
@@ -1134,6 +1549,9 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId }: UseWha
     sendMessage,
     inFlightTasks,
     getMentionableUsers,
-    decidirPropuesta
+    decidirPropuesta,
+    enviarRequisitosPdf,
+    enviarImagenDiagrama,
+    detenerIA
   };
 }

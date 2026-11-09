@@ -1,3 +1,4 @@
+import asyncio
 from typing import Optional, Any
 from .llm_client import consultar_llm, transcribir_audio
 from .dsl_normalizer import normalize_ai_output, extraer_entidades_de_texto, garantizar_conectividad_relacional
@@ -51,7 +52,9 @@ async def generar_diagrama_desde_prompt(
     proyecto_id: Optional[int] = None,
     db: Optional[Any] = None,
     estado_antes: Optional[dict] = None,
-    autor: Optional[str] = None
+    autor: Optional[str] = None,
+    cancelado: Optional[Any] = None,
+    correcciones: Optional[list] = None
 ) -> dict:
     """
     Orquestador único y genérico para generación/refactorización de diagramas UML.
@@ -68,7 +71,10 @@ async def generar_diagrama_desde_prompt(
         try:
             from backend.modules.gestion_asistencia_ia.gestionar_contexto_persistente.services.contexto_service import ContextoService
             service = ContextoService(db)
-            compilado = await service.compilar_contexto(proyecto_id)
+            if correcciones is not None:
+                # las correcciones del diagrama entran a la memoria ANTES de armar el contexto
+                await service.sincronizar_correcciones(proyecto_id, correcciones)
+            compilado = await service.compilar_contexto(proyecto_id, consulta=prompt)
             if compilado and compilado.contexto_compilado_llm:
                 effective_context = f"{compilado.contexto_compilado_llm}\n\nLienzo Actual:\n{effective_context}"
         except Exception as ctx_err:
@@ -123,6 +129,14 @@ async def generar_diagrama_desde_prompt(
             if not resultado.get("summary"):
                 resultado["summary"] = "Entidades extraídas y conectadas coherentemente."
 
+    # Si el usuario pulsó "Detener" mientras la IA pensaba, no se registra nada
+    if cancelado is not None:
+        try:
+            if await cancelado():
+                return resultado
+        except Exception:
+            pass
+
     if db is not None and proyecto_id is not None and proyecto_id > 0:
         try:
             from backend.modules.gestion_asistencia_ia.gestionar_contexto_persistente.services.contexto_service import ContextoService
@@ -142,7 +156,8 @@ async def generar_diagrama_desde_prompt(
                 "tasks": resultado.get("tasks") or [],
                 "summary": resultado.get("summary") or "",
             } if hay_cambios else None
-            registro = await service.registrar_interaccion(
+            # shield: una vez empezado, el registro termina aunque se cancele la petición (no queda a medias)
+            registro = await asyncio.shield(service.registrar_interaccion(
                 RegistrarInteraccionRequest(
                     proyecto_id=proyecto_id,
                     user_prompt=prompt,
@@ -154,7 +169,7 @@ async def generar_diagrama_desde_prompt(
                     autor=autor,
                     propuesta=propuesta,
                 )
-            )
+            ))
             resultado["version_id"] = registro.version_id
         except Exception as reg_err:
             print(f"[ContextoPersistente] Advertencia al persistir interacción: {reg_err}")

@@ -1,5 +1,6 @@
+import asyncio
 import logging
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.core.database import get_db
 from backend.core.config import settings
@@ -30,11 +31,14 @@ async def get_prompt_config():
 @router.post("/generar", response_model=PromptResponse)
 async def generar_diagrama(
     request: PromptRequest,
+    http_request: Request,
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_user_optional)
 ):
     try:
-        resultado = await generar_diagrama_desde_prompt(
+        # "Detener" en el chat corta la petición: si el cliente se desconecta, se cancela la
+        # llamada a la IA (deja de generar y de gastar) y no se registra ninguna propuesta.
+        tarea = asyncio.create_task(generar_diagrama_desde_prompt(
             prompt=request.prompt,
             context=request.context,
             image_base64=request.image_base64,
@@ -45,7 +49,18 @@ async def generar_diagrama(
             db=db,
             estado_antes=request.estado_antes,
             autor=request.autor or getattr(current_user, "nombre", None),
-        )
+            cancelado=http_request.is_disconnected,
+            correcciones=request.correcciones,
+        ))
+        while True:
+            hecho, _ = await asyncio.wait({tarea}, timeout=0.5)
+            if hecho:
+                break
+            if await http_request.is_disconnected():
+                tarea.cancel()
+                logger.info("[POST /prompt/generar] El usuario detuvo la IA; llamada cancelada")
+                raise HTTPException(status_code=499, detail="Solicitud detenida por el usuario")
+        resultado = tarea.result()
         return PromptResponse(
             nodes=resultado.get("nodes", []),
             relations=resultado.get("relations", []),
@@ -74,3 +89,48 @@ async def transcribe_audio(
         request.api_key
     )
     return {"text": transcripcion}
+
+
+# ─── CU36: requisitos en PDF → texto (luego /requisitos genera la propuesta) ──
+
+from pydantic import BaseModel as _BaseModel  # noqa: E402
+
+MAX_PDF_BYTES = 10 * 1024 * 1024
+MAX_PDF_PAGINAS = 40
+MAX_TEXTO_REQUISITOS = 15000
+
+
+class ExtraerPdfRequest(_BaseModel):
+    pdf_base64: str
+    nombre: str = "requisitos.pdf"
+
+
+@router.post("/extraer-texto-pdf")
+async def extraer_texto_pdf(req: ExtraerPdfRequest, current_user = Depends(get_current_user_optional)):
+    """Extrae el texto de un PDF de requisitos (sin IA). Límite: 10 MB y 40 páginas."""
+    import base64
+    import io
+    from pypdf import PdfReader
+
+    datos = req.pdf_base64.split(",", 1)[-1]
+    try:
+        contenido = base64.b64decode(datos, validate=False)
+    except Exception:
+        raise HTTPException(status_code=400, detail="El archivo no es un PDF válido")
+    if len(contenido) > MAX_PDF_BYTES:
+        raise HTTPException(status_code=413, detail="El PDF supera los 10 MB")
+    try:
+        lector = PdfReader(io.BytesIO(contenido))
+        paginas = lector.pages[:MAX_PDF_PAGINAS]
+        texto = "\n".join((p.extract_text() or "").strip() for p in paginas).strip()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"No se pudo leer el PDF: {exc}")
+    if not texto:
+        raise HTTPException(status_code=422, detail="El PDF no tiene texto seleccionable (¿es una imagen escaneada?)")
+    truncado = len(texto) > MAX_TEXTO_REQUISITOS or len(lector.pages) > MAX_PDF_PAGINAS
+    return {
+        "texto": texto[:MAX_TEXTO_REQUISITOS],
+        "paginas": len(lector.pages),
+        "truncado": truncado,
+        "nombre": req.nombre,
+    }
