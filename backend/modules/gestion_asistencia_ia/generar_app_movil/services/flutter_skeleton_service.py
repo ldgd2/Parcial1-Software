@@ -111,6 +111,7 @@ La URL del backend NO está escrita en el código: se lee del archivo `.env` de 
 ```env
 API_BASE_URL={api_base_url.rstrip("/")}
 API_TIMEOUT_SECONDS=20
+MONEDA=Bs
 ```
 
 - `.env.example` es la plantilla: cópiala a `.env` si no existe.
@@ -132,6 +133,8 @@ def generar_env(api_base_url: str) -> str:
 API_BASE_URL={api_base_url.rstrip("/")}
 # Segundos de espera por petición
 API_TIMEOUT_SECONDS=20
+# Símbolo de moneda para precios y totales
+MONEDA=Bs
 """
 
 
@@ -142,6 +145,7 @@ def generar_env_example() -> str:
 # Celular físico en tu red:   http://<IP-de-tu-PC>:8080
 API_BASE_URL=http://10.0.2.2:8080
 API_TIMEOUT_SECONDS=20
+MONEDA=Bs
 """
 
 
@@ -235,7 +239,12 @@ class ApiClient {
   dynamic _handleResponse(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (response.body.isEmpty) return null;
-      return jsonDecode(utf8.decode(response.bodyBytes));
+      final texto = utf8.decode(response.bodyBytes);
+      try {
+        return jsonDecode(texto);
+      } on FormatException {
+        return texto;
+      }
     } else {
       String errorMessage = 'Error al comunicarse con el servidor';
       try {
@@ -256,92 +265,6 @@ class ApiClient {
       }
       throw ApiException(response.statusCode, errorMessage);
     }
-  }
-}
-"""
-
-
-def generar_app_theme() -> str:
-    return """import 'package:flutter/material.dart';
-
-class AppTheme {
-  static const Color primaryColor = Color(0xFF2563EB);
-  static const Color secondaryColor = Color(0xFF0F172A);
-  static const Color accentColor = Color(0xFF38BDF8);
-  static const Color backgroundColor = Color(0xFF0F172A);
-  static const Color surfaceColor = Color(0xFF1E293B);
-  static const Color cardColor = Color(0xFF1E293B);
-  static const Color textColor = Color(0xFFF8FAFC);
-  static const Color textMutedColor = Color(0xFF94A3B8);
-  static const Color borderColor = Color(0xFF334155);
-
-  static ThemeData get darkTheme {
-    return ThemeData(
-      useMaterial3: true,
-      brightness: Brightness.dark,
-      primaryColor: primaryColor,
-      scaffoldBackgroundColor: backgroundColor,
-      cardColor: cardColor,
-      colorScheme: const ColorScheme.dark(
-        primary: primaryColor,
-        secondary: accentColor,
-        surface: surfaceColor,
-      ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: surfaceColor,
-        elevation: 0,
-        centerTitle: true,
-        titleTextStyle: TextStyle(
-          color: textColor,
-          fontSize: 18,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.5,
-        ),
-        iconTheme: IconThemeData(color: textColor),
-      ),
-      cardTheme: CardThemeData(
-        color: surfaceColor,
-        elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: borderColor, width: 1),
-        ),
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: primaryColor,
-          foregroundColor: Colors.white,
-          elevation: 2,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          textStyle: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: surfaceColor,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: borderColor),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: borderColor),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: primaryColor, width: 1.5),
-        ),
-        labelStyle: const TextStyle(color: textMutedColor),
-        hintStyle: const TextStyle(color: textMutedColor),
-      ),
-    );
   }
 }
 """
@@ -475,368 +398,14 @@ abstract class BaseCrudService<T extends BaseModel> {
   Future<void> delete(dynamic id) async {
     await client.delete('$endpoint/$id');
   }
-}
-"""
 
-
-def generar_app_text_field() -> str:
-    return """import 'package:flutter/material.dart';
-
-class AppTextField extends StatelessWidget {
-  final TextEditingController controller;
-  final String label;
-  final String? hint;
-  final TextInputType keyboardType;
-  final bool obscureText;
-  final String? Function(String?)? validator;
-  final IconData? prefixIcon;
-  final int maxLines;
-
-  const AppTextField({
-    super.key,
-    required this.controller,
-    required this.label,
-    this.hint,
-    this.keyboardType = TextInputType.text,
-    this.obscureText = false,
-    this.validator,
-    this.prefixIcon,
-    this.maxLines = 1,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: TextFormField(
-        controller: controller,
-        keyboardType: keyboardType,
-        obscureText: obscureText,
-        maxLines: maxLines,
-        validator: validator,
-        decoration: InputDecoration(
-          labelText: label,
-          hintText: hint,
-          prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 20) : null,
-        ),
-      ),
-    );
-  }
-}
-"""
-
-
-def generar_app_button() -> str:
-    return """import 'package:flutter/material.dart';
-
-class AppButton extends StatelessWidget {
-  final String text;
-  final VoidCallback? onPressed;
-  final bool isLoading;
-  final IconData? icon;
-  final Color? backgroundColor;
-
-  const AppButton({
-    super.key,
-    required this.text,
-    required this.onPressed,
-    this.isLoading = false,
-    this.icon,
-    this.backgroundColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 48,
-      child: ElevatedButton(
-        style: backgroundColor != null
-            ? ElevatedButton.styleFrom(backgroundColor: backgroundColor)
-            : null,
-        onPressed: isLoading ? null : onPressed,
-        child: isLoading
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (icon != null) ...[
-                    Icon(icon, size: 18),
-                    const SizedBox(width: 8),
-                  ],
-                  Text(text),
-                ],
-              ),
-      ),
-    );
-  }
-}
-"""
-
-
-def generar_confirm_dialog() -> str:
-    return """import 'package:flutter/material.dart';
-
-class ConfirmDialog {
-  static Future<bool> show({
-    required BuildContext context,
-    required String title,
-    required String message,
-    String confirmLabel = 'Eliminar',
-    String cancelLabel = 'Cancelar',
-    bool isDestructive = true,
-  }) async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E293B),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: Color(0xFF334155)),
-        ),
-        title: Text(
-          title,
-          style: const TextStyle(color: Color(0xFFF8FAFC), fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        content: Text(
-          message,
-          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(cancelLabel, style: const TextStyle(color: Color(0xFF94A3B8))),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isDestructive ? const Color(0xFFEF4444) : const Color(0xFF2563EB),
-            ),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(confirmLabel),
-          ),
-        ],
-      ),
-    );
-    return result ?? false;
-  }
-}
-"""
-
-
-def generar_entity_card() -> str:
-    return """import 'package:flutter/material.dart';
-
-class EntityCard extends StatelessWidget {
-  final String title;
-  final String? subtitle;
-  final String? trailingText;
-  final IconData leadingIcon;
-  final VoidCallback onTap;
-  final VoidCallback? onEdit;
-  final VoidCallback? onDelete;
-
-  const EntityCard({
-    super.key,
-    required this.title,
-    this.subtitle,
-    this.trailingText,
-    this.leadingIcon = Icons.layers_outlined,
-    required this.onTap,
-    this.onEdit,
-    this.onDelete,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        leading: CircleAvatar(
-          backgroundColor: const Color(0xFF2563EB).withValues(alpha: 0.15),
-          child: Icon(leadingIcon, color: const Color(0xFF38BDF8), size: 20),
-        ),
-        title: Text(
-          title,
-          style: const TextStyle(color: Color(0xFFF8FAFC), fontWeight: FontWeight.w600, fontSize: 15),
-        ),
-        subtitle: subtitle != null
-            ? Text(
-                subtitle!,
-                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              )
-            : null,
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (trailingText != null)
-              Padding(
-                padding: const EdgeInsets.only(right: 8.0),
-                child: Text(
-                  trailingText!,
-                  style: const TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold),
-                ),
-              ),
-            if (onEdit != null)
-              IconButton(
-                icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF94A3B8)),
-                onPressed: onEdit,
-                tooltip: 'Editar',
-              ),
-            if (onDelete != null)
-              IconButton(
-                icon: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFEF4444)),
-                onPressed: onDelete,
-                tooltip: 'Eliminar',
-              ),
-          ],
-        ),
-        onTap: onTap,
-      ),
-    );
-  }
-}
-"""
-
-
-def generar_loading_widget() -> str:
-    return """import 'package:flutter/material.dart';
-
-class LoadingWidget extends StatelessWidget {
-  final String? message;
-
-  const LoadingWidget({super.key, this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CircularProgressIndicator(strokeWidth: 2.5),
-          if (message != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              message!,
-              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-"""
-
-
-def generar_empty_state_widget() -> str:
-    return """import 'package:flutter/material.dart';
-
-class EmptyStateWidget extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final VoidCallback? onAction;
-  final String? actionLabel;
-
-  const EmptyStateWidget({
-    super.key,
-    this.title = 'Sin registros',
-    this.subtitle = 'No se encontraron elementos disponibles.',
-    this.onAction,
-    this.actionLabel,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.inbox_outlined, size: 48, color: Color(0xFF64748B)),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: const TextStyle(
-                color: Color(0xFFF8FAFC),
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-            ),
-            if (onAction != null && actionLabel != null) ...[
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: onAction,
-                child: Text(actionLabel!),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-"""
-
-
-def generar_error_state_widget() -> str:
-    return """import 'package:flutter/material.dart';
-
-class ErrorStateWidget extends StatelessWidget {
-  final String error;
-  final VoidCallback? onRetry;
-
-  const ErrorStateWidget({super.key, required this.error, this.onRetry});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: Color(0xFFEF4444)),
-            const SizedBox(height: 12),
-            const Text(
-              'Ocurrió un error',
-              style: TextStyle(
-                color: Color(0xFFF8FAFC),
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              error,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-            ),
-            if (onRetry != null) ...[
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh, size: 16),
-                label: const Text('Reintentar'),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
+  /// Método de negocio del diagrama: el backend lo expone como POST <endpoint>/<nombre>?param=valor
+  Future<dynamic> accion(String nombre, [Map<String, dynamic> parametros = const {}]) {
+    final query = parametros.entries
+        .where((e) => e.value != null && e.value.toString().isNotEmpty)
+        .map((e) => '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent(e.value.toString())}')
+        .join('&');
+    return client.post('$endpoint/$nombre${query.isEmpty ? '' : '?$query'}', const <String, dynamic>{});
   }
 }
 """
@@ -852,17 +421,9 @@ def construir_archivos_esqueleto(app_name: str, api_base_url: str) -> Dict[str, 
         ".env.example": generar_env_example(),
         "lib/core/config/api_config.dart": generar_api_config(api_base_url),
         "lib/core/network/api_client.dart": generar_api_client(),
-        "lib/core/theme/app_theme.dart": generar_app_theme(),
         "lib/core/models/base_model.dart": generar_base_model(),
         "lib/core/dto/base_dto.dart": generar_base_dto(),
         "lib/core/services/base_crud_service.dart": generar_base_crud_service(),
-        "lib/shared/widgets/app_text_field.dart": generar_app_text_field(),
-        "lib/shared/widgets/app_button.dart": generar_app_button(),
-        "lib/shared/widgets/confirm_dialog.dart": generar_confirm_dialog(),
-        "lib/shared/widgets/entity_card.dart": generar_entity_card(),
-        "lib/shared/widgets/loading_widget.dart": generar_loading_widget(),
-        "lib/shared/widgets/empty_state_widget.dart": generar_empty_state_widget(),
-        "lib/shared/widgets/error_state_widget.dart": generar_error_state_widget(),
     }
 
 
