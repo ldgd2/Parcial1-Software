@@ -26,6 +26,7 @@ class ConnectionManager:
             await websocket.accept()
         self._init_sala(sala_id)
         self.salas[sala_id]["host"] = websocket
+        self.salas[sala_id]["host_id"] = host_id or "host"
         if host_id and nickname:
             self.salas[sala_id]["guest_nicknames"][host_id] = nickname
 

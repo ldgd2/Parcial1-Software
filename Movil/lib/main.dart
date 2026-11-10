@@ -25,6 +25,7 @@ class MovilVisorApp extends StatelessWidget {
 
     return MaterialApp(
       title: 'Visor Móvil UML',
+      scaffoldMessengerKey: mensajeroGlobal,
       debugShowCheckedModeBanner: false,
       scrollBehavior: const MaterialScrollBehavior().copyWith(
         dragDevices: {

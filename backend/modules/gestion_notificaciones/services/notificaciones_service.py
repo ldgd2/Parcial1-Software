@@ -13,6 +13,7 @@ Los eventos que no pasan por el ORM (p. ej. el UPDATE atómico de aprobar/rechaz
 import asyncio
 import logging
 import os
+import re
 import unicodedata
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -168,6 +169,15 @@ async def _construir(db, ev: Dict[str, Any]) -> List[Dict[str, Any]]:
             destinatarios = [m["id"] for m in await _miembros(db, pid) if _norm(m["nombre"]) == _norm(autor)]
             verbo = "aprobó" if ev.get("aprobada") else "rechazó"
             para(destinatarios, f"{por} {verbo} tu pedido a la IA", _corto(ev.get("resumen"), 120))
+
+    elif tipo == "mencion":
+        from backend.modules.gestion_concurrencia.sincronizacion_tiempo_real.services.presencia_service import mencionados
+        autor = ev.get("autor") or "Alguien"
+        miembros = await _miembros(db, pid)
+        autor_guest = str(ev.get("autor_guest") or "")
+        autor_id = int(autor_guest.split("_")[1]) if re.match(r"^(auth|mob)_\d+", autor_guest) else None
+        ids = [i for i in mencionados(ev.get("texto") or "", miembros, autor) if i != autor_id]
+        para(ids, f"{autor} te mencionó en {proyecto}", _corto(ev.get("texto"), 140))
 
     elif tipo == "comentario":
         autor = ev.get("autor") or "Alguien"

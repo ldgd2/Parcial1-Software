@@ -6,6 +6,11 @@ from backend.core.database import get_db
 from backend.modules.gestion_proyectos.versioning.models import GitObject, Commit
 from backend.modules.gestion_proyectos.models import Proyecto, ColaboradorProyecto
 from sqlalchemy import select
+from backend.modules.gestion_concurrencia.sincronizacion_tiempo_real.services.presencia_service import (
+    anunciar_presencia,
+    procesar_mencion,
+    usuarios_en_linea,
+)
 import asyncio
 import json
 
@@ -37,6 +42,14 @@ def guardar_en_historial_chat(history: list, chat_msg: dict) -> None:
         viejo["media"] = {**viejo["media"], "dataUrl": "", "expirado": True}
 
 router = APIRouter(tags=["WebSockets Salas"])
+_tareas_ws: set = set()
+
+
+def _en_segundo_plano(coro) -> None:
+    """Las menciones consultan la BD: no deben frenar el reenvío del chat."""
+    tarea = asyncio.create_task(coro)
+    _tareas_ws.add(tarea)
+    tarea.add_done_callback(_tareas_ws.discard)
 
 
 async def _usuario_del_token(token: str | None) -> int | None:
@@ -274,6 +287,7 @@ async def websocket_endpoint(
                 pass  # el cliente ya cerró
             return
         await manager.connect_host(websocket, codigo_acceso, host_id=guest_id, nickname=nickname, accept=False)
+        await anunciar_presencia(codigo_acceso)
 
         # Enviar guests pendientes al host
         pending = manager.salas[codigo_acceso].get("pending_guests", {})
@@ -315,6 +329,7 @@ async def websocket_endpoint(
                                 codigo_acceso,
                                 exclude=guest_ws,
                             )
+                            await anunciar_presencia(codigo_acceso)
                         else:
                             await guest_ws.close()
 
@@ -333,6 +348,7 @@ async def websocket_endpoint(
                         if approved:
                             manager.remove_pending_guest(codigo_acceso, target_guest)
                             manager.salas[codigo_acceso]["approved_guests"].add(target_guest)
+                            await anunciar_presencia(codigo_acceso)
 
                 # ── Cliente pide snapshots para sincronizar al reconectarse ──
                 elif msg_type == "get_room_users":
@@ -352,6 +368,7 @@ async def websocket_endpoint(
                     target_guest = message.get("guest_id")
                     await manager.kick_user(codigo_acceso, target_guest)
                     await manager.send_personal_message({"type": "user_kicked", "guest_id": target_guest}, websocket)
+                    await anunciar_presencia(codigo_acceso)
 
                 elif msg_type == "change_role":
                     target_guest = message.get("guest_id")
@@ -421,10 +438,15 @@ async def websocket_endpoint(
                         guardar_en_historial_chat(
                             manager.salas[codigo_acceso].setdefault("chat_history", []), chat_msg)
                     await manager.broadcast_to_sala(message, codigo_acceso, exclude=websocket)
+                    _en_segundo_plano(procesar_mencion(codigo_acceso, chat_msg))
 
                 elif msg_type == "request_chat_history":
                     history = manager.salas.get(codigo_acceso, {}).get("chat_history", [])
                     await manager.send_personal_message({"type": "chat_history", "messages": history}, websocket)
+
+                elif msg_type == "get_presence":
+                    await manager.send_personal_message(
+                        {"type": "presence", "users": usuarios_en_linea(codigo_acceso)}, websocket)
 
                 # ── Delta del diagrama: guardar en BD y propagar ──────────
                 elif msg_type in ("sync_offline", "diagram_delta"):
@@ -447,7 +469,10 @@ async def websocket_endpoint(
                     await manager.broadcast_to_sala(message, codigo_acceso, exclude=websocket)
 
         except WebSocketDisconnect:
+            pass
+        finally:
             manager.disconnect(websocket, codigo_acceso)
+            await anunciar_presencia(codigo_acceso)
 
     else:  # Guest
         if not guest_id or not nickname:
@@ -513,6 +538,7 @@ async def websocket_endpoint(
                 codigo_acceso,
                 exclude=websocket,
             )
+            await anunciar_presencia(codigo_acceso)
 
         try:
             while True:
@@ -567,10 +593,15 @@ async def websocket_endpoint(
                         guardar_en_historial_chat(
                             manager.salas[codigo_acceso].setdefault("chat_history", []), chat_msg)
                     await manager.broadcast_to_sala(message, codigo_acceso, exclude=websocket)
+                    _en_segundo_plano(procesar_mencion(codigo_acceso, chat_msg))
 
                 elif msg_type == "request_chat_history":
                     history = manager.salas.get(codigo_acceso, {}).get("chat_history", [])
                     await manager.send_personal_message({"type": "chat_history", "messages": history}, websocket)
+
+                elif msg_type == "get_presence":
+                    await manager.send_personal_message(
+                        {"type": "presence", "users": usuarios_en_linea(codigo_acceso)}, websocket)
 
                 # ── Delta del guest: guardar en BD y propagar ─────────────
                 elif msg_type in ("sync_offline", "diagram_delta"):
@@ -601,9 +632,13 @@ async def websocket_endpoint(
                     await manager.broadcast_to_sala(message, codigo_acceso, exclude=websocket)
 
         except WebSocketDisconnect:
+            pass
+        finally:
+            # También con errores inesperados (antes el invitado quedaba "conectado" para siempre)
             manager.disconnect(websocket, codigo_acceso)
             manager.remove_pending_guest(codigo_acceso, guest_id)
             await manager.notify_host(codigo_acceso, {
                 "type": "guest_left",
                 "guest_id": guest_id,
             })
+            await anunciar_presencia(codigo_acceso)

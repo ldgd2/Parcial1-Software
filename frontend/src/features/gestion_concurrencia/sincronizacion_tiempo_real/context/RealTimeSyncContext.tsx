@@ -62,6 +62,8 @@ interface RealTimeSyncContextType {
   broadcastDiagramEvent: (event: any) => void;
   broadcastDiagramDelta: (head: string, objects: Record<string, any>) => void;
   roomUsers: any[];
+  /** Conectados ahora (web y app móvil), según el servidor */
+  onlineUsers: { id: string; nickname: string; role: string; device: string }[];
   requestRoomUsers: () => void;
   kickUser: (guestId: string) => void;
   changeUserRole: (guestId: string, role: string) => void;
@@ -76,6 +78,7 @@ export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: a
   const [cursors, setCursors] = useState<Record<string, Cursor>>({});
   const [lockedElements, setLockedElements] = useState<Record<string, string>>({});
   const [roomUsers, setRoomUsers] = useState<any[]>([]);
+  const [onlineUsers, setOnlineUsers] = useState<RealTimeSyncContextType['onlineUsers']>([]);
   // CU38: el permiso guardado llega con la sala; el WebSocket lo confirma o lo cambia en vivo
   const [isReadOnly, setIsReadOnly] = useState(sala?.permiso === 'lector');
   useEffect(() => { setIsReadOnly(sala?.permiso === 'lector'); }, [sala?.permiso]);
@@ -178,6 +181,7 @@ export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: a
         // Pedir al servidor los snapshots de versiones actuales e historial de chat
         ws!.send(JSON.stringify({ type: 'request_snapshots' }));
         ws!.send(JSON.stringify({ type: 'request_chat_history' }));
+        ws!.send(JSON.stringify({ type: 'get_presence' }));
       };
 
       ws.onmessage = (event) => {
@@ -235,6 +239,9 @@ export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: a
               }
               break;
               
+            case 'presence':
+              setOnlineUsers(Array.isArray(data.users) ? data.users : []);
+              break;
             case 'room_users_list':
               setRoomUsers(data.users);
               break;
@@ -443,6 +450,7 @@ export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: a
       broadcastDiagramEvent,
       broadcastDiagramDelta,
       roomUsers,
+      onlineUsers,
       requestRoomUsers,
       kickUser,
       changeUserRole,
