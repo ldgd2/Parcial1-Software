@@ -31,7 +31,6 @@ Ciclo 3,CU26,Importar desde XML,APROBADO,NORMAL,NORMAL,Anfitrión
 
 Ciclo 4,CU28,Aprobar propuestas de la IA,EN PRUEBAS,CRÍTICA,ALTO,Anfitrión / Colaborador / API IA
 Ciclo 4,CU29,Historial de versiones y restauración,EN PRUEBAS,ALTA,ALTO,Anfitrión / Colaborador
-Ciclo 4,CU30,Chat privado con asistente IA,DESCARTADO,ALTA,NORMAL,Usuario / API IA
 Ciclo 4,CU31,Memoria persistente del proyecto (IA),EN PRUEBAS,ALTA,ALTO,API IA
 Ciclo 4,CU32,Revisión del diagrama por IA,EN PRUEBAS,ALTA,NORMAL,Anfitrión / Colaborador / API IA
 Ciclo 4,CU33,Sugerencias de IA en el chat y comentarios de cambios,EN PRUEBAS,ALTA,NORMAL,Anfitrión / Colaborador / API IA
@@ -40,9 +39,9 @@ Ciclo 4,CU35,Generar documentación del modelo,EN PRUEBAS,NORMAL,NORMAL,Anfitri�
 Ciclo 4,CU36,Generar diagrama desde requisitos,EN PRUEBAS,ALTA,ALTO,Usuario / API IA
 Ciclo 4,CU37,Estimar esfuerzo de tareas,EN PRUEBAS,NORMAL,NORMAL,Anfitrión / API IA
 
-Ciclo 5,CU38,Permisos persistentes por colaborador,PENDIENTE,CRÍTICA,ALTO,Anfitrión
+Ciclo 5,CU38,Permisos persistentes por colaborador,EN PRUEBAS,CRÍTICA,ALTO,Anfitrión
 Ciclo 5,CU39,Notificaciones (Firebase),EN PRUEBAS,MEDIA,NORMAL,Usuario / API Firebase
 Ciclo 5,CU40,Actividad y contribución por miembro,EN PRUEBAS,MEDIA,NORMAL,Anfitrión
 Ciclo 5,CU41,Exportar diagrama a imagen o PDF,EN PRUEBAS,NORMAL,NORMAL,Anfitrión / Colaborador
 Ciclo 5,CU42,Plantillas de proyecto,EN PRUEBAS,NORMAL,NORMAL,Usuario
-Ciclo 5,CU43,Validar permisos en el backend,PENDIENTE,ALTA,ALTO,Sistema
+Ciclo 5,CU43,Validar permisos en el backend,EN PRUEBAS,ALTA,ALTO,Sistema

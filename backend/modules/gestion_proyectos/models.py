@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, JSON
+from sqlalchemy import Boolean, Column, Integer, String, DateTime, ForeignKey, Text, JSON, text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from backend.core.database import Base
@@ -16,6 +16,13 @@ class ColaboradorProyecto(Base):
     
     # 'pendiente', 'aprobado', 'rechazado'
     estado = Column(String, nullable=False, default="pendiente")
+
+    # CU38: Permisos persistentes por colaborador
+    permiso_rol = Column(String(20), nullable=False, default="editor", server_default="editor")  # 'editor' | 'lector'
+    puede_editar = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    puede_eliminar = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    puede_exportar = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    puede_usar_ia = Column(Boolean, nullable=False, default=True, server_default=text("true"))
 
     # Rol asignado por la arquitectura o IA en este proyecto específico (ej: Backend Architect, Frontend Lead, DBA, QA)
     rol_ia = Column(String, nullable=True, default=None)
