@@ -340,7 +340,7 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
         
     print(f"[{project_id}] Esperando a que Spring Boot inicie y escuche en el puerto {deployment.port}...")
     ready = False
-    for _ in range(30):
+    for _ in range(180):  # hasta 90 s: en el VPS Spring + Flyway puede tardar más de 15 s
         await asyncio.sleep(0.5)
         if process.poll() is not None:
             break
@@ -355,14 +355,29 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
 
     if process.poll() is not None:
         print(f"[{project_id}] ERROR: El proceso de Spring Boot finalizó prematuramente (código: {process.returncode}).")
+        causa = "revisa app.log"
         try:
             with open(os.path.join(project_dir, "app.log"), "r", encoding="utf-8", errors="ignore") as f:
-                logs = f.read()
-                print(f"[{project_id}] --- APP LOG INICIO ---")
-                print(logs[-2000:] if len(logs) > 2000 else logs)
-                print(f"[{project_id}] --- APP LOG FIN ---")
+                lineas = f.read().splitlines()
+            # Lo útil son las causas, no las 40 líneas de stack trace del final
+            claves = [l for l in lineas if re.search(r"Caused by|ERROR|Detail:|Where:|APPLICATION FAILED|Description:|Action:", l)]
+            print(f"[{project_id}] --- APP LOG (causas) ---")
+            print("
+".join(claves[-30:] or lineas[-40:]))
+            print(f"[{project_id}] --- FIN ---")
+            causas = [l for l in claves if "Caused by" in l or "Detail:" in l]
+            if causas:
+                causa = causas[-1].strip()[:300]
         except Exception as log_err:
             print(f"[{project_id}] No se pudo leer app.log: {log_err}")
+        deployment.status = "failed"
+        await db.commit()
+        # Sin esto se publicaba en nginx una app muerta y el usuario solo veía 502 Bad Gateway
+        raise RuntimeError(f"Spring Boot no arrancó: {causa}")
+    elif not ready:
+        print(f"[{project_id}] Spring Boot sigue iniciando (PID {process.pid}); se publica igual en el puerto {deployment.port}.")
+        if db_name and owner_prefix:
+            grant_all_permissions_to_db(db_name, owner_prefix)
     else:
         print(f"[{project_id}] El proceso de Spring Boot (PID {process.pid}) está activo y respondiendo en el puerto {deployment.port}.")
         
