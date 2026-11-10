@@ -2,7 +2,7 @@ import json
 from typing import List, Dict, Any, Optional
 from sqlalchemy import select, desc
 from backend.core.database import AsyncSessionLocal
-from backend.modules.gestion_asistencia_ia.notificaciones.models import NotificationToken, NotificationLog
+from backend.modules.gestion_notificaciones.models import NotificationToken, NotificationLog
 from backend.modules.gestion_notificaciones.models import Notificacion, DispositivoPush
 from backend.modules.gestion_usuarios.models import Usuario
 

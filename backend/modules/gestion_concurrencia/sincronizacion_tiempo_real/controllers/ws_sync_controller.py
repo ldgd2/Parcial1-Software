@@ -349,10 +349,9 @@ async def websocket_endpoint(
                             from backend.modules.gestion_proyectos.administrar_proyecto.repositories.admin_repo import admin_repo
                             solicitud = await admin_repo.get_colaborador(db, proyecto_id, user_id)
                             if solicitud and solicitud.estado == "pendiente":
-                                if approved:
-                                    solicitud.estado = "aprobado"
-                                else:
-                                    await db.delete(solicitud)
+                                # Rechazo guardado (no se borra la fila: si no, la espera del
+                                # invitado volvía a crear la solicitud a los 3 segundos)
+                                solicitud.estado = "aprobado" if approved else "rechazado"
                                 await db.commit()
                             break
                         if approved:
@@ -382,6 +381,11 @@ async def websocket_endpoint(
                     target_guest = message.get("guest_id")
                     new_role = message.get("role")
                     sala = manager.salas[codigo_acceso]
+                    # CU38: el permiso se GUARDA (antes vivía solo en memoria y se perdía al reconectar)
+                    async for db in get_db():
+                        from backend.modules.gestion_proyectos.permisos_proyecto.permisos_service import guardar_desde_sala
+                        await guardar_desde_sala(db, codigo_acceso, target_guest, new_role)
+                        break
                     if new_role == "view":
                         sala["readonly_guests"].add(target_guest)
                     else:
@@ -509,11 +513,27 @@ async def websocket_endpoint(
         if lector_bd:
             manager.salas[codigo_acceso]["readonly_guests"].add(guest_id)
 
-        if (
+        # CU38: un miembro ya aprobado en la base entra directo con su permiso guardado
+        guardado = None
+        async for db in get_db():
+            from backend.modules.gestion_proyectos.permisos_proyecto.permisos_service import permiso_guardado
+            guardado = await permiso_guardado(db, codigo_acceso, guest_id)
+            break
+        sala_actual = manager.salas[codigo_acceso]
+
+        if guardado and guardado["estado"] == "aprobado":
+            sala_actual["approved_guests"].add(guest_id)
+            solo_lectura = guardado["permiso"] == "view" and guardado["rol_proyecto"] != "anfitrion"
+            if solo_lectura:
+                sala_actual["readonly_guests"].add(guest_id)
+            else:
+                sala_actual["readonly_guests"].discard(guest_id)
+            await manager.send_personal_message({"type": "admission_status", "approved": True}, websocket)
+            await manager.send_personal_message({"type": "role_changed", "role": "view" if solo_lectura else "edit"}, websocket)
+        elif (
             user_type in ("viewer", "observer")
             or str(guest_id).startswith("mob_")
             or str(guest_id).startswith("viewer_")
-            or guest_id in manager.salas[codigo_acceso]["approved_guests"]
         ):
             manager.salas[codigo_acceso]["approved_guests"].add(guest_id)
             # Solo los visores/móviles entran en solo lectura por defecto. Antes TODO invitado ya
@@ -528,6 +548,15 @@ async def websocket_endpoint(
                 exclude=websocket,
             )
             if guest_id in manager.salas[codigo_acceso]["readonly_guests"]:
+            # Visores (app móvil, enlaces de solo ver): siempre solo lectura
+            sala_actual["approved_guests"].add(guest_id)
+            sala_actual["readonly_guests"].add(guest_id)
+            await manager.send_personal_message({"type": "admission_status", "approved": True}, websocket)
+        elif guest_id in sala_actual["approved_guests"]:
+            # Reconexión de un invitado ya admitido: conserva el rol que tenía
+            # (antes se le forzaba solo lectura al reconectarse)
+            await manager.send_personal_message({"type": "admission_status", "approved": True}, websocket)
+            if guest_id in sala_actual["readonly_guests"]:
                 await manager.send_personal_message({"type": "role_changed", "role": "view"}, websocket)
         else:
             manager.add_pending_guest(codigo_acceso, guest_id, nickname)

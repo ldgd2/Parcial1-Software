@@ -44,7 +44,7 @@ def _build_conn_str(env: Dict[str, str]) -> str:
     return f"postgresql://{auth}@{host}:{port}/{dbname}"
 
 
-def _delete_orphan(conn_str: str, orphan_rev: str) -> None:
+def _delete_orphan(conn_str: str, orphan_rev: str) -> bool:
     """Remove the orphan revision from the ``alembic_version`` table."""
     try:
         import psycopg2
@@ -55,27 +55,40 @@ def _delete_orphan(conn_str: str, orphan_rev: str) -> None:
     conn.autocommit = True
     with conn.cursor() as cur:
         cur.execute("DELETE FROM alembic_version WHERE version_num = %s", (orphan_rev,))
+        borradas = cur.rowcount
     conn.close()
-    console.print(f"[dim]Entrada orphan {orphan_rev} eliminada de alembic_version.[/dim]")
+    if borradas:
+        console.print(f"[dim]Entrada orphan {orphan_rev} eliminada de alembic_version.[/dim]")
+    return borradas > 0
 
 
 def fix_state() -> None:
     """Auto‑repair the Alembic migration state.
 
     1. Load database credentials from ``.env``.
-    2. Delete the orphan revision ``e3f4a5b6c7d8``.
-    3. Stamp the database to the current head.
+    2. Delete the orphan revision ``e3f4a5b6c7d8`` (its file was removed from the chain).
+    3. If the DB was on it, stamp its parent ``d2e3f4a5b6c7`` (lo último que esa base sí tenía).
+    4. Apply the pending migrations (upgrade head).
+
+    Antes se hacía `stamp head`: marcaba la base como al día SIN crear lo que faltaba (por ejemplo
+    las columnas de permisos o plantillas_proyecto). Las migraciones posteriores a d2e3f4a5b6c7 son
+    idempotentes (IF NOT EXISTS), así que aplicarlas sobre una base que ya tiene parte es seguro.
     """
-    env_path = Path(BACKEND_DIR) / ".env"
-    env = _load_env(env_path)
-    conn_str = _build_conn_str(env)
+    # Misma conexión que el backend y alembic (settings): respeta variables de entorno y
+    # contraseñas con caracteres especiales, que armándola a mano desde el .env fallaban.
+    from backend.core.config import settings
+    conn_str = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://", 1)
     orphan_rev = "e3f4a5b6c7d8"
-    _delete_orphan(conn_str, orphan_rev)
-    ok, _ = ejecutar_comando_alembic(["stamp", "head"], mostrar=True)
+    if _delete_orphan(conn_str, orphan_rev):
+        ok, _ = ejecutar_comando_alembic(["stamp", "d2e3f4a5b6c7"], mostrar=True)
+        if not ok:
+            console.print("[bold red]Falló el stamp a d2e3f4a5b6c7.[/bold red]")
+            return
+    ok, _ = ejecutar_comando_alembic(["upgrade", "head"], mostrar=True)
     if ok:
-        console.print("[bold green]Stamp a head ejecutado con éxito.[/bold green]")
+        console.print("[bold green]Migraciones al día (upgrade head).[/bold green]")
     else:
-        console.print("[bold red]Falló el stamp a head.[/bold red]")
+        console.print("[bold red]Falló el upgrade a head.[/bold red]")
 
 
 if __name__ == "__main__":

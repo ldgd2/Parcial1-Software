@@ -31,6 +31,10 @@ export const UnirseView: React.FC = () => {
           if (data.acceso === 'aprobado') {
             setStatus('aprobado');
             setTimeout(() => navigate(`/diagrama/${data.proyecto_id}`), 1500);
+          } else if (data.acceso === 'rechazado') {
+            // Ya fue rechazado: no volver a pedir acceso cada 3 segundos
+            setStatus('error');
+            setMessage(data.mensaje || 'El anfitrión ha rechazado tu solicitud de ingreso.');
           } else {
             setStatus('pendiente');
             setMessage(data.mensaje || 'Esperando aprobación del anfitrión de la sala...');

@@ -73,6 +73,9 @@ def obtener_estado() -> dict | None:
     if not (ok_h and ok_c):
         console.print("[bold red]No se pudo consultar el estado de las migraciones:[/bold red]")
         console.print(salida_c or salida_h, markup=False, highlight=False)
+        if "Can't locate revision" in (salida_c or ""):
+            console.print("[yellow]La BD está en una migración que ya no existe en el código. "
+                          "Usa [7] Fix estado de migraciones.[/yellow]")
         return None
     return {"heads": _revisiones(salida_h), "actual": _revisiones(salida_c)}
 
@@ -113,84 +116,6 @@ def menu_migrations():
         console.print("[0] Volver")
 
         opcion = Prompt.ask("\nSelecciona una opción", choices=["1", "2", "3", "4", "5", "6", "7", "0"], default="0")
-
-        if opcion == "1":
-            estado = obtener_estado()
-            if estado and estado["actual"] and set(estado["actual"]) != set(estado["heads"]):
-                console.print("[yellow]La BD no está en head: aplica primero las migraciones pendientes ([2] Up).[/yellow]")
-            elif estado and len(estado["heads"]) > 1:
-                console.print("[yellow]Hay más de un head: resuélvelo antes de crear otra migración ([5]).[/yellow]")
-            else:
-                mensaje = Prompt.ask("Ingresa un mensaje para la migración")
-                if mensaje:
-                    with console.status("[bold cyan]Generando migración..."):
-                        ejecutar_comando_alembic(["revision", "--autogenerate", "-m", mensaje])
-                    console.print("[dim]Revisa el archivo generado en backend/alembic/versions antes de aplicarlo.[/dim]")
-            Prompt.ask("\nPresiona Enter para continuar")
-
-        elif opcion == "2":
-            estado = obtener_estado()
-            if estado and len(estado["heads"]) > 1:
-                console.print("[yellow]Hay más de un head: resuélvelo antes de aplicar ([5] Ver estado).[/yellow]")
-            else:
-                with console.status("[bold cyan]Aplicando migraciones..."):
-                    ejecutar_comando_alembic(["upgrade", "head"])
-                mostrar_estado()
-            Prompt.ask("\nPresiona Enter para continuar")
-
-        elif opcion == "3":
-            estado = mostrar_estado()
-            if estado and estado["actual"]:
-                if Confirm.ask("\n[bold red]¿Revertir la última migración? Puede borrar tablas o columnas con datos[/bold red]", default=False):
-                    with console.status("[bold cyan]Revertiendo migración..."):
-                        ejecutar_comando_alembic(["downgrade", "-1"])
-            elif estado is not None:
-                console.print("[yellow]No hay ninguna migración aplicada que revertir.[/yellow]")
-            Prompt.ask("\nPresiona Enter para continuar")
-
-        elif opcion == "4":
-            console.print(
-                "[dim]Stamp solo marca la BD como actualizada, sin ejecutar nada. "
-                "Úsalo cuando las tablas ya existen (por ejemplo, creadas con init_db).[/dim]"
-            )
-            if Confirm.ask("¿Sellar la BD en head?", default=False):
-                with console.status("[bold cyan]Sellando versión en Head..."):
-                    ejecutar_comando_alembic(["stamp", "head"])
-            Prompt.ask("\nPresiona Enter para continuar")
-
-        elif opcion == "5":
-            mostrar_estado()
-            Prompt.ask("\nPresiona Enter para continuar")
-
-        elif opcion == "6":
-            ejecutar_comando_alembic(["history", "--indicate-current"])
-            Prompt.ask("\nPresiona Enter para continuar")
-
-
-
-        elif opcion == "7":
-            console.print("[dim]Ejecutando reparación automática del estado de migraciones...[/dim]")
-            from .fix_state import fix_state
-            fix_state()
-            # Mostrar estado actualizado
-            estado = obtener_estado()
-            if estado:
-                mostrar_estado()
-            Prompt.ask("\nPresiona Enter para continuar")
-        elif opcion == "0":
-            break
-
-    while True:
-        print_header("MANAGER > BASE DE DATOS > MIGRACIONES")
-        console.print("[1] Crear nueva migración (Make)")
-        console.print("[2] Aplicar migraciones (Up)")
-        console.print("[3] Revertir última migración (Down)")
-        console.print("[4] Sellar versión en Head (Stamp Head)")
-        console.print("[5] Ver estado (versión actual / heads)")
-        console.print("[6] Ver historial")
-        console.print("[0] Volver")
-
-        opcion = Prompt.ask("\nSelecciona una opción", choices=["1", "2", "3", "4", "5", "6", "0"], default="0")
 
         if opcion == "1":
             estado = obtener_estado()

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.core.database import get_db
+from backend.core.permissions.proyecto import requiere_proyecto, usuario_requerido, verificar_permiso
 from backend.modules.gestion_usuarios.dependencies import get_current_user
 from backend.modules.gestion_usuarios.models import Usuario
 from backend.modules.gestion_interoperabilidad.exportar_a_xml.services import export_service
@@ -21,6 +22,7 @@ async def exportar_xmi(
     Exporta el diagrama del proyecto a un archivo XML en formato OMG XMI 2.1 
     compatible con Enterprise Architect.
     """
+    await verificar_permiso(db, user, proyecto_id, "lector")
     xml_content = await export_service.generar_xmi(proyecto_id, user, db)
     if not xml_content:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No se pudo generar el XMI o proyecto no encontrado.")

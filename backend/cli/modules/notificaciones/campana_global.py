@@ -2,7 +2,7 @@ from rich.prompt import Prompt, Confirm
 from rich.table import Table
 from backend.cli.console import console
 from backend.cli.async_runner import ejecutar_async
-from backend.modules.gestion_asistencia_ia.notificaciones.firebase_init import send_fcm_message
+from backend.modules.gestion_notificaciones.firebase_init import send_fcm_message
 from .db_executor import ejecutar_campana_completa
 
 

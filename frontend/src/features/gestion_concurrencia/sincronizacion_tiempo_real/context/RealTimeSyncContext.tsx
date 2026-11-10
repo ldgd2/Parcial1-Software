@@ -76,7 +76,9 @@ export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: a
   const [cursors, setCursors] = useState<Record<string, Cursor>>({});
   const [lockedElements, setLockedElements] = useState<Record<string, string>>({});
   const [roomUsers, setRoomUsers] = useState<any[]>([]);
-  const [isReadOnly, setIsReadOnly] = useState(false);
+  // CU38: el permiso guardado llega con la sala; el WebSocket lo confirma o lo cambia en vivo
+  const [isReadOnly, setIsReadOnly] = useState(sala?.permiso === 'lector');
+  useEffect(() => { setIsReadOnly(sala?.permiso === 'lector'); }, [sala?.permiso]);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const socketRef = useRef<WebSocket | null>(null);
   

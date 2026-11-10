@@ -109,10 +109,12 @@ def _al_deshacer(session: Session) -> None:
 
 async def _miembros(db, proyecto_id: int) -> List[Dict[str, Any]]:
     filas = (await db.execute(text(
-        "SELECT u.id, u.nombre, c.rol_proyecto FROM colaboradores_proyecto c JOIN usuarios u ON u.id = c.usuario_id "
+        "SELECT u.id, u.nombre, c.rol_proyecto, c.permiso FROM colaboradores_proyecto c JOIN usuarios u ON u.id = c.usuario_id "
         "WHERE c.proyecto_id = :p AND c.estado = 'aprobado'"
     ), {"p": proyecto_id})).all()
-    return [{"id": i, "nombre": n, "rol": r} for i, n, r in filas]
+    # puede_aprobar: anfitrión o editor (CU38); un lector no decide propuestas
+    return [{"id": i, "nombre": n, "rol": r, "puede_aprobar": r == "anfitrion" or (pm or "edit") != "view"}
+            for i, n, r, pm in filas]
 
 
 async def _nombre(db, tabla_sql: str, id_: Any) -> str:
@@ -155,7 +157,8 @@ async def _construir(db, ev: Dict[str, Any]) -> List[Dict[str, Any]]:
 
     elif tipo == "propuesta_pendiente":
         autor = ev.get("autor") or "Alguien"
-        otros = [m["id"] for m in await _miembros(db, pid) if _norm(m["nombre"]) != _norm(autor)]
+        otros = [m["id"] for m in await _miembros(db, pid)
+                 if _norm(m["nombre"]) != _norm(autor) and m["puede_aprobar"]]
         para(otros, f"La IA propone un cambio en {proyecto}",
              f"Pedido por {autor}: {_corto(ev.get('resumen'), 100)} — revísalo para aprobarlo o rechazarlo.")
 
@@ -236,14 +239,11 @@ _firebase_error: Optional[str] = None
 
 
 def _ruta_credenciales() -> str:
-    ruta = (settings.FIREBASE_CREDENTIALS or "").strip()
-    if not ruta:
-        return ""
-    if not os.path.isabs(ruta):
-        raiz = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
-        candidatas = [os.path.join(raiz, ruta), os.path.join(raiz, "backend", ruta)]
-        ruta = next((c for c in candidatas if os.path.isfile(c)), candidatas[0])
-    return ruta
+    """FIREBASE_CREDENTIALS del .env o, si no está, el JSON que se haya dejado en
+    gestion_notificaciones/config/ (misma búsqueda que firebase_init, la del módulo móvil)."""
+    from backend.modules.gestion_notificaciones.firebase_init import candidatos_credenciales
+
+    return next((str(c) for c in candidatos_credenciales() if c.is_file()), "")
 
 
 def firebase_app():

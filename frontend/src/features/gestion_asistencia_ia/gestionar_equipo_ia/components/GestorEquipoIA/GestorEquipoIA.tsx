@@ -12,7 +12,7 @@ import {
   PropuestaYaDecididaError,
 } from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente/services/contextoService';
 import { EVENTO_VERSIONES_ACTUALIZADAS } from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente/hooks/useVersionesContexto';
-import { crearTareaManual } from '@/features/gestion_proyectos_asistida/repartir_tareas';
+import { crearTareaManual } from '@/features/gestion_asistencia_ia/repartir_tareas';
 import { etiquetaEsfuerzo, horasTotales } from '@/shared/utils/esfuerzo';
 import './GestorEquipoIA.css';
 

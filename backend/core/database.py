@@ -48,3 +48,4 @@ async def init_db():
         await conn.execute(text("ALTER TABLE tareas_ia ADD COLUMN IF NOT EXISTS area VARCHAR DEFAULT 'general';"))
         await conn.execute(text("ALTER TABLE tareas_ia ADD COLUMN IF NOT EXISTS estimacion_horas INTEGER;"))
         await conn.execute(text("ALTER TABLE tareas_ia ADD COLUMN IF NOT EXISTS complejidad VARCHAR;"))
+        await conn.execute(text("ALTER TABLE colaboradores_proyecto ADD COLUMN IF NOT EXISTS permiso VARCHAR(10) DEFAULT 'edit' NOT NULL;"))
