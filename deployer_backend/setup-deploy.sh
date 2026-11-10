@@ -25,8 +25,18 @@ if $ES_LINUX; then
     # En un VPS recién creado `unattended-upgrades` suele tener tomado el candado de dpkg unos
     # minutos: se espera (hasta 15 min) en vez de fallar con "Could not get lock".
     APT="sudo apt-get -o DPkg::Lock::Timeout=900"
-    if pgrep -x unattended-upgr > /dev/null || pgrep -f unattended-upgrade > /dev/null; then
-        echo "⏳ Ubuntu está instalando actualizaciones automáticas; se espera a que termine..."
+    if pgrep -f unattended-upgrade > /dev/null; then
+        echo "⏳ Ubuntu está instalando actualizaciones automáticas (bloquean apt)."
+        read -r -p "   ¿Detenerlas ahora para continuar ya? Terminan el paquete en curso y se reanudan solas otro día [S/n]: " DETENER
+        if [[ ! "$DETENER" =~ ^[nN] ]]; then
+            # Parada ordenada: unattended-upgrades termina el paquete que está instalando y sale
+            sudo systemctl stop unattended-upgrades 2>/dev/null || true
+            sudo systemctl stop apt-daily.service apt-daily-upgrade.service 2>/dev/null || true
+            for _ in $(seq 1 60); do pgrep -f unattended-upgrade > /dev/null || break; sleep 2; done
+            sudo dpkg --configure -a   # deja dpkg consistente si quedó algo a medias
+        else
+            echo "   Se espera a que terminen (máximo 15 min; sigue apenas se libere apt)."
+        fi
     fi
     $APT update
     $APT install -y python3 python3-venv python3-pip nginx sqlite3 postgresql postgresql-contrib openjdk-17-jdk maven
