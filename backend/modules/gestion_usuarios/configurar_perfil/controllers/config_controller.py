@@ -11,6 +11,7 @@ from backend.modules.gestion_usuarios.models import Usuario, UsuarioGitHub
 from backend.modules.gestion_usuarios.configurar_perfil.schemas.config_schemas import ConfiguracionResponse, ConfigurarDbRequest, PerfilRequest
 from backend.modules.gestion_usuarios.recuperar_password.services.reset_service import generar_y_guardar_otp, verificar_otp
 from backend.core.security import encriptar_dato
+from backend.modules.gestion_usuarios.configurar_perfil.services.rol_postgres_service import SinPermisoCreateRole, asegurar_rol
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -88,24 +89,25 @@ async def configurar_db_password(
         
     user.db_password_encrypted = encriptar_dato(payload.db_password)
     
-    # 3. Alterar contraseña de ROL en Postgres en el host
-    owner_prefix = re.sub(r'[^a-zA-Z0-9]', '', user.email.split("@")[0]) if user.email else "user"
-    clean_password = payload.db_password.replace("'", "''")
-    alter_role_sql = text(f'DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = \'{owner_prefix}\') THEN CREATE ROLE "{owner_prefix}" WITH LOGIN ENCRYPTED PASSWORD \'{clean_password}\'; ELSE ALTER ROLE "{owner_prefix}" WITH PASSWORD \'{clean_password}\'; END IF; END $$;')
+    # 3. Crear / actualizar el ROL del usuario en el PostgreSQL del host (en un SAVEPOINT: antes
+    #    el error se "ignoraba" pero dejaba la transacción abortada y el UPDATE daba 500)
     try:
-        # SAVEPOINT: antes el error se "ignoraba" pero dejaba la transacción abortada y el
-        # UPDATE siguiente fallaba con 500 (InFailedSQLTransactionError).
-        async with db.begin_nested():
-            await db.execute(alter_role_sql)
-    except Exception as e:
+        await asegurar_rol(db, user.email, payload.db_password)
+    except SinPermisoCreateRole:
         await db.rollback()
-        sin_permiso = "CREATEROLE" in str(e) or "permission denied" in str(e).lower()
-        logger.warning("No se pudo crear/alterar el rol de Postgres '%s': %s", owner_prefix, type(e).__name__)
+        logger.error("El usuario de BD del backend no tiene CREATEROLE: ejecuta en el gestor "
+                     "Base de Datos → Roles PostgreSQL de usuarios")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=("El servidor no tiene permiso para crear usuarios de PostgreSQL (falta CREATEROLE). "
-                    "Avisa al administrador; tu contraseña no se cambió." if sin_permiso else
-                    "No se pudo actualizar tu usuario de PostgreSQL en el servidor; tu contraseña no se cambió."),
+            detail="El servidor aún no puede crear usuarios de PostgreSQL. Avisa al administrador "
+                   "(gestor → Base de Datos → Roles PostgreSQL); tu contraseña no se cambió.",
+        )
+    except Exception as e:
+        await db.rollback()
+        logger.warning("No se pudo crear/alterar el rol de Postgres: %s", type(e).__name__)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No se pudo actualizar tu usuario de PostgreSQL en el servidor; tu contraseña no se cambió.",
         )
 
     await db.commit()

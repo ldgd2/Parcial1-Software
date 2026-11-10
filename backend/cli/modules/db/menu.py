@@ -11,9 +11,10 @@ def menu_db():
         console.print("[2] Seeders")
         console.print("[3] Test de Conexión (Ping)")
         console.print("[4] Inicializar Tablas (init_db)")
+        console.print("[5] Roles PostgreSQL de usuarios (permiso CREATEROLE + sincronizar)")
         console.print("[0] Volver")
         
-        opcion = Prompt.ask("\nSelecciona una opción", choices=["1", "2", "3", "4", "0"], default="0")
+        opcion = Prompt.ask("\nSelecciona una opción", choices=["1", "2", "3", "4", "5", "0"], default="0")
         
         if opcion == "1":
             menu_migrations()
@@ -54,6 +55,10 @@ def menu_db():
                         console.print("[bold green]¡Alembic sincronizado (stamp head)![/bold green]")
                     else:
                         console.print("[yellow]Aviso: no se pudo sellar Alembic en head (usa Migraciones > [4]).[/yellow]")
+            Prompt.ask("\nPresiona Enter para continuar")
+        elif opcion == "5":
+            from backend.cli.modules.db.roles_postgres import reparar_roles
+            reparar_roles()
             Prompt.ask("\nPresiona Enter para continuar")
         elif opcion == "0":
             break
