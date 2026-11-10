@@ -7,6 +7,7 @@ class ConfiguracionResponse(BaseModel):
     db_configurada: bool
     email: Optional[str] = None
     nombre: Optional[str] = None
+    etiquetas_habilidades: list[str] = []
 
 class ConfigurarDbRequest(BaseModel):
     codigo_otp: str

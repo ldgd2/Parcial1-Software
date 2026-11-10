@@ -289,8 +289,6 @@ class ContextoService:
         usuario=None,
     ) -> VersionDetalle:
         """Aprueba o rechaza una propuesta pendiente y registra quién lo hizo."""
-        from backend.core.permissions.proyecto import exigir_permiso_edicion
-        await exigir_permiso_edicion(self.repo.db, proyecto_id, usuario)
         v = await self.repo.obtener_version(proyecto_id, version_id)
         if not v:
             raise HTTPException(status_code=404, detail="Versión no encontrada")

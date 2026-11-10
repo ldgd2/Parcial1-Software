@@ -5,14 +5,14 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.core.permissions.proyecto import PERMISOS_VALIDOS, nivel_de
+from backend.core.permissions.proyecto import PERMISOS_VALIDOS, fijar_permiso, nivel_de
 from backend.modules.gestion_proyectos.models import ColaboradorProyecto, Proyecto
 from backend.modules.gestion_usuarios.models import Usuario
 
 
 async def listar_miembros(db: AsyncSession, proyecto_id: int) -> List[Dict[str, Any]]:
     filas = (await db.execute(
-        select(ColaboradorProyecto, Usuario.nombre)
+        select(ColaboradorProyecto, Usuario.nombre, Usuario.email)
         .join(Usuario, Usuario.id == ColaboradorProyecto.usuario_id)
         .where(ColaboradorProyecto.proyecto_id == proyecto_id, ColaboradorProyecto.estado == "aprobado")
         .order_by(ColaboradorProyecto.rol_proyecto.desc(), Usuario.nombre)
@@ -20,10 +20,11 @@ async def listar_miembros(db: AsyncSession, proyecto_id: int) -> List[Dict[str, 
     return [{
         "usuario_id": c.usuario_id,
         "nombre": nombre,
+        "email": email,
         "rol_proyecto": c.rol_proyecto,
         "permiso": "edit" if c.rol_proyecto == "anfitrion" else (c.permiso or "edit"),
         "nivel": nivel_de(c.rol_proyecto, c.permiso),
-    } for c, nombre in filas]
+    } for c, nombre, email in filas]
 
 
 async def listar_rechazados(db: AsyncSession, proyecto_id: int) -> List[Dict[str, Any]]:
@@ -60,7 +61,7 @@ async def cambiar_permiso(db: AsyncSession, proyecto_id: int, usuario_id: int, p
         raise HTTPException(status_code=404, detail="Esa persona no es miembro aprobado del proyecto.")
     if c.rol_proyecto == "anfitrion":
         raise HTTPException(status_code=400, detail="El anfitrión siempre puede editar.")
-    c.permiso = permiso
+    fijar_permiso(c, permiso)
     await db.commit()
     await aplicar_en_sala(db, proyecto_id, usuario_id, permiso)
     return {"usuario_id": usuario_id, "permiso": permiso, "nivel": nivel_de(c.rol_proyecto, permiso)}
@@ -111,6 +112,6 @@ async def guardar_desde_sala(db, codigo_acceso: str, guest_id: str, rol: str) ->
     )).scalar_one_or_none()
     if c is None or c.rol_proyecto == "anfitrion":
         return False
-    c.permiso = "view" if rol == "view" else "edit"
+    fijar_permiso(c, "view" if rol == "view" else "edit")
     await db.commit()
     return True

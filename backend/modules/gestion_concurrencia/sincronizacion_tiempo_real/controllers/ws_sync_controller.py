@@ -78,57 +78,6 @@ def _usuario_de_guest(guest_id: str | None) -> int | None:
     return None
 
 
-async def _proyecto_de_sala(db, codigo_acceso: str) -> int | None:
-    resultado = await db.execute(select(Proyecto.id).where(Proyecto.codigo_acceso == codigo_acceso))
-    return resultado.scalar_one_or_none()
-
-
-async def _guardar_rol(codigo_acceso: str, guest_id: str, lector: bool) -> None:
-    """CU38: el rol elegido en Permisos de Acceso se guarda en colaboradores_proyecto
-    (antes vivía solo en memoria del WebSocket y se perdía al recargar o reiniciar)."""
-    usuario_id = _usuario_de_guest(guest_id)
-    if usuario_id is None:
-        return
-    from backend.core.permissions.proyecto import guardar_permiso
-    async for db in get_db():
-        proyecto_id = await _proyecto_de_sala(db, codigo_acceso)
-        if proyecto_id:
-            await guardar_permiso(db, proyecto_id, usuario_id, lector)
-        break
-
-
-async def aplicar_rol_en_vivo(codigo_acceso: str, usuario_id: int, lector: bool) -> None:
-    """Refleja en la sala un cambio de permiso hecho por REST (invitar / cambiar permiso)."""
-    sala = manager.salas.get(codigo_acceso)
-    if sala is None:
-        return
-    guest_id = f"auth_{usuario_id}"
-    rol = "view" if lector else "edit"
-    if lector:
-        sala["readonly_guests"].add(guest_id)
-    else:
-        sala["readonly_guests"].discard(guest_id)
-    if guest_id in sala["guests"]:
-        await manager.send_personal_message({"type": "role_changed", "role": rol}, sala["guests"][guest_id])
-    if sala.get("host") is not None:
-        await manager.send_personal_message({"type": "role_updated", "guest_id": guest_id, "role": rol}, sala["host"])
-
-
-async def _estado_guardado(codigo_acceso: str, guest_id: str) -> tuple[bool, bool]:
-    """(aprobado, lector) del colaborador registrado según colaboradores_proyecto."""
-    usuario_id = _usuario_de_guest(guest_id)
-    if usuario_id is None:
-        return False, False
-    from backend.core.permissions.proyecto import obtener_colaborador, es_lector
-    async for db in get_db():
-        proyecto_id = await _proyecto_de_sala(db, codigo_acceso)
-        if not proyecto_id:
-            return False, False
-        colaborador = await obtener_colaborador(db, proyecto_id, usuario_id)
-        return bool(colaborador and colaborador.estado == "aprobado"), es_lector(colaborador)
-    return False, False
-
-
 async def _save_delta_to_db(new_objects: dict, head_hash: str, author: str):
     """Guarda los nuevos GitObjects y el Commit en PostgreSQL usando inserciones masivas."""
     async for db in get_db():
@@ -390,7 +339,6 @@ async def websocket_endpoint(
                         sala["readonly_guests"].add(target_guest)
                     else:
                         sala["readonly_guests"].discard(target_guest)
-                    await _guardar_rol(codigo_acceso, target_guest, new_role == "view")
 
                     if target_guest in sala["guests"]:
                         await manager.send_personal_message({"type": "role_changed", "role": new_role}, sala["guests"][target_guest])
@@ -505,66 +453,50 @@ async def websocket_endpoint(
         # Con el nickname: sin él, "Permisos de Acceso" mostraba a todos como "Guest"
         await manager.connect_guest(websocket, codigo_acceso, guest_id, nickname=nickname, accept=False)
 
-        # Colaborador registrado ya aprobado en BD: entra sin pasar otra vez por la sala de
-        # espera, y con el rol guardado (un lector sigue siéndolo tras recargar o reconectarse).
-        aprobado_bd, lector_bd = await _estado_guardado(codigo_acceso, guest_id)
-        if aprobado_bd:
-            manager.salas[codigo_acceso]["approved_guests"].add(guest_id)
-        if lector_bd:
-            manager.salas[codigo_acceso]["readonly_guests"].add(guest_id)
-
-        # CU38: un miembro ya aprobado en la base entra directo con su permiso guardado
+        # CU38: un miembro con cuenta ya aprobado en la base entra directo, con su permiso guardado
+        # (un lector sigue siéndolo tras recargar o reconectarse).
         guardado = None
         async for db in get_db():
             from backend.modules.gestion_proyectos.permisos_proyecto.permisos_service import permiso_guardado
             guardado = await permiso_guardado(db, codigo_acceso, guest_id)
             break
         sala_actual = manager.salas[codigo_acceso]
+        es_visor = user_type in ("viewer", "observer") or str(guest_id).startswith(("mob_", "viewer_"))
 
         if guardado and guardado["estado"] == "aprobado":
-            sala_actual["approved_guests"].add(guest_id)
             solo_lectura = guardado["permiso"] == "view" and guardado["rol_proyecto"] != "anfitrion"
-            if solo_lectura:
-                sala_actual["readonly_guests"].add(guest_id)
-            else:
-                sala_actual["readonly_guests"].discard(guest_id)
-            await manager.send_personal_message({"type": "admission_status", "approved": True}, websocket)
-            await manager.send_personal_message({"type": "role_changed", "role": "view" if solo_lectura else "edit"}, websocket)
-        elif (
-            user_type in ("viewer", "observer")
-            or str(guest_id).startswith("mob_")
-            or str(guest_id).startswith("viewer_")
-        ):
-            manager.salas[codigo_acceso]["approved_guests"].add(guest_id)
-            # Solo los visores/móviles entran en solo lectura por defecto. Antes TODO invitado ya
-            # aprobado que se reconectaba quedaba como lector, aunque el anfitrión lo hubiera hecho editor.
-            if user_type in ("viewer", "observer") or str(guest_id).startswith(("mob_", "viewer_")):
-                manager.salas[codigo_acceso]["readonly_guests"].add(guest_id)
-            await manager.send_personal_message({"type": "admission_status", "approved": True}, websocket)
-            # CU13: los demás participantes se enteran de que entró
-            await manager.broadcast_to_sala(
-                {"type": "user_joined", "guest_id": guest_id, "nickname": nickname or "Invitado"},
-                codigo_acceso,
-                exclude=websocket,
-            )
-            if guest_id in manager.salas[codigo_acceso]["readonly_guests"]:
-            # Visores (app móvil, enlaces de solo ver): siempre solo lectura
-            sala_actual["approved_guests"].add(guest_id)
-            sala_actual["readonly_guests"].add(guest_id)
-            await manager.send_personal_message({"type": "admission_status", "approved": True}, websocket)
+        elif es_visor:
+            solo_lectura = True   # visores (app móvil, enlaces de solo ver): siempre solo lectura
         elif guest_id in sala_actual["approved_guests"]:
             # Reconexión de un invitado ya admitido: conserva el rol que tenía
             # (antes se le forzaba solo lectura al reconectarse)
-            await manager.send_personal_message({"type": "admission_status", "approved": True}, websocket)
-            if guest_id in sala_actual["readonly_guests"]:
-                await manager.send_personal_message({"type": "role_changed", "role": "view"}, websocket)
+            solo_lectura = guest_id in sala_actual["readonly_guests"]
         else:
+            solo_lectura = None   # debe esperar a que el anfitrión lo admita
+
+        if solo_lectura is None:
             manager.add_pending_guest(codigo_acceso, guest_id, nickname)
             await manager.notify_host(codigo_acceso, {
                 "type": "join_request",
                 "guest_id": guest_id,
                 "nickname": nickname,
             })
+        else:
+            sala_actual["approved_guests"].add(guest_id)
+            if solo_lectura:
+                sala_actual["readonly_guests"].add(guest_id)
+            else:
+                sala_actual["readonly_guests"].discard(guest_id)
+            await manager.send_personal_message({"type": "admission_status", "approved": True}, websocket)
+            await manager.send_personal_message(
+                {"type": "role_changed", "role": "view" if solo_lectura else "edit"}, websocket
+            )
+            # CU13: los demás participantes se enteran de que entró
+            await manager.broadcast_to_sala(
+                {"type": "user_joined", "guest_id": guest_id, "nickname": nickname or "Invitado"},
+                codigo_acceso,
+                exclude=websocket,
+            )
 
         try:
             while True:

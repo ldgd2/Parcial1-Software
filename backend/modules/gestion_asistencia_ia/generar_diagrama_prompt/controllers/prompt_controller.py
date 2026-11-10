@@ -8,7 +8,6 @@ from backend.core.config import settings
 from ..schemas.prompt_schemas import PromptRequest, PromptResponse, AudioRequest
 from ..services.prompt_service import generar_diagrama_desde_prompt, transcribe_audio_with_gemini
 from backend.modules.gestion_usuarios.dependencies import get_current_user_optional
-from backend.core.permissions.proyecto import exigir_permiso_edicion
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -37,8 +36,6 @@ async def generar_diagrama(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(usuario_requerido())
 ):
-    # Un colaborador en modo Lector no puede generar cambios aunque llame directo a la API (CP51)
-    await exigir_permiso_edicion(db, request.proyecto_id, current_user)
     if request.proyecto_id:
         # CU43: el pedido queda como propuesta del proyecto → solo editores (y con sesión)
         await verificar_permiso(db, current_user, request.proyecto_id, "editor")

@@ -27,10 +27,10 @@ async def listar_todos_los_proyectos(
     user: Usuario = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Se mantiene por compatibilidad con la app móvil, pero ya no lista los proyectos de toda la
-    plataforma sin sesión: eso exponía el código de acceso de cualquier sala.
-    """
+    """Todos los proyectos solo para el administrador global; los demás ven los suyos.
+    (Antes era público y devolvía el código de acceso de todas las salas.)"""
+    if getattr(user, "rol_global", None) == "admin" or getattr(getattr(user, "rol", None), "nombre", None) == "admin":
+        return await admin_service.listar_todos_los_proyectos(db)
     return await admin_service.listar_mis_proyectos(user, db)
 
 @router.post("/", response_model=ProyectoResponse, status_code=status.HTTP_201_CREATED)
