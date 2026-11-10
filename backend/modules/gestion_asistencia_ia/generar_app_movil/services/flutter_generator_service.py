@@ -9,8 +9,14 @@ from backend.modules.gestion_asistencia_ia.generar_app_movil.services.flutter_sk
     construir_archivos_esqueleto,
 )
 from backend.modules.gestion_asistencia_ia.exportar_github.services.parser_service import (
+    RESERVED_CRUD_METHODS,
     map_java_type,
+    parse_java_parameters,
     sanitize_identifier,
+)
+from backend.modules.gestion_asistencia_ia.generar_app_movil.services.flutter_ui_service import (
+    archivos_interfaz,
+    preparar_entidad,
 )
 
 
@@ -92,6 +98,7 @@ def _extraer_clases_diagrama(diagram_json: dict) -> List[dict]:
                 dart_type, base_type = _map_to_dart_type(tipo_raw)
                 atributos.append({
                     "nombre": attr_name,
+                    "nombre_visible": _nombre_visible(nombre_raw),
                     "tipo": dart_type,
                     "base_tipo": base_type,
                     "java_tipo": map_java_type(tipo_raw),
@@ -104,10 +111,46 @@ def _extraer_clases_diagrama(diagram_json: dict) -> List[dict]:
                 "nombre_pascal": pascal,
                 "nombre_snake": snake,
                 "endpoint": f"/api/{nombre_backend.lower()}s",
-                "atributos": atributos
+                "atributos": atributos,
+                "metodos": _extraer_metodos(nodo),
             })
 
     return clases
+
+
+def _nombre_visible(raw: str) -> str:
+    """Nombre tal como se escribió en el diagrama (sanitize_identifier lo deja en minúsculas:
+    fechaIngreso -> fechaingreso), solo para mostrarlo en pantalla."""
+    texto = re.sub(r"^[\-\+#~\s]+", "", str(raw or "")).split(":")[0].strip()
+    texto = re.sub(r"[^a-zA-Z0-9_ ]", " ", texto).strip()
+    return texto or str(raw or "")
+
+
+def _extraer_metodos(nodo: dict) -> List[dict]:
+    """Métodos de negocio tal como los expone el backend: POST /api/<entidad>/<método>?param=valor."""
+    metodos, vistos = [], set()
+    for m in nodo.get("metodos", []) or []:
+        nombre_raw = m.get("nombre") or m.get("name") or ""
+        nombre = sanitize_identifier(nombre_raw)
+        if not nombre or nombre == "unnamed" or nombre.lower() in RESERVED_CRUD_METHODS or nombre in vistos:
+            continue
+        vistos.add(nombre)
+        retorno = str(m.get("retorno") or m.get("tipoRetorno") or "void").strip()
+        retorno = "void" if retorno.lower() == "void" else map_java_type(retorno)
+        params_raw = str(m.get("parametros", "") or "")
+        java_decl = parse_java_parameters(params_raw, nombre)[0]
+        partes_raw = [p.strip() for p in params_raw.split(",") if p.strip()]
+        parametros = []
+        for i, decl in enumerate(d.strip() for d in java_decl.split(",") if d.strip()):
+            tipo, _, pnombre = decl.rpartition(" ")
+            visible = pnombre
+            if i < len(partes_raw):
+                raw = partes_raw[i]
+                visible = _nombre_visible(raw if ":" in raw else (raw.split()[-1] if raw.split() else raw))
+            parametros.append({"nombre": pnombre, "tipo": tipo, "nombre_visible": visible})
+        metodos.append({"nombre": nombre, "nombre_visible": _nombre_visible(nombre_raw),
+                        "retorno": retorno, "parametros": parametros})
+    return metodos
 
 
 def _campo_to_json(a: dict) -> str:
@@ -271,16 +314,14 @@ def _generar_servicio_dart(clase: dict) -> str:
     snake = clase["nombre_snake"]
     endpoint = clase["endpoint"]
 
-    return f"""import '../core/network/api_client.dart';
-import '../core/services/base_crud_service.dart';
+    return f"""import '../core/services/base_crud_service.dart';
 import '../models/{snake}.dart';
 
 class {pascal}Service extends BaseCrudService<{pascal}> {{
-  {pascal}Service({{ApiClient? client}})
+  {pascal}Service({{super.client}})
       : super(
           endpoint: '{endpoint}',
           fromJson: {pascal}.fromJson,
-          client: client,
         );
 }}
 """
@@ -412,842 +453,23 @@ def _analizar_dominio_proyecto(clases: List[dict], app_name: str = "") -> Tuple[
     return titulo, subtitulo, icono_hero, grupos_resultado
 
 
-def _generar_list_view_dart(clase: dict) -> str:
-    pascal = clase["nombre_pascal"]
-    snake = clase["nombre_snake"]
-    attrs = clase["atributos"]
-
-    pk_attr = next((a["nombre"] for a in attrs if a["es_pk"]), attrs[0]["nombre"])
-    display_attr = next((a["nombre"] for a in attrs if not a["es_pk"] and a["base_tipo"] == "String"), pk_attr)
-    sub_attr = next((a["nombre"] for a in attrs if a["nombre"] not in [pk_attr, display_attr]), None)
-
-    sub_expr = f"'${{item.{sub_attr}}}'" if sub_attr else f"'ID: ${{item.{pk_attr}}}'"
-
-    return f"""import 'package:flutter/material.dart';
-import '../../models/{snake}.dart';
-import '../../services/{snake}_service.dart';
-import '../../shared/widgets/loading_widget.dart';
-import '../../shared/widgets/empty_state_widget.dart';
-import '../../shared/widgets/error_state_widget.dart';
-import '../../shared/widgets/confirm_dialog.dart';
-import '../../shared/widgets/entity_card.dart';
-import '{snake}_form_view.dart';
-
-class {pascal}ListView extends StatefulWidget {{
-  const {pascal}ListView({{super.key}});
-
-  @override
-  State<{pascal}ListView> createState() => _{pascal}ListViewState();
-}}
-
-class _{pascal}ListViewState extends State<{pascal}ListView> {{
-  final {pascal}Service _service = {pascal}Service();
-  late Future<List<{pascal}>> _itemsFuture;
-  String _filter = '';
-
-  @override
-  void initState() {{
-    super.initState();
-    _refresh();
-  }}
-
-  void _refresh() {{
-    setState(() {{
-      _itemsFuture = _service.getAll();
-    }});
-  }}
-
-  Future<void> _deleteItem(dynamic id) async {{
-    final confirm = await ConfirmDialog.show(
-      context: context,
-      title: 'Eliminar {pascal}',
-      message: '¿Estás seguro de que deseas eliminar este registro permanentemente?',
-    );
-
-    if (confirm == true) {{
-      try {{
-        await _service.delete(id);
-        if (mounted) {{
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Registro eliminado correctamente')),
-          );
-          _refresh();
-        }}
-      }} catch (e) {{
-        if (mounted) {{
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error al eliminar: $e')),
-          );
-        }}
-      }}
-    }}
-  }}
-
-  @override
-  Widget build(BuildContext context) {{
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('{pascal}s'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            tooltip: 'Actualizar',
-            onPressed: _refresh,
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: Theme.of(context).primaryColor,
-        icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: const Text('Nuevo', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        onPressed: () async {{
-          final created = await Navigator.push<bool>(
-            context,
-            MaterialPageRoute(builder: (_) => const {pascal}FormView()),
-          );
-          if (created == true) _refresh();
-        }},
-      ),
-      body: FutureBuilder<List<{pascal}>>(
-        future: _itemsFuture,
-        builder: (context, snapshot) {{
-          if (snapshot.connectionState == ConnectionState.waiting) {{
-            return const LoadingWidget(message: 'Cargando {pascal}s...');
-          }}
-          if (snapshot.hasError) {{
-            return ErrorStateWidget(
-              error: snapshot.error.toString(),
-              onRetry: _refresh,
-            );
-          }}
-
-          final allItems = snapshot.data ?? [];
-          final items = _filter.trim().isEmpty
-              ? allItems
-              : allItems.where((it) => it.{display_attr}.toString().toLowerCase().contains(_filter.toLowerCase())).toList();
-
-          if (allItems.isEmpty) {{
-            return EmptyStateWidget(
-              title: 'Sin {pascal}s',
-              subtitle: 'Aún no se han registrado datos en este módulo.',
-              actionLabel: 'Crear {pascal}',
-              onAction: () async {{
-                final created = await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(builder: (_) => const {pascal}FormView()),
-                );
-                if (created == true) _refresh();
-              }},
-            );
-          }}
-
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                child: TextField(
-                  onChanged: (v) => setState(() => _filter = v),
-                  decoration: InputDecoration(
-                    hintText: 'Filtrar en {pascal}s (${{allItems.length}})...',
-                    hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-                    prefixIcon: const Icon(Icons.search_rounded, size: 20, color: Color(0xFF94A3B8)),
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: Color(0xFF334155)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: Color(0xFF334155)),
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: items.isEmpty
-                    ? const Center(child: Text('No hay registros coincidentes.', style: TextStyle(color: Color(0xFF94A3B8))))
-                    : RefreshIndicator(
-                        onRefresh: () async => _refresh(),
-                        child: ListView.builder(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          itemCount: items.length,
-                          itemBuilder: (context, index) {{
-                            final item = items[index];
-                            return EntityCard(
-                              title: '${{item.{display_attr}}}',
-                              subtitle: {sub_expr},
-                              onTap: () async {{
-                                final updated = await Navigator.push<bool>(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => {pascal}FormView(item: item)),
-                                );
-                                if (updated == true) _refresh();
-                              }},
-                              onEdit: () async {{
-                                final updated = await Navigator.push<bool>(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => {pascal}FormView(item: item)),
-                                );
-                                if (updated == true) _refresh();
-                              }},
-                              onDelete: () => _deleteItem(item.id),
-                            );
-                          }},
-                        ),
-                      ),
-              ),
-            ],
-          );
-        }},
-      ),
-    );
-  }}
-}}
-"""
-
-
-def _generar_form_view_dart(clase: dict) -> str:
-    pascal = clase["nombre_pascal"]
-    snake = clase["nombre_snake"]
-    attrs = clase["atributos"]
-
-    pk_attr = next((a for a in attrs if a["es_pk"]), attrs[0])
-    form_attrs = [a for a in attrs if a != pk_attr]
-
-    controller_decls = []
-    controller_inits = []
-    controller_disposes = []
-    widget_fields = []
-    model_instantiations = []
-
-    for a in form_attrs:
-        n = a["nombre"]
-        t = a["base_tipo"]
-
-        if t in ["int", "double", "String"]:
-            controller_decls.append(f"  late TextEditingController _{n}Ctrl;")
-            controller_inits.append(
-                f"    _{n}Ctrl = TextEditingController(text: widget.item?.{n}.toString() ?? '');"
-            )
-            controller_disposes.append(f"    _{n}Ctrl.dispose();")
-
-            n_lower = n.lower()
-            keyboard = "TextInputType.number" if t in ["int", "double"] else "TextInputType.text"
-            prefix_icon_code = "Icons.edit_note_rounded"
-            obscure_code = "false"
-            max_lines_code = "1"
-
-            if "email" in n_lower or "correo" in n_lower:
-                keyboard = "TextInputType.emailAddress"
-                prefix_icon_code = "Icons.email_outlined"
-            elif "pass" in n_lower or "clave" in n_lower or "contrasena" in n_lower or "password" in n_lower:
-                prefix_icon_code = "Icons.lock_outline"
-                obscure_code = "true"
-            elif "tel" in n_lower or "cel" in n_lower or "phone" in n_lower:
-                keyboard = "TextInputType.phone"
-                prefix_icon_code = "Icons.phone_outlined"
-            elif "desc" in n_lower or "obs" in n_lower or "coment" in n_lower or "mensaje" in n_lower or "texto" in n_lower:
-                keyboard = "TextInputType.multiline"
-                prefix_icon_code = "Icons.notes_rounded"
-                max_lines_code = "3"
-            elif n_lower.endswith("_id") or n_lower.startswith("id_") or "fk" in n_lower:
-                prefix_icon_code = "Icons.link_rounded"
-            elif t in ["int", "double"]:
-                prefix_icon_code = "Icons.numbers_rounded"
-
-            label_text = _to_pascal_case(n)
-            if n_lower.endswith("_id") or n_lower.startswith("id_") or "fk" in n_lower:
-                label_text += " (Relación FK)"
-
-            widget_fields.append(f"""
-            AppTextField(
-              controller: _{n}Ctrl,
-              label: '{label_text}',
-              prefixIcon: {prefix_icon_code},
-              obscureText: {obscure_code},
-              maxLines: {max_lines_code},
-              keyboardType: {keyboard},
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Campo requerido' : null,
-            ),""")
-
-            if t == "int":
-                model_instantiations.append(f"          {n}: int.tryParse(_{n}Ctrl.text.trim()) ?? 0,")
-            elif t == "double":
-                model_instantiations.append(f"          {n}: double.tryParse(_{n}Ctrl.text.trim()) ?? 0.0,")
-            else:
-                model_instantiations.append(f"          {n}: _{n}Ctrl.text.trim(),")
-
-        elif t == "bool":
-            controller_decls.append(f"  late bool _{n}Val;")
-            controller_inits.append(f"    _{n}Val = widget.item?.{n} ?? false;")
-            widget_fields.append(f"""
-            SwitchListTile(
-              title: const Text('{_to_pascal_case(n)}'),
-              value: _{n}Val,
-              onChanged: (v) => setState(() => _{n}Val = v),
-            ),
-            const SizedBox(height: 16),""")
-            model_instantiations.append(f"          {n}: _{n}Val,")
-
-        elif t == "DateTime":
-            controller_decls.append(f"  DateTime? _{n}Date;")
-            controller_inits.append(f"    _{n}Date = widget.item?.{n} ?? DateTime.now();")
-            widget_fields.append(f"""
-            ListTile(
-              title: Text('Fecha: ${{_{n}Date?.toLocal().toString().split(' ')[0] ?? 'Seleccionar'}}'),
-              trailing: const Icon(Icons.calendar_today),
-              onTap: () async {{
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: _{n}Date ?? DateTime.now(),
-                  firstDate: DateTime(2000),
-                  lastDate: DateTime(2100),
-                );
-                if (picked != null) setState(() => _{n}Date = picked);
-              }},
-            ),
-            const SizedBox(height: 16),""")
-            model_instantiations.append(f"          {n}: _{n}Date,")
-
-    decls_code = "\n".join(controller_decls)
-    inits_code = "\n".join(controller_inits)
-    disposes_code = "\n".join(controller_disposes)
-    widgets_code = "\n".join(widget_fields)
-    instantiations_code = "\n".join(model_instantiations)
-
-    pk_type = pk_attr["base_tipo"]
-    if pk_type == "int":
-        pk_create_expr = "0"
-    elif pk_type == "double":
-        pk_create_expr = "0.0"
-    else:
-        pk_create_expr = "''"
-
-    return f"""import 'package:flutter/material.dart';
-import '../../models/{snake}.dart';
-import '../../services/{snake}_service.dart';
-import '../../shared/widgets/app_text_field.dart';
-import '../../shared/widgets/app_button.dart';
-
-class {pascal}FormView extends StatefulWidget {{
-  final {pascal}? item;
-
-  const {pascal}FormView({{super.key, this.item}});
-
-  @override
-  State<{pascal}FormView> createState() => _{pascal}FormViewState();
-}}
-
-class _{pascal}FormViewState extends State<{pascal}FormView> {{
-  final _formKey = GlobalKey<FormState>();
-  final {pascal}Service _service = {pascal}Service();
-  bool _isLoading = false;
-
-{decls_code}
-
-  @override
-  void initState() {{
-    super.initState();
-{inits_code}
-  }}
-
-  @override
-  void dispose() {{
-{disposes_code}
-    super.dispose();
-  }}
-
-  Future<void> _save() async {{
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() => _isLoading = true);
-
-    try {{
-      final isEdit = widget.item != null;
-      final payload = {pascal}(
-        {pk_attr['nombre']}: isEdit ? widget.item!.{pk_attr['nombre']} : {pk_create_expr},
-{instantiations_code}
-      );
-
-      if (isEdit) {{
-        await _service.update(widget.item!.{pk_attr['nombre']}, payload.toJson());
-      }} else {{
-        await _service.create(payload.toJson());
-      }}
-
-      if (mounted) {{
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(isEdit ? 'Actualizado correctamente' : 'Creado con éxito')),
-        );
-        Navigator.pop(context, true);
-      }}
-    }} catch (e) {{
-      if (mounted) {{
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al guardar: $e')),
-        );
-      }}
-    }} finally {{
-      if (mounted) setState(() => _isLoading = false);
-    }}
-  }}
-
-  @override
-  Widget build(BuildContext context) {{
-    final isEdit = widget.item != null;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(isEdit ? 'Editar {pascal}' : 'Nuevo {pascal}'),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-{widgets_code}
-              const SizedBox(height: 24),
-              AppButton(
-                text: isEdit ? 'Guardar Cambios' : 'Registrar {pascal}',
-                isLoading: _isLoading,
-                onPressed: _save,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }}
-}}
-"""
-
-
-def _generar_home_view_dart(clases: List[dict], app_name: str = "app_movil") -> str:
-    titulo_hero, subtitulo_hero, icono_hero, grupos = _analizar_dominio_proyecto(clases, app_name)
-
-    imports = "\n".join(f"import '../{c['nombre_snake']}/{c['nombre_snake']}_list_view.dart';" for c in clases)
-
-    rutas_cases = []
-    for c in clases:
-        pascal = c["nombre_pascal"]
-        snake = c["nombre_snake"]
-        rutas_cases.append(f"""      case '{snake}':
-        Navigator.push(context, MaterialPageRoute(builder: (_) => const {pascal}ListView()));
-        break;""")
-    rutas_code = "\n".join(rutas_cases)
-
-    grupos_dart = []
-    for g in grupos:
-        items_dart = []
-        for c in g["clases"]:
-            pascal = c["nombre_pascal"]
-            snake = c["nombre_snake"]
-            meta = _obtener_meta_entidad(pascal)
-            items_dart.append(f"""              _ModuleItem(
-                id: '{snake}',
-                name: '{pascal}',
-                desc: '{meta["desc"]}',
-                badge: '{meta["badge"]}',
-                icon: {meta["icon"]},
-                color: const Color({meta["color"]}),
-              )""")
-        items_code = ",\n".join(items_dart)
-        grupos_dart.append(f"""        _ModuleGroup(
-          title: '{g["titulo"]}',
-          icon: {g["icono"]},
-          color: const Color({g["color"]}),
-          items: [
-{items_code}
-          ],
-        )""")
-    grupos_code = ",\n".join(grupos_dart)
-
-    return f"""import 'package:flutter/material.dart';
-{imports}
-
-class HomeView extends StatefulWidget {{
-  const HomeView({{super.key}});
-
-  @override
-  State<HomeView> createState() => _HomeViewState();
-}}
-
-class _HomeViewState extends State<HomeView> {{
-  String _searchQuery = '';
-
-  final List<_ModuleGroup> _groups = [
-{grupos_code}
-  ];
-
-  void _navigateToModule(BuildContext context, String moduleId) {{
-    switch (moduleId) {{
-{rutas_code}
-    }}
-  }}
-
-  @override
-  Widget build(BuildContext context) {{
-    final query = _searchQuery.toLowerCase().trim();
-
-    final filteredGroups = _groups.map((group) {{
-      final matchingItems = group.items.where((it) {{
-        return it.name.toLowerCase().contains(query) ||
-               it.desc.toLowerCase().contains(query) ||
-               it.badge.toLowerCase().contains(query);
-      }}).toList();
-      return _ModuleGroup(
-        title: group.title,
-        icon: group.icon,
-        color: group.color,
-        items: matchingItems,
-      );
-    }}).where((g) => g.items.isNotEmpty).toList();
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('{titulo_hero}'),
-        centerTitle: false,
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 16),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFF10B981).withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.bolt, size: 14, color: Color(0xFF10B981)),
-                SizedBox(width: 4),
-                Text('Persistente', style: TextStyle(color: Color(0xFF10B981), fontSize: 11, fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ),
-        ],
-      ),
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFF334155)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 22,
-                          backgroundColor: const Color(0xFF38BDF8).withValues(alpha: 0.15),
-                          child: const Icon({icono_hero}, color: Color(0xFF38BDF8), size: 24),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                '{titulo_hero}',
-                                style: TextStyle(
-                                  color: Color(0xFFF8FAFC),
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '{subtitulo_hero}',
-                                style: const TextStyle(
-                                  color: Color(0xFF94A3B8),
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        _buildMetricPill(Icons.layers_outlined, '{len(clases)} Módulos'),
-                        const SizedBox(width: 8),
-                        _buildMetricPill(Icons.sync_rounded, 'REST Sync'),
-                        const SizedBox(width: 8),
-                        _buildMetricPill(Icons.shield_outlined, 'Persistencia OK'),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: TextField(
-                onChanged: (v) => setState(() => _searchQuery = v),
-                decoration: InputDecoration(
-                  hintText: 'Buscar módulos, materias, notas...',
-                  hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
-                  prefixIcon: const Icon(Icons.search, size: 20, color: Color(0xFF94A3B8)),
-                  filled: true,
-                  fillColor: const Color(0xFF1E293B),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF334155)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF334155)),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          if (filteredGroups.isEmpty)
-            const SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(
-                child: Text('No se encontraron módulos coincidentes con la búsqueda.'),
-              ),
-            )
-          else
-            SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {{
-                  final group = filteredGroups[index];
-                  return Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(group.icon, size: 18, color: group.color),
-                            const SizedBox(width: 8),
-                            Text(
-                              group.title,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFFF8FAFC),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: group.color.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                '${{group.items.length}}',
-                                style: TextStyle(color: group.color, fontSize: 11, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        ...group.items.map((item) => _buildModuleCard(context, item)),
-                      ],
-                    ),
-                  );
-                }},
-                childCount: filteredGroups.length,
-              ),
-            ),
-        ],
-      ),
-    );
-  }}
-
-  Widget _buildMetricPill(IconData icon, String label) {{
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF334155)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: const Color(0xFF38BDF8)),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 11, fontWeight: FontWeight.w600),
-          ),
-        ],
-      ),
-    );
-  }}
-
-  Widget _buildModuleCard(BuildContext context, _ModuleItem item) {{
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF334155)),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () => _navigateToModule(context, item.id),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: item.color.withValues(alpha: 0.15),
-                  child: Icon(item.icon, color: item.color, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            item.name,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 15,
-                              color: Color(0xFFF8FAFC),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: item.color.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              item.badge,
-                              style: TextStyle(
-                                color: item.color,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        item.desc,
-                        style: const TextStyle(
-                          color: Color(0xFF94A3B8),
-                          fontSize: 12,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 14,
-                  color: Color(0xFF64748B),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }}
-}}
-
-class _ModuleGroup {{
-  final String title;
-  final IconData icon;
-  final Color color;
-  final List<_ModuleItem> items;
-
-  _ModuleGroup({{
-    required this.title,
-    required this.icon,
-    required this.color,
-    required this.items,
-  }});
-}}
-
-class _ModuleItem {{
-  final String id;
-  final String name;
-  final String desc;
-  final String badge;
-  final IconData icon;
-  final Color color;
-
-  _ModuleItem({{
-    required this.id,
-    required this.name,
-    required this.desc,
-    required this.badge,
-    required this.icon,
-    required this.color,
-  }});
-}}
-"""
-
-
-def _generar_main_dart(app_name: str, clases: List[dict]) -> str:
-    title = app_name.replace("_", " ").title()
-    return f"""import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'core/theme/app_theme.dart';
-import 'views/home/home_view.dart';
-
-Future<void> main() async {{
-  WidgetsFlutterBinding.ensureInitialized();
-  // API_BASE_URL y demás ajustes salen de .env (ver README / .env.example)
-  try {{
-    await dotenv.load(fileName: '.env');
-  }} catch (e) {{
-    debugPrint('No se pudo leer .env, se usa la URL de respaldo de ApiConfig: $e');
-  }}
-  runApp(const MainApp());
-}}
-
-class MainApp extends StatelessWidget {{
-  const MainApp({{super.key}});
-
-  @override
-  Widget build(BuildContext context) {{
-    return MaterialApp(
-      title: '{title}',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
-      home: const HomeView(),
-    );
-  }}
-}}
-"""
+# Lo que NO se copia de la plantilla nativa: código Dart viejo y basura de compilación local.
+_OMITIR_PLANTILLA = {"lib", "build", ".dart_tool", ".gradle", ".idea"}
+_OMITIR_ARCHIVOS = {"local.properties", ".flutter-plugins", ".flutter-plugins-dependencies", "pubspec.lock"}
+
+
+def _archivos_plantilla_nativa():
+    """(ruta absoluta, ruta relativa) de android/, web/, etc. de templates/flutter_skeleton."""
+    template_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates", "flutter_skeleton")
+    if not os.path.isdir(template_dir):
+        return
+    for root, dirs, files in os.walk(template_dir):
+        dirs[:] = [d for d in dirs if d not in _OMITIR_PLANTILLA]
+        for file in files:
+            if file in _OMITIR_ARCHIVOS or file.endswith(".iml"):
+                continue
+            abs_path = os.path.join(root, file)
+            yield abs_path, os.path.relpath(abs_path, template_dir).replace("\\", "/")
 
 
 def generar_app_flutter_completa(
@@ -1257,14 +479,11 @@ def generar_app_flutter_completa(
     api_base_url: str = "http://localhost:8080"
 ) -> Dict[str, str]:
     """
-    Construye de forma hiper-modular, completa y determinista toda la aplicación
-    móvil en Flutter:
-    - Esqueleto estricto (pubspec, analysis, themes, api_client, api_config)
-    - Modelos Dart por cada clase UML
-    - Servicios HTTP CRUD por cada clase
-    - Vistas CRUD completas (List y Form) por cada clase
-    - Home dashboard de navegación
-    - main.dart configurado
+    Genera la app Flutter completa a partir del diagrama:
+    - Esqueleto (pubspec, .env, ApiClient, servicios base)
+    - Modelos, DTOs y servicios HTTP por clase (mismos nombres/rutas que el backend Spring)
+    - Interfaz de APP: splash, inicio con resumen, módulos, ajustes, lista con búsqueda,
+      detalle, formularios tipados, acciones de negocio (métodos del diagrama) y animaciones.
     """
     archivos = construir_archivos_esqueleto(app_name, api_base_url)
     clases = _extraer_clases_diagrama(diagram_json)
@@ -1274,21 +493,20 @@ def generar_app_flutter_completa(
         archivos[f"lib/models/{snake}.dart"] = _generar_modelo_dart(c)
         archivos[f"lib/dto/{snake}_dto.dart"] = _generar_dto_dart(c)
         archivos[f"lib/services/{snake}_service.dart"] = _generar_servicio_dart(c)
-        archivos[f"lib/views/{snake}/{snake}_list_view.dart"] = _generar_list_view_dart(c)
-        archivos[f"lib/views/{snake}/{snake}_form_view.dart"] = _generar_form_view_dart(c)
 
-    archivos["lib/views/home/home_view.dart"] = _generar_home_view_dart(clases, app_name)
-    archivos["lib/main.dart"] = _generar_main_dart(app_name, clases)
+    titulo, subtitulo, icono_hero, _ = _analizar_dominio_proyecto(clases, app_name)
+    if titulo.startswith("Portal "):
+        titulo = app_name.replace("_", " ").replace("-", " ").strip().title() or titulo
+    entidades = [preparar_entidad(c, _obtener_meta_entidad(c["nombre_snake"].replace("_", ""))) for c in clases]
+    archivos.update(archivos_interfaz(entidades, titulo, subtitulo, icono_hero))
 
     if output_dir:
-        # Copiar plantilla física previa si existe
-        template_dir = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            "templates",
-            "flutter_skeleton"
-        )
-        if os.path.isdir(template_dir):
-            shutil.copytree(template_dir, output_dir, dirs_exist_ok=True)
+        for abs_path, rel in _archivos_plantilla_nativa():
+            if rel in archivos:
+                continue
+            destino = os.path.join(output_dir, rel.replace("/", os.sep))
+            os.makedirs(os.path.dirname(destino), exist_ok=True)
+            shutil.copy2(abs_path, destino)
 
         for rel_path, content in archivos.items():
             full_path = os.path.join(output_dir, rel_path.replace("/", os.sep))
@@ -1317,24 +535,14 @@ def crear_zip_app_flutter(
 
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        # 1. Incluir estructura de plataformas nativas físicas (android, web, windows)
-        template_dir = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            "templates",
-            "flutter_skeleton"
-        )
-        if os.path.isdir(template_dir):
-            for root, _, files in os.walk(template_dir):
-                for file in files:
-                    abs_path = os.path.join(root, file)
-                    rel_to_template = os.path.relpath(abs_path, template_dir).replace("\\", "/")
-                    if rel_to_template not in archivos:
-                        with open(abs_path, "rb") as f:
-                            zf.writestr(f"{app_name}/{rel_to_template}", f.read())
+        # 1. Plataformas nativas (android, web, windows…) sin el lib/ viejo ni basura de compilación
+        for abs_path, rel in _archivos_plantilla_nativa():
+            if rel not in archivos:
+                with open(abs_path, "rb") as f:
+                    zf.writestr(f"{app_name}/{rel}", f.read())
 
-        # 2. Escribir archivos autogenerados de Dart y configuración
+        # 2. Código Dart y configuración generados
         for rel_path, content in archivos.items():
             zf.writestr(f"{app_name}/{rel_path}", content.encode("utf-8"))
 
     return zip_buffer.getvalue()
-
