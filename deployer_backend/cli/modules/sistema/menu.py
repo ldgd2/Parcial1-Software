@@ -7,6 +7,36 @@ BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
 SERVICE_DIR = "/etc/systemd/system"
 NGINX_CONF_DIR = "/etc/nginx/sites-available"
 
+# En el VPS conviven dos proyectos. Puertos:
+#   diagramador: backend 127.0.0.1:8000 · nginx 80 (dominio) / 80 + 8080 (IP)
+#   deployer:    uvicorn 127.0.0.1:8001  · nginx 80 con su subdominio / 8081 (IP)
+#   apps desplegadas: desde el 9000 (ver deploy_service.PUERTOS_RESERVADOS)
+PUERTO_DEPLOYER = 8001
+PUERTO_PUBLICO_IP = 8081
+
+
+def conf_nginx_deployer(listen: int, server_name: str) -> str:
+    return f"""server {{
+    listen {listen};
+    server_name {server_name};
+
+    # Apps desplegadas (/host/<dueño>/<proyecto>/), las escribe el deployer
+    include /etc/nginx/deploy_apps/*.conf;
+
+    location / {{
+        proxy_pass http://127.0.0.1:{PUERTO_DEPLOYER}/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # compilar/desplegar un proyecto tarda: sin esto nginx corta a los 60 s
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
+        client_max_body_size 100m;
+    }}
+}}
+"""
+
 def menu_sistema():
     while True:
         print_header("Gestión de Sistema y Despliegue (Deployer)")
@@ -64,7 +94,9 @@ def crear_servicios(modo):
     console.print("\n[cyan]⚙️  Generando servicios y configuraciones...[/cyan]")
     
     # 1. Systemd
-    comando = f"{BASE_DIR}/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8001"
+    # Solo en local: el acceso público pasa por nginx (así no choca con el `listen` de nginx
+    # en modo IP, que antes también usaba el 8001).
+    comando = f"{BASE_DIR}/venv/bin/uvicorn main:app --host 127.0.0.1 --port {PUERTO_DEPLOYER}"
     content_service = f"""[Unit]
 Description=Deployer Backend API
 After=network.target
@@ -81,41 +113,22 @@ WantedBy=multi-user.target
     with open("/tmp/deployer-backend.service", "w") as f: f.write(content_service)
     os.system("sudo mv /tmp/deployer-backend.service /etc/systemd/system/")
     
-    # 2. Nginx
+    # 2. Nginx: un sitio PROPIO del deployer (no toca los del diagramador)
+    os.system("sudo mkdir -p /etc/nginx/deploy_apps && sudo chmod 777 /etc/nginx/deploy_apps")
     if modo == "dominio":
-        dominio = Prompt.ask("Ingresa el subdominio para el Deployer (Ej: deploy.example.com)")
-        conf_nginx = f"""server {{
-    listen 80;
-    server_name {dominio};
-
-    location / {{
-        proxy_pass http://127.0.0.1:8001/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }}
-}}
-"""
-        with open("/tmp/deployer.conf", "w") as f: f.write(conf_nginx)
-        os.system("sudo mv /tmp/deployer.conf /etc/nginx/sites-available/")
-        os.system("sudo ln -sf /etc/nginx/sites-available/deployer.conf /etc/nginx/sites-enabled/")
+        dominio = Prompt.ask("Ingresa el subdominio para el Deployer (Ej: host.example.com)")
+        conf_nginx = conf_nginx_deployer(listen=80, server_name=dominio)
+        nombre = "deployer.conf"
+        url_publica = f"http(s)://{dominio}"
     else:
         ip = Prompt.ask("Ingresa la IP pública de tu servidor")
-        conf_nginx = f"""server {{
-    listen 8001;
-    server_name {ip};
-
-    location / {{
-        proxy_pass http://127.0.0.1:8001/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }}
-}}
-"""
-        with open("/tmp/deployer-ip.conf", "w") as f: f.write(conf_nginx)
-        os.system("sudo mv /tmp/deployer-ip.conf /etc/nginx/sites-available/")
-        os.system("sudo ln -sf /etc/nginx/sites-available/deployer-ip.conf /etc/nginx/sites-enabled/")
+        conf_nginx = conf_nginx_deployer(listen=PUERTO_PUBLICO_IP, server_name=ip)
+        nombre = "deployer-ip.conf"
+        url_publica = f"http://{ip}:{PUERTO_PUBLICO_IP}"
+    with open(f"/tmp/{nombre}", "w") as f: f.write(conf_nginx)
+    os.system(f"sudo mv /tmp/{nombre} /etc/nginx/sites-available/")
+    os.system(f"sudo ln -sf /etc/nginx/sites-available/{nombre} /etc/nginx/sites-enabled/")
+    console.print(f"[cyan]Deployer público en {url_publica}  (en el backend del diagramador: DEPLOYER_URL={url_publica.replace('http(s)', 'https')})[/cyan]")
 
     # Enable and start
     console.print("[cyan]Habilitando servicios...[/cyan]")

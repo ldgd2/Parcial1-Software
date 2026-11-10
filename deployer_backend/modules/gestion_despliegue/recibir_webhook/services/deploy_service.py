@@ -38,12 +38,19 @@ async def ensure_dependencies():
     except Exception as e:
         print(f"Error ensuring dependencies: {e}")
 
-def get_free_port(start_port: int = 8080, exclude_ports: set = None) -> int:
+# Puertos del VPS que NO puede tomar una app desplegada (comparten servidor dos proyectos):
+#   8000 backend del diagramador · 8080 API del diagramador por IP (nginx)
+#   8001 deployer (uvicorn)      · 8081 deployer por IP (nginx)
+PUERTOS_RESERVADOS = {80, 443, 5432, 8000, 8001, 8080, 8081}
+PUERTO_INICIAL_APPS = 9000
+
+
+def get_free_port(start_port: int = PUERTO_INICIAL_APPS, exclude_ports: set = None) -> int:
     """Encuentra el primer puerto libre que no esté asignado en la BD ni reservado por el sistema."""
     if exclude_ports is None:
         exclude_ports = set()
-        
-    reserved_system_ports = {80, 443, 5432, 8000, 8001}.union(exclude_ports)
+
+    reserved_system_ports = PUERTOS_RESERVADOS.union(exclude_ports)
     port = start_port
     while port < 65535:
         if port in reserved_system_ports:
@@ -68,23 +75,21 @@ def ensure_nginx_include():
         if not sites_dir.exists():
             return
             
-        already_included = False
+        # Solo los sitios del DEPLOYER: antes tomaba el primer archivo con "server {" y podía
+        # meter las apps desplegadas dentro del nginx del diagramador.
         target_file = None
-        
-        for conf_file in sites_dir.glob("*"):
-            try:
-                content = conf_file.read_text(encoding="utf-8", errors="ignore")
-                if "deploy_apps/*.conf" in content:
-                    already_included = True
-                    break
-                if not target_file and "server {" in content:
-                    target_file = conf_file
-            except Exception:
-                pass
-                
-        if not already_included and target_file:
+        for nombre in ("deployer.conf", "deployer-ip.conf"):
+            conf_file = sites_dir / nombre
+            if not conf_file.exists():
+                continue
+            content = conf_file.read_text(encoding="utf-8", errors="ignore")
+            if "deploy_apps/*.conf" in content:
+                return
+            target_file = target_file or conf_file
+
+        if target_file:
             content = target_file.read_text(encoding="utf-8", errors="ignore")
-            new_content = content.replace("server {", "server {\n    include /etc/nginx/deploy_apps/*.conf;\n")
+            new_content = content.replace("server {", "server {\n    include /etc/nginx/deploy_apps/*.conf;\n", 1)
             target_file.write_text(new_content, encoding="utf-8")
             print(f"Incluido /etc/nginx/deploy_apps/*.conf en {target_file}")
     except Exception as e:
@@ -234,7 +239,7 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
     used_ports_in_db = set(p for p in other_deployments.scalars().all() if p is not None)
     
     if not deployment:
-        port = get_free_port(start_port=8080, exclude_ports=used_ports_in_db)
+        port = get_free_port(exclude_ports=used_ports_in_db)
         
         deployment = Deployment(
             project_id=project_id,
@@ -246,7 +251,7 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
         await db.commit()
         await db.refresh(deployment)
     elif deployment.port in used_ports_in_db:
-        new_port = get_free_port(start_port=8080, exclude_ports=used_ports_in_db)
+        new_port = get_free_port(exclude_ports=used_ports_in_db)
         deployment.port = new_port
         await db.commit()
         await db.refresh(deployment)
