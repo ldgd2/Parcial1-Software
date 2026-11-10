@@ -10,7 +10,40 @@ from sqlalchemy import func
 from models import Deployment
 import platform
 import psutil
+import re
 import socket
+
+
+def ocultar_secretos(texto: str) -> str:
+    """Quita tokens de URLs (https://x-access-token:TOKEN@github.com) antes de imprimir."""
+    return re.sub(r"(https?://)[^/@\s]+@", r"\1***@", str(texto))
+
+
+def _pg_local() -> bool:
+    return settings.PG_HOST in ("localhost", "127.0.0.1", "::1", "")
+
+
+def psql(sql: str, db_name: str = None, capturar: bool = False) -> subprocess.CompletedProcess:
+    """Ejecuta SQL como administrador de PostgreSQL.
+
+    - PostgreSQL en este VPS: como el usuario del sistema `postgres` por socket local (peer). En
+      Ubuntu `postgres` no tiene contraseña por TCP: con `-h 127.0.0.1` psql salía con código 2
+      y la BD del proyecto nunca se creaba.
+    - PostgreSQL remoto: TCP con PG_PASSWORD.
+    El SQL va por stdin: así las contraseñas no aparecen en errores, logs ni en `ps`."""
+    opciones = ["-v", "ON_ERROR_STOP=1", "-X", "-q"] + (["-t", "-A"] if capturar else [])
+    if db_name:
+        opciones += ["-d", db_name]
+    env = os.environ.copy()
+    if _pg_local() and platform.system() == "Linux":
+        comando = (["runuser", "-u", "postgres", "--"] if os.geteuid() == 0 else ["sudo", "-u", "postgres"]) + ["psql"]
+    else:
+        comando = ["psql", "-U", "postgres", "-h", settings.PG_HOST]
+        env["PGPASSWORD"] = settings.PG_PASSWORD
+    resultado = subprocess.run(comando + opciones, input=sql, env=env, capture_output=True, text=True)
+    if resultado.returncode != 0:
+        raise RuntimeError(f"psql salió con código {resultado.returncode}: {resultado.stderr.strip()[:500]}")
+    return resultado
 
 async def ensure_dependencies():
     """Verify and install dependencies like Git, Java, Maven if on Linux."""
@@ -118,11 +151,6 @@ def grant_all_permissions_to_db(db_name: str, db_user: str):
     if platform.system() != "Linux":
         return
     try:
-        env = os.environ.copy()
-        env["PGPASSWORD"] = settings.PG_PASSWORD
-        pg_host = settings.PG_HOST
-        psql_db_cmd = ["psql", "-U", "postgres", "-h", pg_host, "-d", db_name]
-        
         grant_sql = (
             f'ALTER SCHEMA public OWNER TO "{db_user}"; '
             f'GRANT ALL PRIVILEGES ON DATABASE "{db_name}" TO "{db_user}"; '
@@ -134,7 +162,7 @@ def grant_all_permissions_to_db(db_name: str, db_user: str):
             f'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO "{db_user}"; '
             f'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON SEQUENCES TO "{db_user}";'
         )
-        subprocess.run(psql_db_cmd + ["-c", grant_sql], env=env, check=False)
+        psql(grant_sql, db_name=db_name)
         print(f"[{db_name}] Permisos PostgreSQL otorgados a {db_user}.")
     except Exception as e:
         print(f"[{db_name}] Error al otorgar permisos: {e}")
@@ -144,22 +172,15 @@ def auto_fix_all_databases():
     if platform.system() != "Linux":
         return
     try:
-        env = os.environ.copy()
-        env["PGPASSWORD"] = settings.PG_PASSWORD
-        pg_host = settings.PG_HOST
-        
-        psql_cmd = ["psql", "-U", "postgres", "-h", pg_host, "-t", "-c",
-                    "SELECT datname, pg_catalog.pg_get_userbyid(datdba) FROM pg_database WHERE datname NOT IN ('postgres', 'template0', 'template1');"]
-        result = subprocess.run(psql_cmd, env=env, capture_output=True, text=True)
-        if result.returncode == 0:
-            lines = result.stdout.strip().split("\n")
-            for line in lines:
-                parts = line.split("|")
-                if len(parts) == 2:
-                    dbname = parts[0].strip()
-                    dbowner = parts[1].strip()
-                    if dbname and dbowner and dbowner != "postgres":
-                        grant_all_permissions_to_db(dbname, dbowner)
+        result = psql("SELECT datname, pg_catalog.pg_get_userbyid(datdba) FROM pg_database "
+                      "WHERE datname NOT IN ('postgres', 'template0', 'template1');", capturar=True)
+        for line in result.stdout.strip().split("\n"):
+            parts = line.split("|")
+            if len(parts) == 2:
+                dbname = parts[0].strip()
+                dbowner = parts[1].strip()
+                if dbname and dbowner and dbowner != "postgres":
+                    grant_all_permissions_to_db(dbname, dbowner)
     except Exception as e:
         print(f"Error en auto_fix_all_databases: {e}")
 
@@ -181,40 +202,47 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
         print(f"Directory {project_dir} exists. Pulling latest changes...")
         subprocess.run(["git", "pull"], cwd=project_dir, check=True)
     else:
-        print(f"Cloning {repo_url} into {project_dir}...")
-        subprocess.run(["git", "clone", repo_url, project_dir], check=True)
-        
+        # La URL lleva el token de GitHub: nunca imprimirla tal cual
+        print(f"Cloning {ocultar_secretos(repo_url)} into {project_dir}...")
+        clon = subprocess.run(["git", "clone", repo_url, project_dir], capture_output=True, text=True)
+        if clon.returncode != 0:
+            raise RuntimeError(f"git clone falló: {ocultar_secretos(clon.stderr.strip())[:500]}")
+
     # 2. Create Database in Postgres (if auto_deploy requested)
     if db_name and db_password and owner_prefix:
         print(f"[{project_id}] Aprovisionando base de datos PostgreSQL: {db_name} con usuario {owner_prefix}...")
         db_user = owner_prefix
+        clave = db_password.replace("'", "''")
         try:
-            env = os.environ.copy()
-            env["PGPASSWORD"] = settings.PG_PASSWORD
-            pg_host = settings.PG_HOST
-            psql_cmd = ["psql", "-U", "postgres", "-h", pg_host]
-
-            create_role_sql = f"DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '{db_user}') THEN CREATE ROLE \"{db_user}\" WITH LOGIN ENCRYPTED PASSWORD '{db_password}'; ELSE ALTER ROLE \"{db_user}\" WITH PASSWORD '{db_password}'; END IF; END $$;"
-            subprocess.run(psql_cmd + ["-c", create_role_sql], env=env, check=True)
-
-            check_result = subprocess.run(psql_cmd + ["-t", "-c", f"SELECT 1 FROM pg_database WHERE datname = '{db_name}';"], env=env, capture_output=True, text=True)
-            if "1" not in check_result.stdout:
-                subprocess.run(psql_cmd + ["-c", f'CREATE DATABASE "{db_name}" OWNER "{db_user}";'], env=env, check=True)
-            
+            psql(f"DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '{db_user}') "
+                 f"THEN CREATE ROLE \"{db_user}\" WITH LOGIN ENCRYPTED PASSWORD '{clave}'; "
+                 f"ELSE ALTER ROLE \"{db_user}\" WITH LOGIN PASSWORD '{clave}'; END IF; END $$;")
+            existe = psql(f"SELECT 1 FROM pg_database WHERE datname = '{db_name}';", capturar=True)
+            if "1" not in existe.stdout:
+                psql(f'CREATE DATABASE "{db_name}" OWNER "{db_user}";')
             # Otorgar permisos completos sobre la BD, esquema public, tablas y secuencias
             grant_all_permissions_to_db(db_name, db_user)
-        except subprocess.CalledProcessError as e:
+            print(f"[{project_id}] Base de datos {db_name} lista.")
+        except Exception as e:
             print(f"[{project_id}] Error aprovisionando BD PostgreSQL: {e}")
 
     # 3. Build the project using Maven
-    print("Building project with Maven...")
+    print(f"[{project_id}] Compilando con Maven...")
     mvn_cmd = "mvn.cmd" if platform.system() == "Windows" else "mvn"
     maven_env = os.environ.copy()
     java17_home = "/usr/lib/jvm/java-17-openjdk-amd64"
     if os.path.isdir(java17_home):
         maven_env["JAVA_HOME"] = java17_home
         maven_env["PATH"] = f"{java17_home}/bin:" + maven_env.get("PATH", "")
-    subprocess.run([mvn_cmd, "clean", "package", "-DskipTests"], cwd=project_dir, env=maven_env, check=True)
+    build = subprocess.run([mvn_cmd, "-B", "clean", "package", "-DskipTests"], cwd=project_dir,
+                           env=maven_env, capture_output=True, text=True)
+    if build.returncode != 0:
+        # Antes solo decía "returned non-zero exit status 1": se muestran los errores reales
+        salida = (build.stdout + build.stderr).splitlines()
+        errores = [l for l in salida if "[ERROR]" in l][:25] or salida[-40:]
+        print(f"[{project_id}] Maven falló. Java usado: {maven_env.get('JAVA_HOME', 'el del sistema')}")
+        print("\n".join(errores))
+        raise RuntimeError("La compilación con Maven falló (ver errores arriba).")
 
     # Find the generated jar
     target_dir = os.path.join(project_dir, "target")
