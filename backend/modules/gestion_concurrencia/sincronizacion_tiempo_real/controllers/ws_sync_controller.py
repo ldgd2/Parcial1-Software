@@ -12,6 +12,34 @@ import json
 router = APIRouter(tags=["WebSockets Salas"])
 
 
+async def _usuario_del_token(token: str | None) -> int | None:
+    """id del usuario de un JWT válido y no revocado; None si no lo es."""
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        usuario_id = int(payload.get("sub"))
+    except Exception:
+        return None
+    from backend.modules.gestion_usuarios.dependencies import _revocado
+    async for db in get_db():
+        if await _revocado(db, token):
+            return None
+        break
+    return usuario_id
+
+
+async def _leer_token_inicial(websocket: WebSocket) -> str | None:
+    """El token llega en el PRIMER mensaje ({type: 'auth'}), no en la URL."""
+    try:
+        primero = json.loads(await asyncio.wait_for(websocket.receive_text(), timeout=5))
+        if isinstance(primero, dict) and primero.get("type") == "auth":
+            return primero.get("token")
+    except (asyncio.TimeoutError, ValueError, WebSocketDisconnect):
+        pass
+    return None
+
+
 async def _usuario_anfitrion(codigo_acceso: str, token: str | None) -> int | None:
     """
     Devuelve el id del usuario si el token es válido y pertenece a un ANFITRIÓN
@@ -21,12 +49,8 @@ async def _usuario_anfitrion(codigo_acceso: str, token: str | None) -> int | Non
     verificar nada: cualquiera con el código de sala podía entrar como host
     (aprobar invitados, expulsar, cambiar roles).
     """
-    if not token:
-        return None
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        usuario_id = int(payload.get("sub"))
-    except Exception:
+    usuario_id = await _usuario_del_token(token)
+    if usuario_id is None:
         return None
 
     async for db in get_db():
@@ -71,6 +95,23 @@ async def _guardar_rol(codigo_acceso: str, guest_id: str, lector: bool) -> None:
         if proyecto_id:
             await guardar_permiso(db, proyecto_id, usuario_id, lector)
         break
+
+
+async def aplicar_rol_en_vivo(codigo_acceso: str, usuario_id: int, lector: bool) -> None:
+    """Refleja en la sala un cambio de permiso hecho por REST (invitar / cambiar permiso)."""
+    sala = manager.salas.get(codigo_acceso)
+    if sala is None:
+        return
+    guest_id = f"auth_{usuario_id}"
+    rol = "view" if lector else "edit"
+    if lector:
+        sala["readonly_guests"].add(guest_id)
+    else:
+        sala["readonly_guests"].discard(guest_id)
+    if guest_id in sala["guests"]:
+        await manager.send_personal_message({"type": "role_changed", "role": rol}, sala["guests"][guest_id])
+    if sala.get("host") is not None:
+        await manager.send_personal_message({"type": "role_updated", "guest_id": guest_id, "role": rol}, sala["host"])
 
 
 async def _estado_guardado(codigo_acceso: str, guest_id: str) -> tuple[bool, bool]:
@@ -249,13 +290,7 @@ async def websocket_endpoint(
         # El rol de host se verifica en el servidor. El token llega en el PRIMER
         # mensaje (no en la URL, que queda en logs de servidores y proxies).
         await websocket.accept()
-        token = None
-        try:
-            primero = json.loads(await asyncio.wait_for(websocket.receive_text(), timeout=5))
-            if isinstance(primero, dict) and primero.get("type") == "auth":
-                token = primero.get("token")
-        except (asyncio.TimeoutError, ValueError, WebSocketDisconnect):
-            token = None
+        token = await _leer_token_inicial(websocket)
         if await _usuario_anfitrion(codigo_acceso, token) is None:
             try:
                 await websocket.close(code=1008, reason="No autorizado como anfitrión de esta sala")
@@ -292,13 +327,17 @@ async def websocket_endpoint(
                             guest_ws,
                         )
                         if approved:
+                            # El apodo se toma ANTES de sacarlo de pendientes (antes siempre salía "Guest")
+                            apodo_unido = (manager.salas[codigo_acceso]["pending_guests"].get(target_guest)
+                                           or manager.salas[codigo_acceso]["guest_nicknames"].get(target_guest, "Invitado"))
                             manager.remove_pending_guest(codigo_acceso, target_guest)
                             manager.salas[codigo_acceso]["approved_guests"].add(target_guest)
                             if target_guest in manager.salas[codigo_acceso]["readonly_guests"]:
                                 await manager.send_personal_message({"type": "role_changed", "role": "view"}, guest_ws)
                             await manager.broadcast_to_sala(
-                                {"type": "user_joined", "nickname": manager.salas[codigo_acceso]["pending_guests"].get(target_guest, "Guest")},
+                                {"type": "user_joined", "guest_id": target_guest, "nickname": apodo_unido},
                                 codigo_acceso,
+                                exclude=guest_ws,
                             )
                         else:
                             await guest_ws.close()
@@ -447,8 +486,20 @@ async def websocket_endpoint(
             await websocket.close(code=1008)
             return
 
+        # Un invitado "auth_<id>" dice ser un usuario registrado: debe probarlo con su token
+        # (antes bastaba con poner auth_<id> en la URL para heredar el permiso de otro usuario).
+        await websocket.accept()
+        if str(guest_id).startswith("auth_"):
+            usuario_token = await _usuario_del_token(await _leer_token_inicial(websocket))
+            if usuario_token is None or usuario_token != _usuario_de_guest(guest_id):
+                try:
+                    await websocket.close(code=1008, reason="Identidad del colaborador no verificada")
+                except RuntimeError:
+                    pass
+                return
+
         # Con el nickname: sin él, "Permisos de Acceso" mostraba a todos como "Guest"
-        await manager.connect_guest(websocket, codigo_acceso, guest_id, nickname=nickname)
+        await manager.connect_guest(websocket, codigo_acceso, guest_id, nickname=nickname, accept=False)
 
         # Colaborador registrado ya aprobado en BD: entra sin pasar otra vez por la sala de
         # espera, y con el rol guardado (un lector sigue siéndolo tras recargar o reconectarse).
@@ -470,6 +521,12 @@ async def websocket_endpoint(
             if user_type in ("viewer", "observer") or str(guest_id).startswith(("mob_", "viewer_")):
                 manager.salas[codigo_acceso]["readonly_guests"].add(guest_id)
             await manager.send_personal_message({"type": "admission_status", "approved": True}, websocket)
+            # CU13: los demás participantes se enteran de que entró
+            await manager.broadcast_to_sala(
+                {"type": "user_joined", "guest_id": guest_id, "nickname": nickname or "Invitado"},
+                codigo_acceso,
+                exclude=websocket,
+            )
             if guest_id in manager.salas[codigo_acceso]["readonly_guests"]:
                 await manager.send_personal_message({"type": "role_changed", "role": "view"}, websocket)
         else:

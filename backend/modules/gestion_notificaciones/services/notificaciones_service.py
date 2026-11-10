@@ -63,6 +63,10 @@ def _al_escribir(session: Session, _ctx) -> None:
                             "usuario_id": obj.usuario_id, "titulo": obj.titulo})
         elif isinstance(obj, ColaboradorProyecto) and obj.estado == "pendiente":
             eventos.append({"tipo": "solicitud_union", "proyecto_id": obj.proyecto_id, "usuario_id": obj.usuario_id})
+        elif isinstance(obj, ColaboradorProyecto) and obj.estado == "aprobado" and obj.rol_proyecto != "anfitrion":
+            # CU08: el anfitrión lo invitó por correo (entra aprobado, sin solicitud)
+            eventos.append({"tipo": "proyecto_compartido", "proyecto_id": obj.proyecto_id,
+                            "usuario_id": obj.usuario_id, "permiso": obj.permiso_rol})
         elif isinstance(obj, VersionContextoIA) and obj.estado_propuesta == "pendiente":
             eventos.append({"tipo": "propuesta_pendiente", "proyecto_id": obj.proyecto_id, "version_id": obj.id,
                             "autor": obj.autor, "resumen": obj.resumen or obj.cmd})
@@ -143,6 +147,11 @@ async def _construir(db, ev: Dict[str, Any]) -> List[Dict[str, Any]]:
         ), {"p": pid, "u": ev["usuario_id"]})).scalar()
         if rol != "anfitrion":   # el creador entra aprobado desde el inicio: no es una solicitud
             para([ev["usuario_id"]], f"Ya puedes entrar a {proyecto}", "Tu solicitud fue aprobada.")
+
+    elif tipo == "proyecto_compartido":
+        permiso = "solo lectura" if ev.get("permiso") == "lector" else "edición"
+        para([ev["usuario_id"]], f"Te compartieron {proyecto}",
+             f"Tienes permiso de {permiso}. Lo encuentras en “Compartidos conmigo”.")
 
     elif tipo == "propuesta_pendiente":
         autor = ev.get("autor") or "Alguien"

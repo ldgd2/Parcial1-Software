@@ -24,10 +24,14 @@ async def listar_mis_proyectos(
 
 @router.get("/todos", response_model=List[ProyectoResponse])
 async def listar_todos_los_proyectos(
+    user: Usuario = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Lista todos los proyectos registrados en la plataforma."""
-    return await admin_service.listar_todos_los_proyectos(db)
+    """
+    Se mantiene por compatibilidad con la app móvil, pero ya no lista los proyectos de toda la
+    plataforma sin sesión: eso exponía el código de acceso de cualquier sala.
+    """
+    return await admin_service.listar_mis_proyectos(user, db)
 
 @router.post("/", response_model=ProyectoResponse, status_code=status.HTTP_201_CREATED)
 async def crear_proyecto(

@@ -139,7 +139,8 @@ export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: a
 
         // El host se identifica con su token en el PRIMER mensaje (no en la URL):
         // el servidor verifica que sea anfitrión de esta sala antes de darle permisos.
-        if (!isGuest) {
+        // Un colaborador registrado (auth_<id>) también prueba su identidad con el token.
+        if (!isGuest || String(identity.id).startsWith('auth_')) {
           ws?.send(JSON.stringify({ type: 'auth', token: TokenService.getToken() }));
         }
         
@@ -189,6 +190,11 @@ export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: a
               });
               break;
               
+            case 'user_joined':
+              // CU13: aviso de que alguien entró a la sala (lo muestra SalaView)
+              window.dispatchEvent(new CustomEvent('sala_usuario_unido', { detail: { nickname: data.nickname, guestId: data.guest_id } }));
+              break;
+
             case 'guest_left':
               setPendingGuests(prev => prev.filter(g => g.guest_id !== data.guest_id));
               setCursors(prev => {

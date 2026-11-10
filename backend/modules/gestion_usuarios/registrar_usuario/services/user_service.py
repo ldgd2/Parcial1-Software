@@ -14,7 +14,7 @@ async def solicitar_otp_registro(email: str, db: AsyncSession):
     # Verificamos si el email ya está registrado
     db_user = await user_repo.get_by(db, email=email)
     if db_user:
-        raise HTTPException(status_code=400, detail="El email ya está registrado")
+        raise HTTPException(status_code=400, detail="El correo ya está en uso")
 
     # Eliminar OTPs anteriores
     result_otp = await db.execute(select(OTPCode).where(OTPCode.email == email))
@@ -37,7 +37,7 @@ async def registrar_nuevo_usuario(user: UsuarioCreate, db: AsyncSession) -> Usua
     if db_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El email ya está registrado"
+            detail="El correo ya está en uso"
         )
 
     # Verificar OTP

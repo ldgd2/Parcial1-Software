@@ -31,11 +31,20 @@ async def obtener_colaborador(db: AsyncSession, proyecto_id: int, usuario_id: in
 
 
 async def exigir_permiso_edicion(db: AsyncSession, proyecto_id: int | None, usuario) -> None:
-    """403 si el usuario es colaborador del proyecto con permiso de solo lectura."""
-    usuario_id = getattr(usuario, "id", None)
-    if not proyecto_id or not usuario_id:
+    """
+    Para modificar un proyecto hay que ser colaborador aprobado y no Lector.
+    Sin proyecto (diagrama local, sin sala) no hay nada que comprobar.
+    Antes una llamada sin token o de alguien ajeno al proyecto pasaba sin control.
+    """
+    if not proyecto_id:
         return
-    if es_lector(await obtener_colaborador(db, proyecto_id, usuario_id)):
+    usuario_id = getattr(usuario, "id", None)
+    if not usuario_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Inicia sesión con tu cuenta para usar la IA o modificar este proyecto.")
+    colaborador = await obtener_colaborador(db, proyecto_id, usuario_id)
+    if colaborador is None or colaborador.estado != "aprobado":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No eres colaborador aprobado de este proyecto.")
+    if es_lector(colaborador):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=MENSAJE_SOLO_LECTURA)
 
 

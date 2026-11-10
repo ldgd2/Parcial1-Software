@@ -88,3 +88,109 @@
   color: var(--secondary);
   margin-top: 1px;
 }
+
+/* CU08: invitar por correo y miembros */
+.compartir-modal__label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.compartir-modal__fila {
+  display: flex;
+  gap: 0;
+}
+
+.compartir-modal__email {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-right: none;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  padding: 0.75rem 1rem;
+  outline: none;
+}
+
+.compartir-modal__email:focus {
+  border-color: var(--primary);
+}
+
+.compartir-modal__permiso {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-right: none;
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  padding: 0 0.75rem;
+  cursor: pointer;
+}
+
+.compartir-modal__miembro .compartir-modal__permiso {
+  border-right: 1px solid var(--border-color);
+  padding: 0.35rem 0.5rem;
+}
+
+.compartir-modal__copy-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.compartir-modal__aviso {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.compartir-modal__aviso--ok { color: var(--success-soft); }
+.compartir-modal__aviso--error { color: #f28b82; }
+
+.compartir-modal__miembros {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-color);
+  padding: 0.75rem 1rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.compartir-modal__miembro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.4rem 0;
+}
+
+.compartir-modal__miembro + .compartir-modal__miembro {
+  border-top: 1px solid var(--border-color);
+}
+
+.compartir-modal__miembro-datos {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.compartir-modal__miembro-nombre {
+  font-size: 0.8rem;
+  color: var(--text-primary);
+}
+
+.compartir-modal__miembro-email {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.compartir-modal__miembro-rol {
+  font-size: 0.7rem;
+  color: var(--primary);
+  letter-spacing: 0.06em;
+}

@@ -18,6 +18,21 @@ export const configApi = {
         return response.json();
     },
 
+    /** CU05: cambia el nombre del usuario */
+    actualizarPerfil: async (nombre: string) => {
+        const response = await fetch(`${API_URL}/configuracion/perfil`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ nombre })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            const det = Array.isArray(data.detail) ? 'El nombre debe tener entre 2 y 80 caracteres.' : data.detail;
+            throw new Error(det || 'Error al actualizar el perfil');
+        }
+        return data;
+    },
+
     solicitarOtpDb: async () => {
         const response = await fetch(`${API_URL}/configuracion/solicitar-otp`, {
             method: 'POST',

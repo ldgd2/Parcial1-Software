@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { DiagramProvider, useDiagram, EVENTO_SINCRONIZADO } from '@/features/gestion_modelado/shared/context/DiagramContext';
 import { RealTimeSyncProvider, useRealTimeSync, getUserIdentity } from '@/features/gestion_concurrencia/sincronizacion_tiempo_real/context/RealTimeSyncContext';
 import { useRegistroCambiosManuales } from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente';
@@ -102,6 +102,28 @@ const SalaContent: React.FC<{ sala: SalaInfo }> = ({ sala }) => {
     window.addEventListener(EVENTO_SINCRONIZADO, alSincronizar);
     return () => window.removeEventListener(EVENTO_SINCRONIZADO, alSincronizar);
   }, []);
+
+  // Avisos breves en la sala: proyecto recién creado (CU06/CU42) y alguien que entra (CU13)
+  const location = useLocation();
+  const mostrarAviso = useCallback((texto: string, ms = 5000) => {
+    setAvisoSync(texto);
+    setTimeout(() => setAvisoSync(actual => (actual === texto ? null : actual)), ms);
+  }, []);
+  useEffect(() => {
+    const aviso = (location.state as { aviso?: string } | null)?.aviso;
+    if (aviso) {
+      mostrarAviso(aviso, 6000);
+      window.history.replaceState({}, '');  // que no se repita al recargar
+    }
+  }, []);
+  useEffect(() => {
+    const alUnirse = (e: Event) => {
+      const { nickname } = (e as CustomEvent).detail || {};
+      mostrarAviso(`${nickname || 'Un colaborador'} se unió a la sala`);
+    };
+    window.addEventListener('sala_usuario_unido', alUnirse);
+    return () => window.removeEventListener('sala_usuario_unido', alUnirse);
+  }, [mostrarAviso]);
 
   // Autosave every 30s when dirty
   useEffect(() => {
@@ -217,7 +239,7 @@ const SalaContent: React.FC<{ sala: SalaInfo }> = ({ sala }) => {
       {/* Save status toast */}
       {saveStatus !== 'idle' && (
         <div className={`sala-view__save-toast sala-view__save-toast--${saveStatus}`}>
-          {saveStatus === 'saved' ? <><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight:4}}><polyline points="20 6 9 17 4 12"/></svg> Diagrama guardado</> : <><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight:4}}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Error al guardar</>}
+          {saveStatus === 'saved' ? <><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight:4}}><polyline points="20 6 9 17 4 12"/></svg> Guardado</> : <><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight:4}}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Error al guardar</>}
         </div>
       )}
     </div>

@@ -104,6 +104,8 @@ app.add_middleware(
     allow_origin_regex=r"https://.*\.gerlextech\.com",
     allow_credentials=True,
     allow_methods=["*"],
+    # El nombre de los archivos descargados (p. ej. {app}_flutter.zip) viaja en esta cabecera
+    expose_headers=["Content-Disposition"],
     allow_headers=["*"],
 )
 
