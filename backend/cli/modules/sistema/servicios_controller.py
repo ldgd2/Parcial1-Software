@@ -11,6 +11,25 @@ BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../
 SERVICE_DIR = os.path.join(BASE_DIR, "systemd_services")
 NGINX_CONF_DIR = os.path.join(BASE_DIR, "nginx_configs")
 
+def fijar_env_backend(clave: str, valor: str) -> None:
+    """Escribe/reemplaza `clave=valor` en backend/.env sin tocar el resto del archivo."""
+    ruta = os.path.join(BASE_DIR, "backend", ".env")
+    lineas = []
+    if os.path.exists(ruta):
+        with open(ruta, encoding="utf-8") as f:
+            lineas = f.read().splitlines()
+    nueva = f"{clave}={valor}"
+    for i, linea in enumerate(lineas):
+        if linea.split("=", 1)[0].strip() == clave:
+            lineas[i] = nueva
+            break
+    else:
+        lineas.append(nueva)
+    with open(ruta, "w", encoding="utf-8") as f:
+        f.write("\n".join(lineas) + "\n")
+    console.print(f"[green]backend/.env: {nueva}[/green]")
+
+
 def existe_servicio():
     return os.path.exists(os.path.join(SERVICE_DIR, "backend-app.service"))
 
@@ -163,6 +182,14 @@ server {{
         with open(env_prod_path, "w") as f:
             f.write(f"VITE_API_URL={api_url}\n")
             f.write(f"VITE_HOST_API_URL={ws_url}\n")
+
+        # El backend arma con FRONTEND_URL la vuelta del login de GitHub y los enlaces de los
+        # correos/notificaciones. Si queda en localhost:5173, GitHub responde
+        # "The redirect_uri is not associated with this application".
+        frontend_url = f"https://diagramador.{dominio_base}" if modo == "dominio" else f"http://{ip_address}"
+        fijar_env_backend("FRONTEND_URL", frontend_url)
+        console.print(f"[yellow]GitHub → Settings → Developer settings → OAuth Apps → Authorization callback URL: "
+                      f"{frontend_url}/github/callback[/yellow]")
 
         console.print("[cyan]Haciendo build del Frontend...[/cyan]")
         subprocess.run("npm run build", cwd=os.path.join(BASE_DIR, "frontend"), shell=True)
