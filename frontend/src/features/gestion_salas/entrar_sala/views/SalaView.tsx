@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { DiagramProvider, useDiagram } from '@/features/gestion_modelado/shared/context/DiagramContext';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { DiagramProvider, useDiagram, EVENTO_SINCRONIZADO } from '@/features/gestion_modelado/shared/context/DiagramContext';
 import { RealTimeSyncProvider, useRealTimeSync, getUserIdentity } from '@/features/gestion_concurrencia/sincronizacion_tiempo_real/context/RealTimeSyncContext';
 import { useRegistroCambiosManuales } from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente';
 import { useSugerenciasAutomaticas } from '@/features/gestion_asistencia_ia/generar_diagrama_prompt/hooks/useSugerenciasAutomaticas';
@@ -60,7 +60,8 @@ const SalaContent: React.FC<{ sala: SalaInfo }> = ({ sala }) => {
     }
   }, [sala.lienzo_json, loadDiagram]);
   const handleSave = useCallback(async () => {
-    if (saving || isGuest) return;
+    // Un lector no guarda: el backend responde 403 y el autoguardado mostraría error cada 30 s
+    if (saving || isGuest || isReadOnly) return;
     setSaving(true);
     try {
       if ((sala as any).isOfflineMode || !navigator.onLine) {
@@ -78,11 +79,51 @@ const SalaContent: React.FC<{ sala: SalaInfo }> = ({ sala }) => {
     } finally {
       setSaving(false);
     }
-  }, [saving, sala.proyecto_id, getDiagramState, isDirty, (sala as any).isOfflineMode, isGuest]);
+  }, [saving, sala.proyecto_id, getDiagramState, isDirty, (sala as any).isOfflineMode, isGuest, isReadOnly]);
   const handleSaveRef = React.useRef(handleSave);
   useEffect(() => {
     handleSaveRef.current = handleSave;
   }, [handleSave]);
+
+  // CU20: al volver la red y terminar la sincronización se avisa y se guarda enseguida
+  // (antes no había aviso y lo hecho sin conexión se perdía al recargar).
+  const [avisoSync, setAvisoSync] = useState<string | null>(null);
+  useEffect(() => {
+    const alSincronizar = (e: Event) => {
+      const { conflictos } = (e as CustomEvent).detail || {};
+      if (conflictos > 0) {
+        setAvisoSync(`Modo en línea: hay ${conflictos} conflicto(s) por resolver antes de sincronizar.`);
+        return;
+      }
+      setAvisoSync('Modo en línea: Todos los cambios han sido sincronizados');
+      handleSaveRef.current();
+      setTimeout(() => setAvisoSync(null), 5000);
+    };
+    window.addEventListener(EVENTO_SINCRONIZADO, alSincronizar);
+    return () => window.removeEventListener(EVENTO_SINCRONIZADO, alSincronizar);
+  }, []);
+
+  // Avisos breves en la sala: proyecto recién creado (CU06/CU42) y alguien que entra (CU13)
+  const location = useLocation();
+  const mostrarAviso = useCallback((texto: string, ms = 5000) => {
+    setAvisoSync(texto);
+    setTimeout(() => setAvisoSync(actual => (actual === texto ? null : actual)), ms);
+  }, []);
+  useEffect(() => {
+    const aviso = (location.state as { aviso?: string } | null)?.aviso;
+    if (aviso) {
+      mostrarAviso(aviso, 6000);
+      window.history.replaceState({}, '');  // que no se repita al recargar
+    }
+  }, []);
+  useEffect(() => {
+    const alUnirse = (e: Event) => {
+      const { nickname } = (e as CustomEvent).detail || {};
+      mostrarAviso(`${nickname || 'Un colaborador'} se unió a la sala`);
+    };
+    window.addEventListener('sala_usuario_unido', alUnirse);
+    return () => window.removeEventListener('sala_usuario_unido', alUnirse);
+  }, [mostrarAviso]);
 
   // Autosave every 30s when dirty
   useEffect(() => {
@@ -118,6 +159,24 @@ const SalaContent: React.FC<{ sala: SalaInfo }> = ({ sala }) => {
             el panel de propiedades el lienzo se encoge y el panel se mueve con él. */}
         <div className="sala-view__canvas-area">
           <DiagramCanvas onCanvasClick={() => {}} proyectoId={sala.proyecto_id} />
+          {avisoSync && (
+            <div role="status" className="sala-view__aviso-sync" style={{
+              position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 20,
+              background: '#e8f7ee', color: '#14532d', border: '1px solid #86d3a5', borderRadius: 8,
+              padding: '6px 14px', fontSize: 13, pointerEvents: 'none', boxShadow: '0 2px 8px rgba(0,0,0,.12)'
+            }}>
+              {avisoSync}
+            </div>
+          )}
+          {isReadOnly && (
+            <div role="status" style={{
+              position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 20,
+              background: '#fff7e6', color: '#7a4b00', border: '1px solid #f0c36d', borderRadius: 8,
+              padding: '6px 14px', fontSize: 13, pointerEvents: 'none', boxShadow: '0 2px 8px rgba(0,0,0,.12)'
+            }}>
+              Modo lectura: el anfitrión te asignó como Lector, no puedes modificar el diagrama.
+            </div>
+          )}
           {sala.proyecto_id > 0 && !isGuest && (
             <ChecklistPanel
               proyectoId={sala.proyecto_id}
@@ -180,7 +239,7 @@ const SalaContent: React.FC<{ sala: SalaInfo }> = ({ sala }) => {
       {/* Save status toast */}
       {saveStatus !== 'idle' && (
         <div className={`sala-view__save-toast sala-view__save-toast--${saveStatus}`}>
-          {saveStatus === 'saved' ? <><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight:4}}><polyline points="20 6 9 17 4 12"/></svg> Diagrama guardado</> : <><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight:4}}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Error al guardar</>}
+          {saveStatus === 'saved' ? <><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight:4}}><polyline points="20 6 9 17 4 12"/></svg> Guardado</> : <><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight:4}}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Error al guardar</>}
         </div>
       )}
     </div>

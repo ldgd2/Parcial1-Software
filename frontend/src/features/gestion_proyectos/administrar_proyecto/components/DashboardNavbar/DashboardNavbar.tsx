@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { cerrarSesion } from '@/shared/lib/session';
+import { cerrarSesionEnServidor } from '@/shared/lib/session';
 import { SettingsModal } from '../SettingsModal/SettingsModal';
 import { CampanaNotificaciones } from '@/features/gestion_notificaciones/CampanaNotificaciones';
 import { desactivarPushLocal } from '@/features/gestion_notificaciones/notificaciones';
@@ -16,7 +16,7 @@ export const DashboardNavbar: React.FC<Props> = ({ userName }) => {
 
   const handleLogout = async () => {
     await desactivarPushLocal();
-    cerrarSesion();
+    await cerrarSesionEnServidor();
     navigate('/login');
   };
 

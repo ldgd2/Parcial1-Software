@@ -26,6 +26,16 @@ class AdminProyectoRepository(BaseRepository):
         )
         return result.scalars().all()
 
+    async def get_con_colaboradores(self, db: AsyncSession, proyecto_id: int) -> Proyecto | None:
+        """Proyecto con colaboradores precargados (evita MissingGreenlet al serializar tras un commit)."""
+        result = await db.execute(
+            select(Proyecto)
+            .where(Proyecto.id == proyecto_id)
+            .options(selectinload(Proyecto.colaboradores))
+            .execution_options(populate_existing=True)
+        )
+        return result.scalars().first()
+
     async def get_mis_proyectos(self, db: AsyncSession, usuario_id: int):
         """Retorna todos los proyectos donde el usuario es colaborador aprobado."""
         result = await db.execute(

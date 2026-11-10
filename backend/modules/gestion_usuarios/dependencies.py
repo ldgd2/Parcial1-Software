@@ -7,6 +7,13 @@ from backend.core.config import settings
 from backend.core.database import get_db
 from backend.modules.gestion_usuarios.models import Usuario
 from backend.core.repository import BaseRepository
+import hashlib
+
+
+async def _revocado(db: AsyncSession, token: str) -> bool:
+    """CU03: un token cerrado con /usuarios/logout ya no autentica."""
+    from backend.modules.gestion_usuarios.models import TokenRevocado
+    return await db.get(TokenRevocado, hashlib.sha256(token.encode()).hexdigest()) is not None
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/usuarios/login")
 oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/usuarios/login", auto_error=False)
@@ -26,7 +33,9 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
             raise credentials_exception
     except JWTError:
         raise credentials_exception
-    
+    if await _revocado(db, token):
+        raise credentials_exception
+
     user = await user_repo.get(db, id=int(user_id_str))
     if user is None:
         raise credentials_exception
@@ -45,7 +54,7 @@ async def get_current_user_optional(
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         user_id_str = payload.get("sub")
         rol_global = payload.get("rol_global")
-        if not user_id_str:
+        if not user_id_str or await _revocado(db, token):
             return None
         user = await user_repo.get(db, id=int(user_id_str))
         if user:

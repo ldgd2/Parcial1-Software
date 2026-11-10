@@ -30,8 +30,8 @@ async def actualizar_proyecto(proyecto_id: int, data: ProyectoUpdate, user: Usua
         
     update_data = data.model_dump(exclude_unset=True)
     if update_data:
-        proyecto = await admin_repo.update(db, db_obj=proyecto, obj_in=update_data)
-    return proyecto
+        await admin_repo.update(db, db_obj=proyecto, obj_in=update_data)
+    return await admin_repo.get_con_colaboradores(db, proyecto_id)
 
 async def eliminar_proyecto(proyecto_id: int, user: Usuario, db: AsyncSession):
     # Usaremos una llamada dinámica si no la hemos implementado estáticamente en GestorPermisos

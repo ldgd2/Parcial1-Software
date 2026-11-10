@@ -80,7 +80,10 @@ export async function descargarZipAppMovil(proyectoId: number, apiBaseUrl?: stri
   const downloadUrl = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = downloadUrl;
-  a.download = `app_flutter_${proyectoId}.zip`;
+  // El backend nombra el ZIP con la app ({app}_flutter.zip); el id queda solo de respaldo
+  const disposicion = res.headers.get('Content-Disposition') || '';
+  const nombre = disposicion.match(/filename="?([^";]+)"?/i)?.[1];
+  a.download = nombre || `app_flutter_${proyectoId}.zip`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

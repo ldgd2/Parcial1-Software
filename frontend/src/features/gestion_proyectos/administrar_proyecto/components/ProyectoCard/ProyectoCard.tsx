@@ -5,9 +5,10 @@ import './ProyectoCard.css';
 interface Props {
   proyecto: Proyecto;
   onAbrir: (p: Proyecto) => void;
-  onEditar: (p: Proyecto) => void;
-  onCompartir: (p: Proyecto) => void;
-  onEliminar: (p: Proyecto) => void;
+  // Opcionales: en “Compartidos conmigo” solo el anfitrión puede editar, compartir o eliminar
+  onEditar?: (p: Proyecto) => void;
+  onCompartir?: (p: Proyecto) => void;
+  onEliminar?: (p: Proyecto) => void;
   onGestionarEquipo?: (p: Proyecto) => void;
 }
 
@@ -47,6 +48,7 @@ export const ProyectoCard: React.FC<Props> = ({ proyecto, onAbrir, onEditar, onC
         </div>
 
         <div className="proyecto-card__actions">
+          {onCompartir && (
           <button
             className="proyecto-card__action-btn"
             title="Compartir enlace"
@@ -54,6 +56,8 @@ export const ProyectoCard: React.FC<Props> = ({ proyecto, onAbrir, onEditar, onC
           >
             <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
           </button>
+          )}
+          {(onGestionarEquipo || onEditar || onEliminar) && (
           <div className="proyecto-card__menu-wrap">
             <button
               className="proyecto-card__action-btn"
@@ -69,18 +73,23 @@ export const ProyectoCard: React.FC<Props> = ({ proyecto, onAbrir, onEditar, onC
                     GESTOR IA
                   </button>
                 )}
-                <button onClick={e => { e.stopPropagation(); setMenuOpen(false); onEditar(proyecto); }}>
-                  EDITAR
-                </button>
-                <button
-                  className="proyecto-card__dropdown-danger"
-                  onClick={e => { e.stopPropagation(); setMenuOpen(false); onEliminar(proyecto); }}
-                >
-                  ELIMINAR
-                </button>
+                {onEditar && (
+                  <button onClick={e => { e.stopPropagation(); setMenuOpen(false); onEditar(proyecto); }}>
+                    EDITAR
+                  </button>
+                )}
+                {onEliminar && (
+                  <button
+                    className="proyecto-card__dropdown-danger"
+                    onClick={e => { e.stopPropagation(); setMenuOpen(false); onEliminar(proyecto); }}
+                  >
+                    ELIMINAR
+                  </button>
+                )}
               </div>
             )}
           </div>
+          )}
         </div>
       </div>
     </div>

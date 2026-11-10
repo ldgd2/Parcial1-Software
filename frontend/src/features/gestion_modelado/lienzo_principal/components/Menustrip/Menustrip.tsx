@@ -17,6 +17,7 @@ import { useExportarGithub } from '@/features/gestion_asistencia_ia/exportar_git
 import { exportarPdf, exportarPng, exportarSvg } from '@/features/gestion_modelado/shared/utils/exportarDiagrama';
 import { EVENTO_GUARDAR_PLANTILLA } from '@/features/gestion_proyectos/plantillas/plantillas';
 import { pedirAbrirHistorial } from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente/utils/abrirHistorial';
+import { restaurarVersion } from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente/utils/versionDiff';
 import { CampanaNotificaciones } from '@/features/gestion_notificaciones/CampanaNotificaciones';
 import './Menustrip.css';
 
@@ -34,7 +35,8 @@ interface MenuItem {
 
 export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat }) => {
   const navigate = useNavigate();
-  const { addNode, nodes, relations, loadDiagram, getDiagramState } = useDiagram();
+  const diagram = useDiagram();
+  const { addNode, nodes, relations, loadDiagram, getDiagramState } = diagram;
   const { pendingGuests } = useRealTimeSync();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [showShare, setShowShare] = useState(false);
@@ -146,57 +148,71 @@ export const Menustrip: React.FC<Props> = ({ sala, onSave, saving, onOpenChat })
   const fileInputRef = useRef<HTMLInputElement>(null);
   const jsonFileInputRef = useRef<HTMLInputElement>(null);
 
+  // Reemplaza la pizarra por el diagrama importado con las acciones normales del diagrama,
+  // que se transmiten a toda la sala (loadDiagram solo cambiaba la pizarra local: CP30).
+  const aplicarImportado = (importado: { nodes?: any[]; relations?: any[] }) => {
+    const actual = getDiagramState();
+    restaurarVersion(
+      { nodes: actual.nodes as any[], relations: actual.relations as any[] },
+      { nodes: importado.nodes || [], relations: importado.relations || [] },
+      diagram
+    );
+  };
+
   const importarEA = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    const terminar = () => {
+      setOpenMenu(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
     if (!file) return;
 
     try {
-      const isOffline = !navigator.onLine;
-      
-      if (!isOffline) {
+      if (navigator.onLine) {
+        let response: Response | null = null;
         try {
           const formData = new FormData();
           formData.append('file', file);
-          
           const token = TokenService.getToken();
           const headers: Record<string, string> = {};
           if (token) headers['Authorization'] = `Bearer ${token}`;
-          
-          const response = await fetch(`${API_URL}/interoperabilidad/${sala.proyecto_id}/importar-ea`, {
+          response = await fetch(`${API_URL}/interoperabilidad/${sala.proyecto_id}/importar-ea`, {
             method: 'POST',
             headers,
             body: formData
           });
-          
-          if (!response.ok) throw new Error('Error backend');
-          const result = await response.json();
-          
-          if (result.status === 'success') {
-            loadDiagram({
-              nodes: result.data.nodes,
-              relations: result.data.relations,
-              version: Date.now()
-            });
-            setOpenMenu(null);
-            if (fileInputRef.current) fileInputRef.current.value = '';
+        } catch {
+          response = null; // sin conexión con el backend: se usa el importador local
+        }
+
+        if (response) {
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok || result.status !== 'success') {
+            // El backend rechazó el archivo: se avisa y la pizarra queda intacta (antes se vaciaba: CP31)
+            showNotification('error', result.detail || 'No se pudo importar el archivo XML.');
+            terminar();
             return;
           }
-        } catch (err) {
-          console.warn("Backend import failed, falling back to frontend import");
+          aplicarImportado(result.data);
+          showNotification('success', `Diagrama importado: ${result.data.nodes.length} elementos y ${result.data.relations.length} relaciones.`);
+          terminar();
+          return;
         }
       }
 
-      // Fallback/Offline import
+      // Importación local (sin conexión)
       const text = await file.text();
-      const importer = new XmiImporter();
-      const state = importer.import(text);
-      loadDiagram(state);
-    } catch (e) {
-      alert("Error importando desde XML");
+      if (new DOMParser().parseFromString(text, 'application/xml').getElementsByTagName('parsererror').length) {
+        throw new Error('El archivo no es un XML válido.');
+      }
+      const state = new XmiImporter().import(text);
+      if (!state.nodes?.length) throw new Error('El archivo no contiene clases de Enterprise Architect.');
+      aplicarImportado(state);
+      showNotification('success', `Diagrama importado: ${state.nodes.length} elementos.`);
+    } catch (err) {
+      showNotification('error', err instanceof Error ? err.message : 'Error importando desde XML');
     }
-    
-    setOpenMenu(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    terminar();
   };
 
   const importarJSON = async (e: React.ChangeEvent<HTMLInputElement>) => {

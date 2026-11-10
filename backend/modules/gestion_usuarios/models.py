@@ -118,3 +118,11 @@ def _completar_estimacion(mapper, connection, tarea):
         h, c = estimar_tarea(tarea.tipo, tarea.titulo, tarea.descripcion, tarea.estimacion_horas, tarea.complejidad)
         tarea.estimacion_horas = tarea.estimacion_horas or h
         tarea.complejidad = tarea.complejidad or c
+
+
+class TokenRevocado(Base):
+    """CU03: tokens invalidados al cerrar sesión. Se guarda el SHA-256 del JWT, no el token."""
+    __tablename__ = "tokens_revocados"
+
+    token_hash = Column(String(64), primary_key=True)
+    expira_en = Column(DateTime, nullable=False, index=True)

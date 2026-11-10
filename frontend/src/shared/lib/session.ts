@@ -36,3 +36,19 @@ export function cerrarSesion(): void {
   TokenService.removeToken();
   limpiarDatosDeSesion();
 }
+
+/**
+ * CU03: invalida el token también en el servidor y luego limpia este navegador.
+ * Si no hay red se cierra igual en local (el token vencerá solo).
+ */
+export async function cerrarSesionEnServidor(): Promise<void> {
+  const token = TokenService.getToken();
+  if (token) {
+    const api = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    await fetch(`${api}/usuarios/logout`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => undefined);
+  }
+  cerrarSesion();
+}

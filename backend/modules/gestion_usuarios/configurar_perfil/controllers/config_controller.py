@@ -7,7 +7,7 @@ from sqlalchemy import text
 from backend.core.database import get_db
 from backend.modules.gestion_usuarios.dependencies import get_current_user
 from backend.modules.gestion_usuarios.models import Usuario, UsuarioGitHub
-from backend.modules.gestion_usuarios.configurar_perfil.schemas.config_schemas import ConfiguracionResponse, ConfigurarDbRequest
+from backend.modules.gestion_usuarios.configurar_perfil.schemas.config_schemas import ConfiguracionResponse, ConfigurarDbRequest, PerfilRequest
 from backend.modules.gestion_usuarios.recuperar_password.services.reset_service import generar_y_guardar_otp, verificar_otp
 from backend.core.security import encriptar_dato
 
@@ -28,8 +28,25 @@ async def obtener_configuracion(
         github_vinculado=github is not None,
         github_username=github.github_username if github else None,
         db_configurada=user.db_password_encrypted is not None if user else False,
-        email=user.email if user else None
+        email=user.email if user else None,
+        nombre=user.nombre if user else None,
     )
+
+
+@router.put("/perfil", response_model=ConfiguracionResponse)
+async def actualizar_perfil(
+    req: PerfilRequest,
+    current_user: Usuario = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """CU05: el usuario cambia su nombre."""
+    nombre = " ".join(req.nombre.split())
+    if len(nombre) < 2:
+        raise HTTPException(status_code=422, detail="El nombre debe tener al menos 2 caracteres.")
+    user = await db.get(Usuario, current_user.id)
+    user.nombre = nombre
+    await db.commit()
+    return await obtener_configuracion(current_user=current_user, db=db)
 
 @router.post("/solicitar-otp")
 async def solicitar_otp_db(

@@ -22,9 +22,11 @@ export const apiFetch = async <T = any>(endpoint: string, options: RequestInit =
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    if (response.status === 401) {
+    // Solo un 401 con token significa "sesión vencida". Un login con clave incorrecta también
+    // responde 401 (sin token): redirigir recargaba /login y el mensaje de error nunca se veía (CP4).
+    if (response.status === 401 && token) {
       cerrarSesion();
-      window.location.href = '/login';
+      if (window.location.pathname !== '/login') window.location.href = '/login';
     }
     throw new Error(data.detail || data.message || 'Error en la petición');
   }

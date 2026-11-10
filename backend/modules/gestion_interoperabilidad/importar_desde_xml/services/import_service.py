@@ -4,11 +4,17 @@ from backend.modules.gestion_interoperabilidad.shared.xmi.relations.relation_bas
 import backend.modules.gestion_interoperabilidad.shared.xmi.elements
 import backend.modules.gestion_interoperabilidad.shared.xmi.relations
 
+class XmiInvalidoError(ValueError):
+    """El archivo no es XML bien formado o no contiene un modelo UML importable."""
+
+
 async def parsear_xmi(xml_content: str) -> dict:
+    # Antes un XML inválido devolvía un diagrama vacío con status "success" y el
+    # frontend reemplazaba el lienzo por él: se perdían todas las clases (CP31).
     try:
-        root = ET.fromstring(xml_content)
-    except Exception:
-        return {"nodes": [], "relations": []}
+        root = ET.fromstring(xml_content.lstrip('﻿'))
+    except ET.ParseError as e:
+        raise XmiInvalidoError(f"El archivo no es un XML válido ({e}).")
     
     nodes = []
     relations = []
@@ -53,6 +59,9 @@ async def parsear_xmi(xml_content: str) -> dict:
         tag_clean = elem.tag.split('}')[-1]
         if tag_clean in valid_tags:
             if elem.attrib.get('name') == 'EARootClass': continue
+            # Tipos auxiliares de EA (<UML:DataType xmi.id="eaxmiid0" name="int"/>) a los que
+            # apuntan los atributos: no son elementos del diagrama.
+            if (elem.attrib.get('xmi.id') or '').startswith('eaxmiid'): continue
             all_elements.append(elem)
             
     class_xmi_types = ClassMapper.get_supported_xmi_types()
@@ -101,6 +110,9 @@ async def parsear_xmi(xml_content: str) -> dict:
             if rel_dict:
                 relations.append(rel_dict)
                 
+    if not nodes:
+        raise XmiInvalidoError("El archivo no contiene clases ni elementos UML de Enterprise Architect.")
+
     return {
         "nodes": nodes,
         "relations": relations

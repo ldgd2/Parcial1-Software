@@ -17,6 +17,9 @@ export const ConfiguracionView: React.FC = () => {
   // Profile and status state
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [nombre, setNombre] = useState('');
+  const [nombreGuardado, setNombreGuardado] = useState('');
+  const [savingPerfil, setSavingPerfil] = useState(false);
   const [githubVinculado, setGithubVinculado] = useState(false);
   const [githubUsername, setGithubUsername] = useState<string | null>(null);
   const [dbConfigurada, setDbConfigurada] = useState(false);
@@ -74,6 +77,27 @@ export const ConfiguracionView: React.FC = () => {
     }
   };
 
+  // CU05: guardar datos personales
+  const handleGuardarPerfil = async () => {
+    setSavingPerfil(true);
+    setBanner(null);
+    try {
+      const config = await configApi.actualizarPerfil(nombre);
+      setNombre(config.nombre || nombre);
+      setNombreGuardado(config.nombre || nombre);
+      try {
+        localStorage.setItem('usuario_nombre', config.nombre);
+        const u = JSON.parse(localStorage.getItem('user') || 'null');
+        if (u) localStorage.setItem('user', JSON.stringify({ ...u, nombre: config.nombre }));
+      } catch { /* sin almacenamiento local */ }
+      setBanner({ type: 'success', text: 'Perfil actualizado exitosamente' });
+    } catch (e: any) {
+      setBanner({ type: 'error', text: e.message || 'Error al actualizar el perfil.' });
+    } finally {
+      setSavingPerfil(false);
+    }
+  };
+
   // Password reset state (Cuenta)
   const [resetStep, setResetStep] = useState<1 | 2 | 3>(1);
   const [resetEmail, setResetEmail] = useState('');
@@ -92,6 +116,8 @@ export const ConfiguracionView: React.FC = () => {
       setGithubUsername(config.github_username);
       setDbConfigurada(config.db_configurada);
       setUserEmail(config.email || null);
+      setNombre(config.nombre || '');
+      setNombreGuardado(config.nombre || '');
       if (config.email) {
         setResetEmail(config.email);
       }
@@ -406,6 +432,28 @@ export const ConfiguracionView: React.FC = () => {
                   </div>
 
                   <div className="config-card">
+                    <div className="field-row">
+                      <label htmlFor="perfil-nombre">Nombre</label>
+                      <input
+                        id="perfil-nombre"
+                        type="text"
+                        value={nombre}
+                        maxLength={80}
+                        onChange={e => setNombre(e.target.value)}
+                        className="config-input"
+                        placeholder="Tu nombre"
+                      />
+                    </div>
+                    <div className="card-actions-row">
+                      <button
+                        className="btn-primary"
+                        onClick={handleGuardarPerfil}
+                        disabled={savingPerfil || nombre.trim().length < 2 || nombre.trim() === nombreGuardado}
+                      >
+                        {savingPerfil ? 'Guardando...' : 'Guardar cambios'}
+                      </button>
+                    </div>
+
                     <div className="field-row">
                       <label>Correo Electrónico Registrado</label>
                       <input type="email" value={userEmail || ''} readOnly className="config-input readonly" />

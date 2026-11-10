@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.core.database import get_db
-from backend.core.permissions.proyecto import requiere_proyecto, usuario_requerido, verificar_permiso
 from backend.modules.gestion_usuarios.dependencies import get_current_user
 from backend.modules.gestion_usuarios.models import Usuario
 from backend.modules.gestion_interoperabilidad.importar_desde_xml.services import import_service
@@ -22,7 +21,6 @@ async def importar_xmi(
     Recibe un archivo XML (XMI 2.1) de Enterprise Architect,
     lo parsea y retorna los nodos y relaciones extraídos.
     """
-    await verificar_permiso(db, user, proyecto_id, "editor")
     if not file.filename.endswith('.xml'):
         raise HTTPException(status_code=400, detail="El archivo debe ser un XML.")
         
@@ -36,6 +34,8 @@ async def importar_xmi(
             
         diagram_data = await import_service.parsear_xmi(text_content)
         return {"status": "success", "data": diagram_data}
+    except import_service.XmiInvalidoError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         import traceback
         traceback.print_exc()

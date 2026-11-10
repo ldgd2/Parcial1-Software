@@ -352,3 +352,14 @@
   box-shadow: 0 4px 16px rgba(223, 208, 184, 0.3);
 }
 
+
+/* CU08: Compartidos conmigo */
+.dashboard-compartidos {
+  margin-top: 2.5rem;
+}
+
+.dashboard-compartidos__vacio {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  padding: 1rem 0;
+}

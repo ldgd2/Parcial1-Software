@@ -75,6 +75,14 @@ export interface ClassNode {
   // VCS Local (Offline)
   offlineVersion?: number;
   isOfflineDirty?: boolean;
+  /** Estado de la clase al perder la conexión: base del merge de 3 vías al reconectar (CU20) */
+  offlineBase?: OfflineBase;
+}
+
+export interface OfflineBase {
+  nombre: string;
+  atributos: Record<string, { nombre: string; tipo: string }>;
+  metodos: Record<string, { nombre: string }>;
 }
 
 // ────────────────────────────────────────────────────────────────────────────

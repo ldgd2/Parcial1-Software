@@ -19,7 +19,16 @@ export const getUserIdentity = (): { id: string; nickname: string; isRegistered:
 
   if (token) {
     const nickname = registeredUser?.nombre || storedName || registeredUser?.email?.split('@')[0] || 'Usuario';
-    const id = registeredUser?.id ? `auth_${registeredUser.id}` : `auth_${nickname.replace(/\s+/g, '_')}`;
+    // El id sale del `sub` del JWT, que siempre está. Antes, si `user` aún no estaba en
+    // localStorage, el colaborador se conectaba como auth_<nombre> en vez de auth_<id>: el
+    // anfitrión lo veía "Desconectado" y el cambio de rol no le llegaba (CP45).
+    let sub: string | undefined;
+    try {
+      const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      sub = JSON.parse(atob(payload)).sub;
+    } catch { sub = undefined; }
+    const userId = sub ?? registeredUser?.id;
+    const id = userId ? `auth_${userId}` : `auth_${nickname.replace(/\s+/g, '_')}`;
     return { id, nickname, isRegistered: true };
   }
 
@@ -132,7 +141,8 @@ export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: a
 
         // El host se identifica con su token en el PRIMER mensaje (no en la URL):
         // el servidor verifica que sea anfitrión de esta sala antes de darle permisos.
-        if (!isGuest) {
+        // Un colaborador registrado (auth_<id>) también prueba su identidad con el token.
+        if (!isGuest || String(identity.id).startsWith('auth_')) {
           ws?.send(JSON.stringify({ type: 'auth', token: TokenService.getToken() }));
         }
         
@@ -182,6 +192,11 @@ export const RealTimeSyncProvider: React.FC<{ children: React.ReactNode; sala: a
               });
               break;
               
+            case 'user_joined':
+              // CU13: aviso de que alguien entró a la sala (lo muestra SalaView)
+              window.dispatchEvent(new CustomEvent('sala_usuario_unido', { detail: { nickname: data.nickname, guestId: data.guest_id } }));
+              break;
+
             case 'guest_left':
               setPendingGuests(prev => prev.filter(g => g.guest_id !== data.guest_id));
               setCursors(prev => {

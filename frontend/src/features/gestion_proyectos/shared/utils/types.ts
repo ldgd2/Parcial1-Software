@@ -14,6 +14,16 @@ export interface Proyecto {
   colaboradores?: Colaborador[];
 }
 
+/** CU08: miembro aprobado de un proyecto y su permiso */
+export interface Miembro {
+  usuario_id: number;
+  nombre: string;
+  email?: string | null;
+  rol_proyecto: string;
+  estado: string;
+  permiso: 'anfitrion' | 'editor' | 'lector';
+}
+
 export interface Notificacion {
   id: string;
   titulo: string;

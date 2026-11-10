@@ -36,6 +36,15 @@ class ClassMapper:
         return mapping
 
     @classmethod
+    def for_node_type(cls, node_type):
+        """Mapper de exportación según el tipo de nodo del lienzo (class, interface, enum, note...)."""
+        for sub_cls in cls._get_all_subclasses():
+            inst = sub_cls()
+            if inst.get_node_type() == node_type:
+                return inst
+        return ClassMapper()
+
+    @classmethod
     def create(cls, xmi_type, stereotype=None):
         # 1. Match xmi_type AND stereotype (for specialized mappers)
         if stereotype:
@@ -45,14 +54,18 @@ class ClassMapper:
                     if inst.get_stereotype().lower() == stereotype.lower():
                         return inst
 
-        # 2. Match xmi_type (check specialized tag match first)
+        # 2. Match xmi_type. Los mappers especializados que comparten la etiqueta UML:Class
+        #    (artifact, boundary, signal, ...) solo se eligen por estereotipo; si no, una clase
+        #    normal de EA caía en el primero de ellos (DataTypeMapper) y se importaba como DataType.
         for sub_cls in cls._get_all_subclasses():
             inst = sub_cls()
             tag = inst.get_xml_tag().replace('UML:', 'uml:')
+            if tag.lower() == 'uml:class':
+                continue
             if xmi_type.lower() == tag.lower():
                 return inst
 
-        return cls()
+        return ClassMapper()
 
     def parse(self, elem, geometries):
         node_id = elem.attrib.get('{http://schema.omg.org/spec/XMI/2.1}id') or elem.attrib.get('xmi.id') or str(uuid.uuid4())
@@ -174,29 +187,43 @@ class ClassMapper:
         pass
         
     # --- EXPORT LOGIC ---
-    def to_xml(self, cls, pkg_owned, proyecto_id):
+    def to_xml(self, cls, pkg_owned, proyecto_id, paquete_id=None, paquete_nombre="ExportedModel", tipos=None):
+        """paquete_id: xmi.id del paquete contenedor; tipos: dict tipo -> xmi.id del UML:DataType
+        al que apunta cada atributo (si es None se usa la referencia genérica eaxmiid0)."""
         import xml.etree.ElementTree as ET
         cls_id = cls.get('id', '')
-        
+        paquete_id = paquete_id or f"EAPK_{proyecto_id}"
+
         elem_tag = self.get_xml_tag()
-        
-        class_elem = ET.SubElement(pkg_owned, elem_tag, attrib={
-            "name": str(cls.get('nombre', 'Unnamed')) if self.get_node_type() != 'note' else '',
-            "body": str(cls.get('contenido', cls.get('nombre', ''))) if self.get_node_type() == 'note' else '',
+        es_nota = self.get_node_type() == 'note'
+
+        attrib = {
+            "name": str(cls.get('nombre', 'Unnamed')) if not es_nota else '',
             "xmi.id": f"EAID_{cls_id}",
             "visibility": "public",
-            "namespace": f"EAPK_{proyecto_id}",
+            "namespace": paquete_id,
             "isRoot": "false", "isLeaf": "false",
-            "isAbstract": "true" if cls.get('type') == 'abstract' else "false",
+            "isAbstract": "true" if cls.get('type') in ('abstract', 'abstract_class') else "false",
             "isActive": "false"
-        })
-        
+        }
+        if es_nota:
+            attrib["body"] = str(cls.get('contenido', cls.get('nombre', '')))
+        class_elem = ET.SubElement(pkg_owned, elem_tag, attrib=attrib)
+
+        # ea_stype es el TIPO de elemento de EA (Class, Interface, Enumeration, DataType, Note),
+        # no el estereotipo: antes se escribía get_stereotype() y las clases llegaban como "DataType".
+        tipo_ea = elem_tag.split(':')[-1]
+        tipo_ea = {"Comment": "Note"}.get(tipo_ea, tipo_ea)
         tags = ET.SubElement(class_elem, "UML:ModelElement.taggedValue")
         ET.SubElement(tags, "UML:TaggedValue", attrib={"tag": "isSpecification", "value": "false"})
-        ET.SubElement(tags, "UML:TaggedValue", attrib={"tag": "ea_stype", "value": self.get_stereotype()})
+        ET.SubElement(tags, "UML:TaggedValue", attrib={"tag": "ea_stype", "value": tipo_ea})
         ET.SubElement(tags, "UML:TaggedValue", attrib={"tag": "ea_ntype", "value": "0"})
-        ET.SubElement(tags, "UML:TaggedValue", attrib={"tag": "package", "value": f"EAPK_{proyecto_id}"})
-        ET.SubElement(tags, "UML:TaggedValue", attrib={"tag": "package_name", "value": "ExportedModel"})
+        ET.SubElement(tags, "UML:TaggedValue", attrib={"tag": "package", "value": paquete_id})
+        ET.SubElement(tags, "UML:TaggedValue", attrib={"tag": "package_name", "value": paquete_nombre})
+        # Los mappers especializados que se exportan como UML:Class (boundary, artifact, signal...)
+        # se distinguen por estereotipo; sin él, al reimportar volverían como clase normal.
+        if elem_tag == "UML:Class" and type(self) is not ClassMapper:
+            ET.SubElement(tags, "UML:TaggedValue", attrib={"tag": "stereotype", "value": self.get_stereotype()})
         ET.SubElement(tags, "UML:TaggedValue", attrib={"tag": "ea_eleType", "value": "element"})
         ET.SubElement(tags, "UML:TaggedValue", attrib={"tag": "style", "value": "BackColor=-1;BorderColor=-1;BorderWidth=-1;FontColor=-1;VSwimLanes=1;HSwimLanes=1;BorderStyle=0;"})
         
@@ -222,7 +249,9 @@ class ClassMapper:
                 ET.SubElement(init_val, "UML:Expression")
                 
                 type_feat = ET.SubElement(attr_elem, "UML:StructuralFeature.type")
-                ET.SubElement(type_feat, "UML:Classifier", attrib={"xmi.idref": "eaxmiid0"})
+                tipo_attr = str(attr.get('tipo') or 'int')
+                ref = tipos.setdefault(tipo_attr, f"eaxmiid{len(tipos)}") if tipos is not None else "eaxmiid0"
+                ET.SubElement(type_feat, "UML:Classifier", attrib={"xmi.idref": ref})
                 
                 attr_tags = ET.SubElement(attr_elem, "UML:ModelElement.taggedValue")
                 ET.SubElement(attr_tags, "UML:TaggedValue", attrib={"tag": "type", "value": str(attr.get('tipo', 'int'))})

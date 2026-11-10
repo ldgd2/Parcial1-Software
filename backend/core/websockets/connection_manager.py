@@ -29,8 +29,10 @@ class ConnectionManager:
         if host_id and nickname:
             self.salas[sala_id]["guest_nicknames"][host_id] = nickname
 
-    async def connect_guest(self, websocket: WebSocket, sala_id: str, guest_id: str, nickname: str = None):
-        await websocket.accept()
+    async def connect_guest(self, websocket: WebSocket, sala_id: str, guest_id: str, nickname: str = None, accept: bool = True):
+        # accept=False cuando el socket ya se aceptó para verificar el token del colaborador
+        if accept:
+            await websocket.accept()
         self._init_sala(sala_id)
         self.salas[sala_id]["guests"][guest_id] = websocket
         if nickname:

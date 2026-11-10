@@ -23,6 +23,8 @@ const DashboardContent: React.FC = () => {
   const { notificar } = useNotif();
 
   const [proyectos, setProyectos] = useState<Proyecto[]>([]);
+  // CU08: proyectos de otros anfitriones donde soy colaborador
+  const [compartidos, setCompartidos] = useState<Proyecto[]>([]);
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState('Usuario');
   const [busqueda, setBusqueda] = useState('');
@@ -60,8 +62,13 @@ const DashboardContent: React.FC = () => {
       return;
     }
     try {
-      const data = await proyectoService.listar();
-      setProyectos(data);
+      const [data, conmigo] = await Promise.all([
+        proyectoService.listar(),
+        proyectoService.compartidosConmigo().catch(() => []),
+      ]);
+      const idsCompartidos = new Set((conmigo as Proyecto[]).map(p => p.id));
+      setProyectos((data as Proyecto[]).filter(p => !idsCompartidos.has(p.id)));
+      setCompartidos(conmigo as Proyecto[]);
     } catch {
       notificar({ tipo: 'error', titulo: 'Error', mensaje: 'No se pudieron cargar los proyectos.' });
     } finally {
@@ -122,13 +129,10 @@ const DashboardContent: React.FC = () => {
         notificar({ tipo: 'error', titulo: 'Plantilla', mensaje: 'El proyecto se creó, pero no se pudo aplicar la plantilla.' });
       }
     }
-    notificar({
-      tipo: 'exito',
-      titulo: 'Proyecto creado',
-      mensaje: `"${nuevo.nombre}" listo${conPlantilla}. Comparte el enlace para colaborar.`,
+    // CU06: el proyecto se abre en el lienzo; allí se confirma que está listo (y con qué plantilla)
+    navigate(`/diagrama/${nuevo.id}`, {
+      state: { aviso: `Proyecto “${nuevo.nombre}” listo${conPlantilla}. Usa COMPARTIR para invitar a tu equipo.` },
     });
-    // Auto-open share
-    setTimeout(() => setProyectoCompartir(nuevo), 400);
   };
 
   const handleEditar = async (nombre: string, descripcion: string) => {
@@ -154,6 +158,9 @@ const DashboardContent: React.FC = () => {
   };
 
   const proyectosFiltrados = proyectos.filter(p =>
+    p.nombre.toLowerCase().includes(busqueda.toLowerCase())
+  );
+  const compartidosFiltrados = compartidos.filter(p =>
     p.nombre.toLowerCase().includes(busqueda.toLowerCase())
   );
 
@@ -269,6 +276,35 @@ const DashboardContent: React.FC = () => {
               </div>
             )}
           </div>
+        )}
+
+        {!loading && !isOffline && (
+          <section className="dashboard-compartidos" aria-labelledby="titulo-compartidos">
+            <div className="dashboard-header">
+              <div className="dashboard-header__left">
+                <h2 id="titulo-compartidos" className="dashboard-header__title">COMPARTIDOS CONMIGO</h2>
+                <p className="dashboard-header__sub">
+                  {compartidos.length} {compartidos.length === 1 ? 'proyecto' : 'proyectos'}
+                </p>
+              </div>
+            </div>
+            {compartidosFiltrados.length > 0 ? (
+              <div className="dashboard-grid">
+                {compartidosFiltrados.map((p, i) => (
+                  <div key={p.id} style={{ animationDelay: `${i * 0.06}s` }}>
+                    <ProyectoCard
+                      proyecto={p}
+                      onAbrir={() => navigate(`/diagrama/${p.id}`)}
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="dashboard-compartidos__vacio">
+                {busqueda ? `Sin resultados para "${busqueda}"` : 'Cuando un anfitrión te invite por correo, sus proyectos aparecerán aquí.'}
+              </p>
+            )}
+          </section>
         )}
       </main>
 
