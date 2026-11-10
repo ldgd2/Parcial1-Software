@@ -95,6 +95,8 @@ def _extraer_clases_diagrama(diagram_json: dict) -> List[dict]:
                 if a.get("visibilidad") == "PK":
                     continue  # en el backend es un UUID interno, no un dato que el usuario escriba
                 tipo_raw = a.get("tipo") or a.get("type") or "String"
+                if str(a.get("visibilidad") or "").upper() == "FK":
+                    tipo_raw = "UUID"  # referencia al id (UUID) de otra entidad, igual que el backend
                 dart_type, base_type = _map_to_dart_type(tipo_raw)
                 atributos.append({
                     "nombre": attr_name,

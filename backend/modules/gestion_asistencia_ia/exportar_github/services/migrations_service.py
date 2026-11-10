@@ -1,18 +1,47 @@
+"""
+Migración Flyway V1 del backend generado.
+
+Todo es DETERMINISTA (antes las FK las escribía una IA y en producción rompía el arranque: copiaba el
+nombre de ejemplo `fk_tu_nombre_unico` y apuntaba una columna INTEGER a un id UUID, Flyway abortaba y
+Spring Boot moría -> 502).
+
+Los nombres salen con las MISMAS reglas que las entidades JPA (parser_service):
+  - tabla   = nombre de la clase sin símbolos, en minúsculas, + "s"
+  - columna = sanitize_identifier(atributo) en minúsculas     (id_cliente -> idcliente)
+  - id      = UUID (BaseEntity); los atributos PK/FK también son UUID, porque referencian ids UUID.
+Cada FK va dentro de un bloque con EXCEPTION: si algo no encaja se registra un aviso y la app arranca.
+"""
 import os
 import re
-import httpx
-from backend.core.config import settings
+from typing import Dict, List, Optional
+
+from backend.modules.gestion_asistencia_ia.exportar_github.services.parser_service import sanitize_identifier
+
+_AUDITORIA = {"id", "createdat", "updatedat", "isactive"}
+# Relaciones que no generan claves foráneas
+_SIN_FK = {"inheritance", "realization", "dependency", "usage", "trace", "abstraction", "substitution",
+           "information_flow", "instantiate", "instantiated_by", "template_binding", "calls", "called_by",
+           "create", "send", "assembly", "connector", "delegate"}
+
+
+def nombre_tabla(raw_nombre: str) -> str:
+    """Igual que parser_service: 'Detalle_Pedido' -> 'detallepedidos'."""
+    base = re.sub(r"[^a-zA-Z0-9]", "", str(raw_nombre or "")).lower() or "entidad"
+    return base if base.endswith("s") else f"{base}s"
+
+
+def nombre_columna(raw_attr: str) -> str:
+    """Igual que la entidad JPA: @Column(name = sanitize_identifier(x).lower())."""
+    return sanitize_identifier(raw_attr).lower()
+
 
 def clean_sql_identifier(raw_name: str, default: str = "attr") -> str:
-    """Limpia un nombre UML (ej: '- email: string') para ser un identificador SQL válido."""
+    """Compatibilidad: identificador SQL válido a partir de un nombre UML."""
     if not raw_name:
         return default
-    # Quitar símbolos UML iniciales: -, +, #, ~ y espacios
     name = re.sub(r'^[\-\+\#\~\s]+', '', str(raw_name))
-    # Si contiene ':', tomar solo la parte anterior al tipo
     if ':' in name:
         name = name.split(':')[0]
-    # Quitar cualquier carácter que no sea alfanumérico o guion bajo
     name = re.sub(r'[^a-zA-Z0-9_]', '_', name).strip('_').lower()
     if not name:
         return default
@@ -20,23 +49,50 @@ def clean_sql_identifier(raw_name: str, default: str = "attr") -> str:
         name = f"{default}_{name}"
     return name
 
+
 def mapear_tipo_sql(tipo_java: str) -> str:
     """Mapea tipos genéricos a tipos de PostgreSQL"""
     tipo_java = str(tipo_java).lower().strip()
+    if 'uuid' in tipo_java:
+        return 'UUID'
+    if 'long' in tipo_java:
+        return 'BIGINT'
     if 'int' in tipo_java or 'entero' in tipo_java:
         return 'INTEGER'
-    elif 'long' in tipo_java:
-        return 'BIGINT'
-    elif 'bool' in tipo_java or 'logico' in tipo_java:
+    if 'bool' in tipo_java or 'logico' in tipo_java:
         return 'BOOLEAN'
-    elif 'float' in tipo_java or 'double' in tipo_java or 'decimal' in tipo_java:
+    if 'float' in tipo_java or 'double' in tipo_java or 'decimal' in tipo_java:
         return 'DOUBLE PRECISION'
-    elif 'date' in tipo_java or 'time' in tipo_java or 'fecha' in tipo_java:
+    if 'datetime' in tipo_java or 'timestamp' in tipo_java:
         return 'TIMESTAMP'
-    elif 'uuid' in tipo_java:
-        return 'UUID'
-    else:
-        return 'VARCHAR(255)'
+    if 'date' in tipo_java or 'fecha' in tipo_java:
+        return 'DATE'
+    if 'time' in tipo_java:
+        return 'TIME'
+    return 'VARCHAR(255)'
+
+
+def _clases(nodos: list) -> list:
+    return [n for n in nodos if n.get("type") in ("class", "interface")]
+
+
+def _columnas(nodo: dict) -> List[dict]:
+    """[{col, tipo_sql, es_ref, raw}] sin id ni auditoría, sin duplicados."""
+    cols, vistos = [], set()
+    for attr in nodo.get("atributos", []) or []:
+        raw = attr.get("nombre", "")
+        col = nombre_columna(raw)
+        if col in _AUDITORIA or col in vistos or col == "unnamed":
+            continue
+        vistos.add(col)
+        raw_tipo = attr.get("tipo", "")
+        if not raw_tipo and ':' in str(raw):
+            raw_tipo = str(raw).split(':', 1)[1].strip()
+        es_ref = str(attr.get("visibilidad") or "").upper() in ("PK", "FK")
+        cols.append({"col": col, "tipo_sql": "UUID" if es_ref else mapear_tipo_sql(raw_tipo or "string"),
+                     "es_ref": es_ref, "raw": str(raw)})
+    return cols
+
 
 def generar_tablas_basicas(nodos: list) -> str:
     sql = 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";\n\n'
@@ -48,154 +104,119 @@ BEGIN
 END;
 $$ language 'plpgsql';\n\n'''
 
-    for nodo in nodos:
-        if nodo.get("type") in ["class", "interface"]:
-            raw_nombre = nodo.get("nombre", "")
-            nombre_tabla = clean_sql_identifier(raw_nombre, default="entidad")
-            if not nombre_tabla.endswith("s"):
-                nombre_tabla += "s"
-                
-            sql += f"CREATE TABLE IF NOT EXISTS {nombre_tabla} (\n"
-            atributos = nodo.get("atributos", [])
-            cols = []
-            
-            # Siempre aseguramos que haya una PK
-            tiene_pk = False
-            for attr in atributos:
-                raw_attr_name = attr.get("nombre", "")
-                nombre_attr = clean_sql_identifier(raw_attr_name, default="columna")
-                
-                # Ignorar columnas base de auditoría para manejarlas centralizadamente
-                if nombre_attr in ['created_at', 'createdat', 'updated_at', 'updatedat', 'is_active', 'isactive']:
-                    continue
+    for nodo in _clases(nodos):
+        tabla = nombre_tabla(nodo.get("nombre", ""))
+        cols = _columnas(nodo)
+        lineas = ["    id UUID PRIMARY KEY DEFAULT gen_random_uuid()"]
+        lineas += [f"    {c['col']} {c['tipo_sql']}" for c in cols]
+        lineas += ["    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP",
+                   "    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP",
+                   "    is_active BOOLEAN DEFAULT TRUE"]
+        sql += f"CREATE TABLE IF NOT EXISTS {tabla} (\n" + ",\n".join(lineas) + "\n);\n\n"
 
-                raw_tipo = attr.get("tipo", "")
-                if not raw_tipo and ':' in str(raw_attr_name):
-                    parts = str(raw_attr_name).split(':', 1)
-                    raw_tipo = parts[1].strip()
-                    
-                tipo_sql = mapear_tipo_sql(raw_tipo or "string")
-                
-                if attr.get("visibilidad") == 'PK' or nombre_attr == 'id':
-                    cols.append(f"    {nombre_attr} UUID PRIMARY KEY DEFAULT gen_random_uuid()")
-                    tiene_pk = True
-                else:
-                    cols.append(f"    {nombre_attr} {tipo_sql}")
-            
-            if not tiene_pk:
-                cols.insert(0, "    id UUID PRIMARY KEY DEFAULT gen_random_uuid()")
-                
-            cols.append("    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP")
-            cols.append("    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP")
-            cols.append("    is_active BOOLEAN DEFAULT TRUE")
+        sql += f"DROP TRIGGER IF EXISTS update_{tabla}_updated_at ON {tabla};\n"
+        sql += f"CREATE TRIGGER update_{tabla}_updated_at\nBEFORE UPDATE ON {tabla}\n"
+        sql += "FOR EACH ROW\nEXECUTE FUNCTION update_updated_at_column();\n\n"
 
-            sql += ",\n".join(cols)
-            sql += "\n);\n\n"
-
-            # Trigger para actualizar automaticamente updated_at
-            sql += f"DROP TRIGGER IF EXISTS update_{nombre_tabla}_updated_at ON {nombre_tabla};\n"
-            sql += f"CREATE TRIGGER update_{nombre_tabla}_updated_at\n"
-            sql += f"BEFORE UPDATE ON {nombre_tabla}\n"
-            sql += f"FOR EACH ROW\n"
-            sql += f"EXECUTE FUNCTION update_updated_at_column();\n\n"
-
-            # Asegurar persistencia de columnas nuevas en tablas preexistentes
-            for attr in atributos:
-                raw_attr_name = attr.get("nombre", "")
-                nombre_attr = clean_sql_identifier(raw_attr_name, default="columna")
-                if nombre_attr in ['created_at', 'createdat', 'updated_at', 'updatedat', 'is_active', 'isactive', 'id']:
-                    continue
-                raw_tipo = attr.get("tipo", "")
-                if not raw_tipo and ':' in str(raw_attr_name):
-                    raw_tipo = str(raw_attr_name).split(':', 1)[1].strip()
-                tipo_sql = mapear_tipo_sql(raw_tipo or "string")
-                sql += f"ALTER TABLE {nombre_tabla} ADD COLUMN IF NOT EXISTS {nombre_attr} {tipo_sql};\n"
-            sql += "\n"
-
+        # Columnas nuevas en tablas que ya existían
+        for c in cols:
+            sql += f"ALTER TABLE {tabla} ADD COLUMN IF NOT EXISTS {c['col']} {c['tipo_sql']};\n"
+        sql += "\n"
     return sql
 
-async def solicitar_constraints_ia(nodos: list, relaciones: list) -> str:
-    """
-    Envía las relaciones y tablas a la IA para que infiera las FK o tablas intermedias (N:M).
-    """
-    if not relaciones:
-        return ""
-        
-    prompt = f"""
-    Eres un experto en bases de datos PostgreSQL.
-    A continuación, tienes un conjunto de nodos (tablas) y relaciones entre ellos.
-    
-    Nodos: {[{'id': n['id'], 'nombre': n['nombre']} for n in nodos if n.get('type') in ['class', 'interface']]}
-    Relaciones: {relaciones}
-    
-    Genera únicamente sentencias SQL seguras en PostgreSQL.
-    Asume que todas las tablas terminan en 's' y su PK principal es de tipo UUID ('id').
-    
-    REGLA CRÍTICA 1: NUNCA uses "ADD CONSTRAINT IF NOT EXISTS". PostgreSQL NO soporta esa sintaxis y causará un error fatal (syntax error at or near EXISTS).
-    
-    REGLA CRÍTICA 2: Para cada relación (Foreign Key), usa estrictamente este bloque seguro:
-    
-    ALTER TABLE nombre_tabla ADD COLUMN IF NOT EXISTS nombre_columna UUID;
-    DO $$ 
-    BEGIN 
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_tu_nombre_unico') THEN
-            ALTER TABLE nombre_tabla ADD CONSTRAINT fk_tu_nombre_unico FOREIGN KEY (nombre_columna) REFERENCES tabla_destino (id);
-        END IF;
-    END $$;
-    
-    No incluyas formato Markdown, explicaciones, ni etiquetas de código. SOLO el código SQL válido.
-    """
-    
-    headers = {
-        "Authorization": f"Bearer {settings.OPENROUTE_API}",
-        "Content-Type": "application/json"
-    }
-    
-    url = "https://openrouter.ai/api/v1/chat/completions"
-    
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(url, json={
-                "model": settings.IA_MODEL,
-                "messages": [{"role": "user", "content": prompt}]
-            }, headers=headers)
-            
-            if response.status_code == 200:
-                data = response.json()
-                raw_sql = data['choices'][0]['message']['content'].strip()
-                sql_lines = []
-                for line in raw_sql.splitlines():
-                    ls = line.strip()
-                    if not ls or ls.startswith("```") or ls.lower().startswith("here") or ls.lower().startswith("aquí"):
-                        continue
-                    sql_lines.append(line)
-                return "\n".join(sql_lines)
+
+def _destino_por_nombre(col: str, tablas: Dict[str, str]) -> Optional[str]:
+    """idcliente / clienteid / id_cliente -> tabla 'clientes' si existe."""
+    base = col
+    for pref in ("id_", "id"):
+        if base.startswith(pref) and len(base) > len(pref):
+            cand = base[len(pref):].strip("_")
+            if cand in tablas:
+                return tablas[cand]
+    for suf in ("_id", "id"):
+        if base.endswith(suf) and len(base) > len(suf):
+            cand = base[:-len(suf)].strip("_")
+            if cand in tablas:
+                return tablas[cand]
+    return None
+
+
+def _bloque_fk(tabla: str, columna: str, destino: str, usados: set) -> str:
+    nombre = f"fk_{tabla}_{columna}"[:60]
+    i = 2
+    while nombre in usados:
+        nombre = f"fk_{tabla}_{columna}"[:57] + f"_{i}"
+        i += 1
+    usados.add(nombre)
+    return f"""DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '{nombre}') THEN
+        ALTER TABLE {tabla} ADD CONSTRAINT {nombre} FOREIGN KEY ({columna}) REFERENCES {destino} (id) ON DELETE SET NULL;
+    END IF;
+EXCEPTION WHEN others THEN
+    RAISE NOTICE 'No se creó la FK {nombre}: %', SQLERRM;
+END $$;
+"""
+
+
+def generar_claves_foraneas(nodos: list, relaciones: list) -> str:
+    """FK para cada atributo PK/FK que referencia a otra clase (por nombre o por la relación dibujada)."""
+    clases = _clases(nodos)
+    por_id = {str(n.get("id")): n for n in clases}
+    # nombre normalizado de la clase (singular, sin símbolos) -> tabla
+    tablas = {}
+    for n in clases:
+        t = nombre_tabla(n.get("nombre", ""))
+        base = re.sub(r"[^a-zA-Z0-9]", "", str(n.get("nombre", ""))).lower()
+        tablas[base] = t
+        tablas[t] = t
+
+    # Vecinos por relaciones que implican FK: tabla -> tablas relacionadas
+    vecinos: Dict[str, List[str]] = {}
+    for r in relaciones or []:
+        tipo = str(r.get("type") or r.get("tipo") or "").lower()
+        if tipo in _SIN_FK:
+            continue
+        a = por_id.get(str(r.get("sourceId") or r.get("source") or r.get("origen") or ""))
+        b = por_id.get(str(r.get("targetId") or r.get("target") or r.get("destino") or ""))
+        if not a or not b:
+            continue
+        ta, tb = nombre_tabla(a.get("nombre", "")), nombre_tabla(b.get("nombre", ""))
+        vecinos.setdefault(ta, []).append(tb)
+        vecinos.setdefault(tb, []).append(ta)
+
+    sql, usados = "", set()
+    for n in clases:
+        tabla = nombre_tabla(n.get("nombre", ""))
+        refs = [c for c in _columnas(n) if c["es_ref"]]
+        candidatos = [v for v in dict.fromkeys(vecinos.get(tabla, [])) if v != tabla]
+        sin_destino = []
+        for c in refs:
+            destino = _destino_por_nombre(c["col"], tablas)
+            if destino:
+                sql += _bloque_fk(tabla, c["col"], destino, usados)
+                if destino in candidatos:
+                    candidatos.remove(destino)
             else:
-                print(f"Error IA SQL: {response.text}")
-                return "-- Error al generar relaciones complejas\n"
-    except Exception as e:
-        print(f"Excepción IA SQL: {str(e)}")
-        return "-- Fallo en la conexión a la IA para las relaciones\n"
+                sin_destino.append(c)
+        # Un único atributo FK sin nombre reconocible y una única relación pendiente: es esa
+        if len(sin_destino) == 1 and len(candidatos) == 1:
+            sql += _bloque_fk(tabla, sin_destino[0]["col"], candidatos[0], usados)
+    return sql
+
 
 async def generar_migracion_sql(diagram_json: dict, temp_dir: str):
-    """
-    Genera el archivo V1__Esquema_Inicial.sql usando lógica determinista para tablas
-    y apoyándose en la IA para las relaciones abstractas.
-    """
+    """Genera src/main/resources/db/migration/V1__Esquema_Inicial.sql (sin IA)."""
     nodos = diagram_json.get("nodes", [])
     relaciones = diagram_json.get("edges", []) or diagram_json.get("relations", [])
-    
-    sql_script = "-- Migración autogenerada por IA\n\n"
+
+    sql_script = "-- Migración autogenerada a partir del diagrama\n\n"
     sql_script += generar_tablas_basicas(nodos)
-    
-    sql_relaciones = await solicitar_constraints_ia(nodos, relaciones)
-    if sql_relaciones and not sql_relaciones.startswith("--"):
-        sql_script += "\n-- Constraints inferidos por IA\n"
-        sql_script += sql_relaciones + "\n"
-        
-    sql_script = sql_script.replace("```sql", "").replace("```", "")
-    
+    fks = generar_claves_foraneas(nodos, relaciones)
+    if fks:
+        sql_script += "\n-- Claves foráneas (atributos PK/FK del diagrama)\n" + fks
+
     file_path = os.path.join(temp_dir, "src", "main", "resources", "db", "migration", "V1__Esquema_Inicial.sql")
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(sql_script)
-

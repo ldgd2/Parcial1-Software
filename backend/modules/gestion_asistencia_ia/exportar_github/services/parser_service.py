@@ -591,7 +591,9 @@ def generar_archivos_java(diagram_json: dict, temp_dir: str):
                 nuevo_a["nombre"] = nuevo_nombre
                 nuevo_a["nombre_capitalizado"] = nuevo_nombre[0].upper() + nuevo_nombre[1:] if nuevo_nombre else ""
                 
-                if a.get("visibilidad") != "PK":
+                # PK/FK referencian ids de otras tablas, que siempre son UUID (BaseEntity): un FK `int`
+                # del diagrama chocaba con la FK de la migración y la app no arrancaba.
+                if str(a.get("visibilidad") or "").upper() not in ("PK", "FK"):
                     nuevo_a["tipo"] = map_java_type(a.get("tipo", ""))
                 else:
                     nuevo_a["tipo"] = "UUID"
