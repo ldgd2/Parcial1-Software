@@ -50,7 +50,7 @@ export function correccionesDelDiagrama(
 }
 
 export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId, proyectoNombre }: UseWhatsAppChatProps) {
-  const { sendChatMessage, roomUsers, cursors } = useRealTimeSync();
+  const { sendChatMessage, roomUsers, cursors, onlineUsers } = useRealTimeSync();
   const { nodes, relations, addNode, updateNode, addRelation, deleteNode, deleteRelation, getDiagramState, resolveCorreccion } = useDiagram();
   const resolveCorreccionRef = useRef(resolveCorreccion);
   resolveCorreccionRef.current = resolveCorreccion;
@@ -1418,6 +1418,15 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId, proyecto
     const seen = new Set<string>();
     seen.add('diag');
 
+    // Conectados ahora (incluye a quien mira desde la app móvil)
+    (onlineUsers || []).forEach((u) => {
+      const name = u.nickname;
+      if (name && !seen.has(name.toLowerCase())) {
+        seen.add(name.toLowerCase());
+        mentions.push({ id: u.id, name, color: getUserColor(u.id) });
+      }
+    });
+
     // Añadir usuarios de la sala
     if (Array.isArray(roomUsers)) {
       roomUsers.forEach((u: any) => {
@@ -1448,7 +1457,7 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId, proyecto
     }
 
     return mentions;
-  }, [roomUsers, cursors]);
+  }, [roomUsers, cursors, onlineUsers]);
 
   // ── Fotos y notas de voz en el chat ──────────────────────────────────────────
   // Se comparten con la sala como cualquier mensaje. La IA NO se mete: solo actúa si alguien

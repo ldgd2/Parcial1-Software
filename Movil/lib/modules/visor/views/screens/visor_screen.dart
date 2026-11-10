@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:movil/modules/visor/models/chat_model.dart';
+import 'package:movil/modules/visor/views/widgets/chat_sheet.dart';
 import 'package:movil/core/storage/local_storage_service.dart';
 import 'package:movil/shared/utils/ui_engine/tema.dart';
 import 'package:movil/modules/visor/models/lienzo_model.dart';
@@ -36,12 +39,15 @@ class VisorScreen extends StatefulWidget {
 class _VisorScreenState extends State<VisorScreen> {
   late final VisorController _controller;
   final TransformationController _transformationController = TransformationController();
+  StreamSubscription<ChatMensajeModel>? _subMenciones;
+  bool _chatVisible = false;
 
   @override
   void initState() {
     super.initState();
     _controller = VisorController();
     _controller.addListener(_onStateChange);
+    _subMenciones = _controller.menciones.listen(_avisarMencion);
 
     final usuario = LocalStorageService.usuario;
     final nickname = usuario != null ? (usuario['nombre'] ?? 'Viewer') : 'Viewer';
@@ -64,6 +70,7 @@ class _VisorScreenState extends State<VisorScreen> {
 
   @override
   void dispose() {
+    _subMenciones?.cancel();
     _controller.removeListener(_onStateChange);
     _controller.dispose();
     _transformationController.dispose();
@@ -72,6 +79,40 @@ class _VisorScreenState extends State<VisorScreen> {
 
   void _onStateChange() {
     if (mounted) setState(() {});
+  }
+
+  void _avisarMencion(ChatMensajeModel m) {
+    if (!mounted || _chatVisible) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
+        backgroundColor: const Color(0xFF3A3000),
+        content: Row(
+          children: [
+            const Icon(Icons.alternate_email, color: Color(0xFFFCC419)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text('${m.senderName} te mencionó: ${m.text}',
+                  maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+        action: SnackBarAction(label: 'VER', textColor: const Color(0xFFFCC419), onPressed: _abrirChat),
+      ));
+  }
+
+  Future<void> _abrirChat() async {
+    _chatVisible = true;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => ChatSheet(controller: _controller),
+    );
+    _chatVisible = false;
   }
 
   void _abrirRevisionesSheet() {
@@ -148,6 +189,39 @@ class _VisorScreenState extends State<VisorScreen> {
           ],
         ),
         actions: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: _abrirChat,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  color: (_controller.wsConectado ? const Color(0xFF25D366) : colores.textoSecundario)
+                      .withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: _controller.wsConectado ? const Color(0xFF25D366) : colores.textoSecundario,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _controller.wsConectado ? '${_controller.cantidadEnLinea} en línea' : 'Sin conexión',
+                      style: textos.cuerpoPequeno.copyWith(fontSize: 12, color: colores.textoPrincipal),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.center_focus_strong_outlined),
             tooltip: 'Centrar',
@@ -242,16 +316,18 @@ class _VisorScreenState extends State<VisorScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.small(
-        backgroundColor: colores.fondoSecundario,
-        foregroundColor: colores.primario,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: colores.borde),
+      floatingActionButton: Badge(
+        isLabelVisible: _controller.noLeidos > 0,
+        label: Text(_controller.noLeidos > 99 ? '99+' : '${_controller.noLeidos}'),
+        offset: const Offset(-4, 4),
+        child: FloatingActionButton(
+          heroTag: 'abrir_chat',
+          backgroundColor: const Color(0xFF25D366),
+          foregroundColor: Colors.white,
+          tooltip: 'Chat de la sala',
+          onPressed: _abrirChat,
+          child: const Icon(Icons.chat_rounded),
         ),
-        tooltip: 'Feed de actividad y tareas',
-        onPressed: _abrirRevisionesSheet,
-        child: const Icon(Icons.feed_outlined, size: 20),
       ),
     );
   }

@@ -111,7 +111,7 @@ export const WhatsAppChatPanel: React.FC<WhatsAppChatPanelProps> = ({
   const [unseen, setUnseen] = useState(0);
 
   const diagram = useDiagram();
-  const { isReadOnly } = useRealTimeSync();
+  const { isReadOnly, onlineUsers } = useRealTimeSync();
 
   // Restaurar una versión del historial en la pizarra de toda la sala
   const handleRestaurarVersion = useCallback(async (
@@ -176,7 +176,9 @@ export const WhatsAppChatPanel: React.FC<WhatsAppChatPanelProps> = ({
   if (!isOpen) return null;
 
   const mentionable = getMentionableUsers();
-  const onlineCount = mentionable.length > 1 ? mentionable.length - 1 : 1;
+  // Personas conectadas según el servidor (web + app móvil); alguien en dos dispositivos cuenta una vez
+  const conectados = new Set((onlineUsers || []).map((u) => (u.nickname || u.id).trim().toLowerCase()));
+  const onlineCount = conectados.size > 0 ? conectados.size : (mentionable.length > 1 ? mentionable.length - 1 : 1);
 
   return (
     <div className="whatsapp-chat-panel">

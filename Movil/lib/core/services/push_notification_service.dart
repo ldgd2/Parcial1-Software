@@ -1,7 +1,11 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:movil/core/network/api_provider.dart';
+
+/// Para mostrar avisos desde fuera de una pantalla (notificaciones con la app abierta).
+final GlobalKey<ScaffoldMessengerState> mensajeroGlobal = GlobalKey<ScaffoldMessengerState>();
 
 class PushNotificationService {
   static bool _inicializado = false;
@@ -41,10 +45,35 @@ class PushNotificationService {
         registrarTokenDispositivo();
       });
 
+      // Con la app abierta Android/iOS NO muestran la notificación: se muestra un aviso en la app
+      // (antes solo se imprimía en consola y las menciones "no llegaban").
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        if (kDebugMode) {
-          print('[PushNotificationService] Notificacion en primer plano: ${message.notification?.title}');
-        }
+        final titulo = message.notification?.title ?? 'Notificación';
+        final cuerpo = message.notification?.body ?? '';
+        final esMencion = message.data['tipo'] == 'mencion';
+        mensajeroGlobal.currentState
+          ?..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 6),
+            content: Row(
+              children: [
+                Icon(esMencion ? Icons.alternate_email : Icons.notifications_active_outlined,
+                    color: esMencion ? const Color(0xFFFCC419) : Colors.white),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(titulo, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      if (cuerpo.isNotEmpty) Text(cuerpo, maxLines: 2, overflow: TextOverflow.ellipsis),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ));
       });
 
       _inicializado = true;

@@ -6,6 +6,10 @@ import 'package:movil/core/storage/local_storage_service.dart';
 
 typedef OnDiagramEvent = void Function(Map<String, dynamic> event);
 typedef OnCanvasRefresh = void Function();
+typedef OnChatMensaje = void Function(Map<String, dynamic> mensaje);
+typedef OnChatHistorial = void Function(List<Map<String, dynamic>> mensajes);
+typedef OnPresencia = void Function(List<Map<String, dynamic>> usuarios);
+typedef OnEstadoConexion = void Function(bool conectado);
 
 class VisorWebSocket {
   final String codigoAcceso;
@@ -13,6 +17,10 @@ class VisorWebSocket {
   final String nickname;
   final OnDiagramEvent? onDiagramEvent;
   final OnCanvasRefresh? onCanvasRefresh;
+  final OnChatMensaje? onChatMensaje;
+  final OnChatHistorial? onChatHistorial;
+  final OnPresencia? onPresencia;
+  final OnEstadoConexion? onEstadoConexion;
 
   WebSocket? _socket;
   bool _estaConectado = false;
@@ -28,6 +36,10 @@ class VisorWebSocket {
     required this.nickname,
     this.onDiagramEvent,
     this.onCanvasRefresh,
+    this.onChatMensaje,
+    this.onChatHistorial,
+    this.onPresencia,
+    this.onEstadoConexion,
   });
 
   String _construirUrlWs() {
@@ -55,22 +67,30 @@ class VisorWebSocket {
       _socket = await WebSocket.connect(url).timeout(const Duration(seconds: 10));
       _estaConectado = true;
 
+      // Un usuario con cuenta (guest_id auth_<id>) prueba su identidad con el token en el PRIMER mensaje
+      if (guestId.startsWith('auth_') && (LocalStorageService.token ?? '').isNotEmpty) {
+        _socket!.add(json.encode({'type': 'auth', 'token': LocalStorageService.token}));
+      }
+      onEstadoConexion?.call(true);
+
       _socket!.listen(
         _manejarMensaje,
         onError: (err) {
           _estaConectado = false;
+          onEstadoConexion?.call(false);
           _programarReconexion();
         },
         onDone: () {
           _estaConectado = false;
+          onEstadoConexion?.call(false);
           _programarReconexion();
         },
       );
 
       // Solicitar snapshots iniciales
-      _enviar({
-        'type': 'request_snapshots',
-      });
+      _enviar({'type': 'request_snapshots'});
+      _enviar({'type': 'request_chat_history'});
+      _enviar({'type': 'get_presence'});
 
       // Heartbeat periódico
       _pingTimer?.cancel();
@@ -110,6 +130,27 @@ class VisorWebSocket {
         case 'admission_status':
           if (decoded['approved'] == true) {
             onCanvasRefresh?.call();
+            _enviar({'type': 'request_chat_history'});
+            _enviar({'type': 'get_presence'});
+          }
+          break;
+
+        case 'chat_message':
+          final m = decoded['message'];
+          if (m is Map) onChatMensaje?.call(Map<String, dynamic>.from(m));
+          break;
+
+        case 'chat_history':
+          final lista = decoded['messages'];
+          if (lista is List) {
+            onChatHistorial?.call(lista.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList());
+          }
+          break;
+
+        case 'presence':
+          final usuarios = decoded['users'];
+          if (usuarios is List) {
+            onPresencia?.call(usuarios.whereType<Map>().map((u) => Map<String, dynamic>.from(u)).toList());
           }
           break;
 
@@ -121,6 +162,13 @@ class VisorWebSocket {
         print('Error procesando WS message: $e');
       }
     }
+  }
+
+  /// Envía un mensaje al chat de la sala. Devuelve false si no hay conexión.
+  bool enviarChat(Map<String, dynamic> mensaje) {
+    if (!_estaConectado || _socket == null) return false;
+    _enviar({'type': 'chat_message', 'message': mensaje});
+    return true;
   }
 
   void _enviar(Map<String, dynamic> data) {
