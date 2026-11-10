@@ -7,15 +7,15 @@ from sqlalchemy.future import select
 from backend.core.config import settings
 from backend.core.websockets.connection_manager import manager
 from backend.modules.gestion_proyectos.models import Proyecto
-from backend.modules.gestion_proyectos_asistida.repartir_roles.schemas.request import (
+from backend.modules.gestion_asistencia_ia.repartir_roles.schemas.request import (
     RepartirRolesRequest,
     AsignarRolManualRequest,
 )
-from backend.modules.gestion_proyectos_asistida.repartir_roles.schemas.response import (
+from backend.modules.gestion_asistencia_ia.repartir_roles.schemas.response import (
     ColaboradorRolOut,
     RepartirRolesResponse,
 )
-from backend.modules.gestion_proyectos_asistida.repartir_roles.repositories.roles_repository import (
+from backend.modules.gestion_asistencia_ia.repartir_roles.repositories.roles_repository import (
     obtener_colaboradores_proyecto,
     obtener_usuarios_por_ids,
     asegurar_colaborador_proyecto,
@@ -346,6 +346,9 @@ async def asignar_rol_manualmente(
     db: AsyncSession
 ) -> ColaboradorRolOut:
     colab = await asegurar_colaborador_proyecto(req.proyecto_id, req.usuario_id, db)
+    if colab is None:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Esa persona no es miembro aprobado del proyecto.")
     colab.rol_ia = req.rol_ia
     colab.areas = req.areas
     colab.responsabilidades = req.responsabilidades or []

@@ -230,14 +230,11 @@ _firebase_error: Optional[str] = None
 
 
 def _ruta_credenciales() -> str:
-    ruta = (settings.FIREBASE_CREDENTIALS or "").strip()
-    if not ruta:
-        return ""
-    if not os.path.isabs(ruta):
-        raiz = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
-        candidatas = [os.path.join(raiz, ruta), os.path.join(raiz, "backend", ruta)]
-        ruta = next((c for c in candidatas if os.path.isfile(c)), candidatas[0])
-    return ruta
+    """FIREBASE_CREDENTIALS del .env o, si no está, el JSON que se haya dejado en
+    gestion_notificaciones/config/ (misma búsqueda que firebase_init, la del módulo móvil)."""
+    from backend.modules.gestion_notificaciones.firebase_init import candidatos_credenciales
+
+    return next((str(c) for c in candidatos_credenciales() if c.is_file()), "")
 
 
 def firebase_app():

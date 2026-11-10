@@ -15,7 +15,7 @@ def test_estimacion_de_esfuerzo():
 
 
 async def _repartir(cliente, equipo, monkeypatch, persistir):
-    from backend.modules.gestion_proyectos_asistida.repartir_tareas.services import tareas_service
+    from backend.modules.gestion_asistencia_ia.repartir_tareas.services import tareas_service
 
     async def ia_tareas(prompt, provider=None, api_key=None):
         assert "Ana Test" in prompt and "Beto Test" in prompt, "la IA recibe al equipo"

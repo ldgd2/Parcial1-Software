@@ -8,15 +8,15 @@ from backend.core.config import settings
 from backend.core.websockets.connection_manager import manager
 from backend.modules.gestion_proyectos.models import Proyecto, ColaboradorProyecto
 from backend.modules.gestion_usuarios.models import TareaIA, Usuario, estimar_tarea
-from backend.modules.gestion_proyectos_asistida.repartir_tareas.schemas.request import (
+from backend.modules.gestion_asistencia_ia.repartir_tareas.schemas.request import (
     RepartirTareasRequest,
     CrearTareaRequest,
 )
-from backend.modules.gestion_proyectos_asistida.repartir_tareas.schemas.response import (
+from backend.modules.gestion_asistencia_ia.repartir_tareas.schemas.response import (
     TareaResponse,
     RepartirTareasResponse,
 )
-from backend.modules.gestion_proyectos_asistida.repartir_tareas.repositories.tareas_repository import (
+from backend.modules.gestion_asistencia_ia.repartir_tareas.repositories.tareas_repository import (
     obtener_tareas_usuario,
     obtener_todas_tareas_proyecto,
     insertar_tareas,
@@ -178,15 +178,23 @@ async def ejecutar_reparticion_tareas(
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
 
-    # Obtener usuarios válidos en la base de datos para no violar Foreign Key
-    res_all_users = await db.execute(select(Usuario.id))
-    valid_uids = set(res_all_users.scalars().all())
+    # Solo los miembros APROBADOS del proyecto pueden recibir tareas (antes valía cualquier usuario
+    # del sistema: un id ajeno mandado en `colaboradores` recibía tareas y avisos de este proyecto).
+    res_miembros = await db.execute(
+        select(ColaboradorProyecto.usuario_id).where(
+            ColaboradorProyecto.proyecto_id == req.proyecto_id, ColaboradorProyecto.estado == "aprobado"
+        )
+    )
+    valid_uids = set(res_miembros.scalars().all())
     anfitrion_id = await _anfitrion_id(proyecto.id, db)
     default_uid = anfitrion_id if anfitrion_id in valid_uids else (next(iter(valid_uids)) if valid_uids else 1)
 
     # 2. Cargar colaboradores y sus roles guardados en el proyecto
     result_colabs = await db.execute(
-        select(ColaboradorProyecto).where(ColaboradorProyecto.proyecto_id == req.proyecto_id)
+        select(ColaboradorProyecto).where(
+            ColaboradorProyecto.proyecto_id == req.proyecto_id,
+            ColaboradorProyecto.estado == "aprobado",   # pendientes y rechazados no reciben tareas
+        )
     )
     colabs = list(result_colabs.scalars().all())
 

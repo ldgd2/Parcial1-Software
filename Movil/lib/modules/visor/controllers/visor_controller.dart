@@ -232,28 +232,15 @@ class VisorController extends ChangeNotifier {
   void _generarNotificacionesActividad() {
     _notificaciones.clear();
 
-    for (final rol in _roles) {
-      _notificaciones.add(
-        RevisionNotificacionModel(
-          id: 'rol_${rol.usuarioId}',
-          tipo: 'rol',
-          titulo: rol.rolAsignado,
-          detalle: '${rol.usuarioNombre} • ${(rol.scoreAdecuacion * 100).toInt()}% match',
-          fecha: DateTime.now(),
-          autor: 'Gestión Asistida',
-        ),
-      );
-    }
-
     for (final tarea in _tareas) {
       _notificaciones.add(
         RevisionNotificacionModel(
           id: 'tarea_${tarea.id}',
           tipo: 'tarea',
           titulo: tarea.titulo,
-          detalle: '${tarea.estado.toUpperCase()} • ${tarea.colaboradorNombre ?? 'Sin asignar'}',
+          detalle: '${tarea.estado.toUpperCase()}${tarea.colaboradorNombre != null ? ' • ${tarea.colaboradorNombre}' : ''}',
           fecha: DateTime.now(),
-          autor: tarea.colaboradorNombre ?? 'Sistema',
+          autor: tarea.colaboradorNombre,
         ),
       );
     }

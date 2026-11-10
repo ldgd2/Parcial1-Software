@@ -70,8 +70,11 @@ async def generar_app_movil(
 @router.post("/refinar", response_model=RefinarVistaResponse)
 async def refinar_vista(
     req: RefinarVistaRequest,
-    _ = Depends(usuario_requerido()),
+    db: AsyncSession = Depends(get_db),
+    usuario = Depends(usuario_requerido()),
 ) -> RefinarVistaResponse:
+    # Gasta tokens de la IA del servidor: solo para miembros del proyecto (igual que /generar)
+    await verificar_permiso(db, usuario, req.proyecto_id, "lector")
     codigo_refinado, resumen = await refinar_codigo_con_ia(
         vista_nombre=req.vista_nombre,
         codigo_actual=req.codigo_actual,

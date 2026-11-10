@@ -73,6 +73,9 @@ def obtener_estado() -> dict | None:
     if not (ok_h and ok_c):
         console.print("[bold red]No se pudo consultar el estado de las migraciones:[/bold red]")
         console.print(salida_c or salida_h, markup=False, highlight=False)
+        if "Can't locate revision" in (salida_c or ""):
+            console.print("[yellow]La BD está en una migración que ya no existe en el código. "
+                          "Usa [7] Fix estado de migraciones.[/yellow]")
         return None
     return {"heads": _revisiones(salida_h), "actual": _revisiones(salida_c)}
 
@@ -109,9 +112,10 @@ def menu_migrations():
         console.print("[4] Sellar versión en Head (Stamp Head)")
         console.print("[5] Ver estado (versión actual / heads)")
         console.print("[6] Ver historial")
+        console.print("[7] Fix estado de migraciones (auto‑repair)")
         console.print("[0] Volver")
 
-        opcion = Prompt.ask("\nSelecciona una opción", choices=["1", "2", "3", "4", "5", "6", "0"], default="0")
+        opcion = Prompt.ask("\nSelecciona una opción", choices=["1", "2", "3", "4", "5", "6", "7", "0"], default="0")
 
         if opcion == "1":
             estado = obtener_estado()
@@ -165,5 +169,14 @@ def menu_migrations():
             ejecutar_comando_alembic(["history", "--indicate-current"])
             Prompt.ask("\nPresiona Enter para continuar")
 
+        elif opcion == "7":
+            console.print("[dim]Ejecutando reparación automática del estado de migraciones...[/dim]")
+            from .fix_state import fix_state
+            fix_state()
+            # Mostrar estado actualizado
+            estado = obtener_estado()
+            if estado:
+                mostrar_estado()
+            Prompt.ask("\nPresiona Enter para continuar")
         elif opcion == "0":
             break

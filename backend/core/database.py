@@ -1,11 +1,13 @@
 from typing import AsyncGenerator, Type
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
+from sqlalchemy.pool import NullPool
 from .config import settings
 
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=True,
+    poolclass=NullPool,
 )
 
 AsyncSessionLocal = async_sessionmaker(
@@ -38,5 +40,10 @@ async def init_db():
         await conn.execute(text("ALTER TABLE colaboradores_proyecto ADD COLUMN IF NOT EXISTS rol_ia VARCHAR;"))
         await conn.execute(text("ALTER TABLE colaboradores_proyecto ADD COLUMN IF NOT EXISTS areas JSONB;"))
         await conn.execute(text("ALTER TABLE colaboradores_proyecto ADD COLUMN IF NOT EXISTS responsabilidades JSONB;"))
+        await conn.execute(text("ALTER TABLE colaboradores_proyecto ADD COLUMN IF NOT EXISTS permiso_rol VARCHAR(20) DEFAULT 'editor';"))
+        await conn.execute(text("ALTER TABLE colaboradores_proyecto ADD COLUMN IF NOT EXISTS puede_editar BOOLEAN DEFAULT TRUE;"))
+        await conn.execute(text("ALTER TABLE colaboradores_proyecto ADD COLUMN IF NOT EXISTS puede_eliminar BOOLEAN DEFAULT TRUE;"))
+        await conn.execute(text("ALTER TABLE colaboradores_proyecto ADD COLUMN IF NOT EXISTS puede_exportar BOOLEAN DEFAULT TRUE;"))
+        await conn.execute(text("ALTER TABLE colaboradores_proyecto ADD COLUMN IF NOT EXISTS puede_usar_ia BOOLEAN DEFAULT TRUE;"))
         await conn.execute(text("ALTER TABLE tareas_ia ADD COLUMN IF NOT EXISTS area VARCHAR DEFAULT 'general';"))
         await conn.execute(text("ALTER TABLE colaboradores_proyecto ADD COLUMN IF NOT EXISTS permiso VARCHAR(10) DEFAULT 'edit' NOT NULL;"))

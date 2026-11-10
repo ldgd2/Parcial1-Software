@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:movil/core/storage/local_storage_service.dart';
+import 'package:movil/core/services/push_notification_service.dart';
 import 'package:movil/modules/auth/models/user_model.dart';
 import 'package:movil/modules/auth/services/auth_service.dart';
 
@@ -30,6 +31,8 @@ class AuthController extends ChangeNotifier {
         token: res.accessToken,
         usuario: res.usuario?.toJson(),
       );
+      // Registrar token FCM en el backend para recibir campanas y notificaciones
+      PushNotificationService.registrarTokenDispositivo(userId: res.usuario?.id);
       _isLoading = false;
       notifyListeners();
       return true;

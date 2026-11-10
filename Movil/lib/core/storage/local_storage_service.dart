@@ -4,7 +4,6 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class LocalStorageService {
   static String? _token;
   static Map<String, dynamic>? _usuario;
-  static String? _baseUrlPersonalizada;
 
   static final List<String> _codigosRecientes = [];
 
@@ -34,9 +33,6 @@ class LocalStorageService {
   }
 
   static String get baseUrl {
-    if (_baseUrlPersonalizada != null && _baseUrlPersonalizada!.isNotEmpty) {
-      return sanitizarUrl(_baseUrlPersonalizada!);
-    }
     String? envUrl;
     if (dotenv.isInitialized) {
       envUrl = dotenv.env['API_BASE_URL'];
@@ -65,11 +61,7 @@ class LocalStorageService {
     _usuario = usuario;
   }
 
-  static void setBaseUrl(String url) {
-    if (url.trim().isNotEmpty) {
-      _baseUrlPersonalizada = sanitizarUrl(url);
-    }
-  }
+  static void setBaseUrl(String url) {}
 
   static void agregarCodigoReciente(String codigo) {
     final limpio = codigo.trim().toUpperCase();

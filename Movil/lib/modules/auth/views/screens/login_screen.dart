@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:movil/core/storage/local_storage_service.dart';
-import 'package:movil/core/network/api_provider.dart';
 import 'package:movil/shared/utils/ui_engine/tema.dart';
 import 'package:movil/shared/widgets/buttons/custom_button_primary.dart';
 import 'package:movil/shared/widgets/buttons/custom_button_outline.dart';
@@ -22,7 +20,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController(text: 'admin@test.com');
   final _passwordController = TextEditingController(text: 'Admin123*');
   final _invitadoController = TextEditingController();
-  final _serverUrlController = TextEditingController();
 
   late final AuthController _authController;
   bool _modoInvitado = false;
@@ -32,7 +29,6 @@ class _LoginScreenState extends State<LoginScreen> {
     super.initState();
     _authController = AuthController();
     _authController.addListener(_onAuthStateChanged);
-    _serverUrlController.text = LocalStorageService.baseUrl;
   }
 
   @override
@@ -41,7 +37,6 @@ class _LoginScreenState extends State<LoginScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _invitadoController.dispose();
-    _serverUrlController.dispose();
     super.dispose();
   }
 
@@ -74,60 +69,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _mostrarConfigurarServidor() {
-    _serverUrlController.text = LocalStorageService.baseUrl;
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: AppColores.oscuro.fondoSecundario,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          title: Text(
-            'Servidor Backend',
-            style: AppTextos.generar(AppColores.oscuro).titulo,
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CustomInput(
-                hint: 'https://api-diagramador.gerlextech.com',
-                controller: _serverUrlController,
-                prefixIcon: Icons.dns_outlined,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Indica la URL base del backend (http:// o https://).',
-                style: AppTextos.generar(AppColores.oscuro).cuerpoPequeno.copyWith(
-                  color: AppColores.oscuro.secundario,
-                  fontSize: 11,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancelar', style: TextStyle(color: AppColores.oscuro.secundario)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColores.oscuro.primario,
-                foregroundColor: AppColores.oscuro.fondo,
-              ),
-              onPressed: () {
-                api.actualizarBaseUrl(_serverUrlController.text);
-                Navigator.pop(ctx);
-                setState(() {});
-              },
-              child: const Text('Guardar'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final colores = AppColores.oscuro;
@@ -135,17 +76,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return Scaffold(
       backgroundColor: colores.fondo,
-      appBar: AppBar(
-        backgroundColor: colores.fondo,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.settings_outlined, color: colores.secundario),
-            tooltip: 'Ajustes de conexión',
-            onPressed: _mostrarConfigurarServidor,
-          ),
-        ],
-      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -263,17 +193,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         },
                       ),
                     ],
-
-                    const SizedBox(height: 28),
-                    Center(
-                      child: Text(
-                        LocalStorageService.baseUrl,
-                        style: textos.cuerpoPequeno.copyWith(
-                          color: colores.secundario,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),

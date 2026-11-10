@@ -14,6 +14,7 @@ def ejecutar_async(coro: Coroutine[Any, Any, Any]) -> Any:
     """
     async def _con_cierre():
         from backend.core.database import engine
+        await engine.dispose()
         try:
             return await coro
         finally:
