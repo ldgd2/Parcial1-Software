@@ -30,6 +30,9 @@ async def obtener_configuracion(
         db_configurada=user.db_password_encrypted is not None if user else False,
         email=user.email if user else None,
         nombre=user.nombre if user else None,
+        # CU05: las habilidades guardadas se precargan (antes la pantalla empezaba vacía y al
+        # guardar se perdían las anteriores)
+        etiquetas_habilidades=[str(e) for e in (user.etiquetas_habilidades or [])] if user else [],
     )
 
 

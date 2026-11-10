@@ -11,4 +11,5 @@ class MiembroResponse(BaseModel):
     email: str | None = None
     rol_proyecto: str
     estado: str
-    permiso: str  # anfitrion | editor | lector
+    permiso: str  # edit | view
+    nivel: str    # anfitrion | editor | lector

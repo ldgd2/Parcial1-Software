@@ -11,12 +11,12 @@ interface Props {
 }
 
 const EMAIL_VALIDO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const ETIQUETA_PERMISO: Record<Miembro['permiso'], string> = { anfitrion: 'Anfitrión', editor: 'Editor', lector: 'Lector' };
+const ETIQUETA_NIVEL: Record<Miembro['nivel'], string> = { anfitrion: 'Anfitrión', editor: 'Editor', lector: 'Lector' };
 
 export const CompartirModal: React.FC<Props> = ({ isOpen, onClose, proyecto }) => {
   const [copiado, setCopiado] = useState(false);
   const [email, setEmail] = useState('');
-  const [permiso, setPermiso] = useState<'editor' | 'lector'>('editor');
+  const [permiso, setPermiso] = useState<'edit' | 'view'>('edit');
   const [enviando, setEnviando] = useState(false);
   const [aviso, setAviso] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const [miembros, setMiembros] = useState<Miembro[]>([]);
@@ -27,7 +27,7 @@ export const CompartirModal: React.FC<Props> = ({ isOpen, onClose, proyecto }) =
 
   useEffect(() => {
     if (isOpen && proyecto) {
-      setEmail(''); setPermiso('editor'); setAviso(null);
+      setEmail(''); setPermiso('edit'); setAviso(null);
       cargarMiembros(proyecto.id);
     }
   }, [isOpen, proyecto?.id]);
@@ -52,7 +52,7 @@ export const CompartirModal: React.FC<Props> = ({ isOpen, onClose, proyecto }) =
     setEnviando(true); setAviso(null);
     try {
       const m = await proyectoService.invitar(proyecto.id, correo, permiso);
-      setAviso({ tipo: 'ok', texto: `${m.nombre} se agregó como ${ETIQUETA_PERMISO[m.permiso].toLowerCase()}. Lo verá en “Compartidos conmigo”.` });
+      setAviso({ tipo: 'ok', texto: `${m.nombre} se agregó como ${ETIQUETA_NIVEL[m.nivel].toLowerCase()}. Lo verá en “Compartidos conmigo”.` });
       setEmail('');
       await cargarMiembros(proyecto.id);
     } catch (err: any) {
@@ -62,7 +62,7 @@ export const CompartirModal: React.FC<Props> = ({ isOpen, onClose, proyecto }) =
     }
   };
 
-  const cambiar = async (m: Miembro, nuevo: 'editor' | 'lector') => {
+  const cambiar = async (m: Miembro, nuevo: 'edit' | 'view') => {
     try {
       await proyectoService.cambiarPermiso(proyecto.id, m.usuario_id, nuevo);
       await cargarMiembros(proyecto.id);
@@ -95,11 +95,11 @@ export const CompartirModal: React.FC<Props> = ({ isOpen, onClose, proyecto }) =
               id="select-permiso-invitado"
               className="compartir-modal__permiso"
               value={permiso}
-              onChange={e => setPermiso(e.target.value as 'editor' | 'lector')}
+              onChange={e => setPermiso(e.target.value as 'edit' | 'view')}
               aria-label="Permiso"
             >
-              <option value="editor">Editor</option>
-              <option value="lector">Lector</option>
+              <option value="edit">Editor</option>
+              <option value="view">Lector</option>
             </select>
             <button id="btn-invitar" type="submit" className="compartir-modal__copy-btn" disabled={enviando || !email.trim()}>
               {enviando ? '...' : 'INVITAR'}
@@ -119,17 +119,17 @@ export const CompartirModal: React.FC<Props> = ({ isOpen, onClose, proyecto }) =
                   <span className="compartir-modal__miembro-nombre">{m.nombre}</span>
                   {m.email && <span className="compartir-modal__miembro-email">{m.email}</span>}
                 </div>
-                {m.permiso === 'anfitrion' ? (
+                {m.nivel === 'anfitrion' ? (
                   <span className="compartir-modal__miembro-rol">Anfitrión</span>
                 ) : (
                   <select
                     className="compartir-modal__permiso"
                     value={m.permiso}
-                    onChange={e => cambiar(m, e.target.value as 'editor' | 'lector')}
+                    onChange={e => cambiar(m, e.target.value as 'edit' | 'view')}
                     aria-label={`Permiso de ${m.nombre}`}
                   >
-                    <option value="editor">Editor</option>
-                    <option value="lector">Lector</option>
+                    <option value="edit">Editor</option>
+                    <option value="view">Lector</option>
                   </select>
                 )}
               </div>

@@ -117,6 +117,7 @@ export const ConfiguracionView: React.FC = () => {
       setDbConfigurada(config.db_configurada);
       setUserEmail(config.email || null);
       setNombre(config.nombre || '');
+      if (Array.isArray(config.etiquetas_habilidades)) setEtiquetasSeleccionadas(config.etiquetas_habilidades);
       setNombreGuardado(config.nombre || '');
       if (config.email) {
         setResetEmail(config.email);

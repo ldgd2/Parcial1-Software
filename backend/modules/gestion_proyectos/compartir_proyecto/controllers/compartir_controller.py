@@ -6,7 +6,7 @@ from backend.modules.gestion_usuarios.dependencies import get_current_user
 from backend.modules.gestion_usuarios.models import Usuario
 from backend.modules.gestion_proyectos.compartir_proyecto.schemas.response import CompartirLinkResponse
 from backend.modules.gestion_proyectos.compartir_proyecto.services import compartir_service, invitar_service
-from backend.modules.gestion_proyectos.compartir_proyecto.schemas.request import InvitarRequest, PermisoRequest
+from backend.modules.gestion_proyectos.compartir_proyecto.schemas.request import InvitarRequest
 from backend.modules.gestion_proyectos.compartir_proyecto.schemas.response import MiembroResponse
 from backend.modules.gestion_proyectos.crear_proyecto.schemas.response import ProyectoResponse
 
@@ -28,25 +28,9 @@ async def invitar(
     user: Usuario = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """CU08: el anfitrión comparte el proyecto con un usuario registrado, con permiso editor o lector."""
+    """CU08: el anfitrión comparte el proyecto con un usuario registrado, con permiso 'edit' o 'view'.
+    Ver y cambiar el permiso de los miembros: /api/proyectos/{id}/miembros (permisos_proyecto)."""
     return await invitar_service.invitar_por_correo(db, proyecto_id, req.email, req.permiso, user)
-
-
-@router.get("/{proyecto_id}/miembros", response_model=List[MiembroResponse])
-async def miembros(proyecto_id: int, user: Usuario = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    return await invitar_service.listar_miembros(db, proyecto_id, user)
-
-
-@router.put("/{proyecto_id}/miembros/{usuario_id}/permiso", response_model=MiembroResponse)
-async def cambiar_permiso(
-    proyecto_id: int,
-    usuario_id: int,
-    req: PermisoRequest,
-    user: Usuario = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """CU38: solo el anfitrión cambia permisos (403 para cualquier otro miembro)."""
-    return await invitar_service.cambiar_permiso(db, proyecto_id, usuario_id, req.permiso, user)
 
 
 @router.get("/{proyecto_id}/link-compartir", response_model=CompartirLinkResponse)
