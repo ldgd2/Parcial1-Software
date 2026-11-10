@@ -1,7 +1,19 @@
-#!/bin/bash
-
+#!/usr/bin/env bash
 # Script de instalación automática para el Deployer Backend
 # (Instala entorno y configura Nginx + SystemD)
+#
+# Uso:  bash setup-deploy.sh   (o ./setup-deploy.sh). Si se lanza con `sh`, se relanza con bash:
+# en Ubuntu `sh` es dash, que no entiende [[ ]], `echo -e` ni `source`.
+if [ -z "$BASH_VERSION" ]; then
+    exec bash "$0" "$@"
+fi
+set -e
+
+# Rutas absolutas: funciona igual desde la raíz del repo o desde deployer_backend/
+DEPLOYER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "$DEPLOYER_DIR")"
+ES_LINUX=false
+[[ "$(uname -s)" == "Linux" ]] && ES_LINUX=true
 
 echo "==================================================="
 echo " 🚀 AUTOMATED SETUP PARA DEPLOYER BACKEND "
@@ -9,7 +21,7 @@ echo "==================================================="
 
 # 1. Dependencias del sistema (igual que setup-diag)
 echo -e "\n[1/4] Verificando dependencias del sistema..."
-if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+if $ES_LINUX; then
     sudo apt-get update
     sudo apt-get install -y python3 python3-venv python3-pip nginx sqlite3 postgresql postgresql-contrib openjdk-17-jdk maven
     # Asegurar que JAVA_HOME apunta a JDK 17
@@ -21,7 +33,7 @@ fi
 
 # 2. Setup del entorno Python
 echo -e "\n[2/4] Configurando el entorno Python para el Deployer..."
-cd deployer_backend
+cd "$DEPLOYER_DIR"
 
 if [ ! -d "venv" ]; then
     echo "Creando entorno virtual (venv)..."
@@ -55,80 +67,92 @@ fi
 # 3. Configuración Nginx y SystemD
 echo -e "\n[3/4] Configurando Nginx y SystemD..."
 
-PROJECT_ROOT=$(pwd)
-
-# Prompt for the deployer domain
-read -p "Ingresa el subdominio de este VPS (ej. host.example.com) [host.example.com]: " DEPLOYER_DOMAIN
+read -r -p "Ingresa el subdominio de este VPS (ej. host.example.com) [host.example.com]: " DEPLOYER_DOMAIN
 DEPLOYER_DOMAIN=${DEPLOYER_DOMAIN:-host.example.com}
 
-if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+if $ES_LINUX; then
     # -- NGINX --
-    if [ ! -f "/etc/nginx/sites-available/deployer" ]; then
+    NGINX_SITE=/etc/nginx/sites-available/gerlextech
+    if [ ! -f "$NGINX_SITE" ]; then
         echo "Creando configuración Nginx para Deployer en $DEPLOYER_DOMAIN..."
-        sudo bash -c "mkdir -p /etc/nginx/deploy_apps
-chmod 777 /etc/nginx/deploy_apps
+        sudo mkdir -p /etc/nginx/deploy_apps
+        sudo chmod 777 /etc/nginx/deploy_apps
 
-# Asegurar que deploy_apps está incluido en nginx.conf
-if ! grep -q \"include /etc/nginx/deploy_apps/\\*.conf;\" /etc/nginx/nginx.conf; then
-    sed -i '/include \\/etc\\/nginx\\/conf\\.d\\/\\*\\.conf;/a \\ \\ \\ \\ include /etc/nginx/deploy_apps/*.conf;' /etc/nginx/nginx.conf
-fi
+        # Asegurar que deploy_apps está incluido en nginx.conf
+        if ! grep -q "include /etc/nginx/deploy_apps/\*.conf;" /etc/nginx/nginx.conf; then
+            sudo sed -i '/include \/etc\/nginx\/conf\.d\/\*\.conf;/a \ \ \ \ include /etc/nginx/deploy_apps/*.conf;' /etc/nginx/nginx.conf
+        fi
 
-cat <<EOF > /etc/nginx/sites-available/gerlextech
+        TMP_CONF="$(mktemp)"
+        # 'EOF' entre comillas: las variables de nginx ($host, $uri…) quedan literales;
+        # las del script se insertan después con sed.
+        cat > "$TMP_CONF" <<'EOF'
 server {
     listen 80;
-    server_name $DOMAIN_NAME;
+    server_name __DOMINIO__;
 
     # Frontend estático
     location / {
-        root $CURRENT_DIR/frontend/dist;
+        root __FRONTEND_DIST__;
         index index.html;
-        try_files \\\$uri \\\$uri/ /index.html;
+        try_files $uri $uri/ /index.html;
     }
 
     # API principal
     location /api/ {
         proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host \\\$host;
-        proxy_set_header X-Real-IP \\\$remote_addr;
-        proxy_set_header X-Forwarded-For \\\$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \\\$scheme;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # La IA puede tardar más de 60 s (si nginx corta, el navegador solo ve "Failed to fetch")
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        client_max_body_size 25m;
     }
 
     # API Deployer
     location /deploy-api/ {
         proxy_pass http://127.0.0.1:8001/;
-        proxy_set_header Host \\\$host;
-        proxy_set_header X-Real-IP \\\$remote_addr;
-        proxy_set_header X-Forwarded-For \\\$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \\\$scheme;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;
+        client_max_body_size 100m;
     }
 }
-EOF"
-        sudo ln -sf /etc/nginx/sites-available/gerlextech /etc/nginx/sites-enabled/
+EOF
+        sed -i "s|__DOMINIO__|${DEPLOYER_DOMAIN}|; s|__FRONTEND_DIST__|${REPO_ROOT}/frontend/dist|" "$TMP_CONF"
+        sudo cp "$TMP_CONF" "$NGINX_SITE"
+        rm -f "$TMP_CONF"
+        sudo ln -sf "$NGINX_SITE" /etc/nginx/sites-enabled/
         sudo nginx -t && sudo systemctl reload nginx
     else
-        echo "La configuración de Nginx (deployer) ya existe."
+        echo "La configuración de Nginx ($NGINX_SITE) ya existe."
     fi
 
     # -- SYSTEMD --
     if [ ! -f "/etc/systemd/system/deployer-backend.service" ]; then
         echo "Creando servicio SystemD para Deployer..."
-        sudo bash -c "cat <<EOF > /etc/systemd/system/deployer-backend.service
+        sudo tee /etc/systemd/system/deployer-backend.service > /dev/null <<EOF
 [Unit]
 Description=Deployer Backend (FastAPI)
 After=network.target
 
 [Service]
-User=\$USER
-WorkingDirectory=${PROJECT_ROOT}
-Environment=\"PATH=${PROJECT_ROOT}/venv/bin\"
-# main.py levanta el servidor, o uvicorn directamente:
-ExecStart=${PROJECT_ROOT}/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8001
+User=root
+WorkingDirectory=${DEPLOYER_DIR}
+Environment="PATH=${DEPLOYER_DIR}/venv/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=${DEPLOYER_DIR}/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8001
 Restart=always
 
 [Install]
 WantedBy=multi-user.target
-EOF"
+EOF
         sudo systemctl daemon-reload
         sudo systemctl enable deployer-backend.service
         sudo systemctl start deployer-backend.service
@@ -144,6 +168,6 @@ echo -e "\n==================================================="
 echo " 🎉 ¡SETUP DEPLOYER COMPLETADO! 🎉"
 echo "==================================================="
 echo "💻 PARA EJECUTAR MANUALMENTE:"
-echo "   cd deployer_backend"
+echo "   cd $DEPLOYER_DIR"
 echo "   python manager.py"
 echo "==================================================="
