@@ -6,7 +6,9 @@ from .config import settings
 
 engine = create_async_engine(
     settings.DATABASE_URL,
-    echo=True,
+    # Antes True: en producción volcaba cada SQL al journal, incluidas contraseñas en claro
+    # (p. ej. el CREATE ROLE de /configuracion/db). Activar con SQL_ECHO=true en el .env.
+    echo=settings.SQL_ECHO,
     poolclass=NullPool,
 )
 
