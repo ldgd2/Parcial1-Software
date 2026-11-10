@@ -339,6 +339,14 @@ async def _consultar_openrouter(
             raise HTTPException(status_code=502, detail=f"Error de red con OpenRouter: {exc}")
 
 
+def _avisar_fallo(proveedor: str, exc: Exception) -> None:
+    """Deja en el log por qué falló un proveedor (antes el respaldo lo tapaba sin rastro)."""
+    import re as _re
+    detalle = str(getattr(exc, "detail", None) or exc)
+    detalle = _re.sub(r"(key=|Bearer\s+)[^\s&\"']+", lambda m: m.group(1) + "***", detalle)
+    print(f"[IA] {proveedor} falló, se prueba el siguiente proveedor: {detalle[:400]}")
+
+
 async def consultar_llm(
     prompt: str,
     context: Optional[str] = None,
@@ -374,6 +382,7 @@ async def consultar_llm(
             raise ValueError("Gemini retornó respuesta insuficiente o vacía")
     except Exception as exc:
         last_exc = exc
+        _avisar_fallo(target, exc)
 
     # Fallback multi-proveedor automático si el proveedor primario falla
     providers_to_fallback = []
@@ -400,7 +409,8 @@ async def consultar_llm(
 
             if result and len(result.strip()) >= 15 and result.strip() not in ["{", "{}", "[]", "null"]:
                 return result, f"{fb_provider} (fallback)"
-        except Exception:
+        except Exception as exc:
+            _avisar_fallo(fb_provider, exc)
             continue
 
     if last_exc:
