@@ -16,6 +16,7 @@ dependencies:
     sdk: flutter
   http: ^1.2.0
   intl: ^0.19.0
+  flutter_dotenv: ^5.2.1
 
 dev_dependencies:
   flutter_test:
@@ -24,6 +25,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - .env
 """
 
 
@@ -69,25 +72,71 @@ Esta aplicación móvil fue generada automáticamente para interactuar directame
 - Dart 3.0.0 o superior
 - Conexión al backend ({api_base_url})
 
-## Configuración y Ejecución
-1. Instalar dependencias:
-   ```bash
-   flutter pub get
-   ```
-2. Ejecutar en emulador o dispositivo físico:
-   ```bash
-   flutter run
-   ```
-3. Si pruebas en emulador Android local, recuerda que `localhost` se accede como `http://10.0.2.2:8080`. Puedes modificar esta URL en `lib/core/config/api_config.dart`.
+## Configurar la URL de la API (`.env`)
+La URL del backend NO está escrita en el código: se lee del archivo `.env` de esta carpeta.
+
+```env
+API_BASE_URL={api_base_url.rstrip("/")}
+API_TIMEOUT_SECONDS=20
+```
+
+- `.env.example` es la plantilla: cópiala a `.env` si no existe.
+- Emulador Android contra un backend en tu PC: `API_BASE_URL=http://10.0.2.2:8080`
+- Celular físico en tu red: `API_BASE_URL=http://<IP-de-tu-PC>:8080`
+- Después de cambiar el `.env` vuelve a ejecutar `flutter run` (es un asset: un hot reload no lo relee).
+- También puedes forzarla al compilar: `flutter run --dart-define=API_BASE_URL=https://mi-api.com`
+
+## Ejecución
+```bash
+flutter pub get
+flutter run
+```
+"""
+
+
+def generar_env(api_base_url: str) -> str:
+    return f"""# URL base del backend Spring Boot (sin / al final). Cámbiala aquí, no en el código.
+API_BASE_URL={api_base_url.rstrip("/")}
+# Segundos de espera por petición
+API_TIMEOUT_SECONDS=20
+"""
+
+
+def generar_env_example() -> str:
+    return """# Copia este archivo a .env y ajusta los valores.
+# Backend desplegado:         https://<dominio>/host/<usuario>/<proyecto>
+# Emulador Android (backend en tu PC): http://10.0.2.2:8080
+# Celular físico en tu red:   http://<IP-de-tu-PC>:8080
+API_BASE_URL=http://10.0.2.2:8080
+API_TIMEOUT_SECONDS=20
 """
 
 
 def generar_api_config(api_base_url: str) -> str:
     clean_url = api_base_url.rstrip("/")
-    return f"""class ApiConfig {{
-  // URL base hacia los microservicios y endpoints REST del backend
-  static const String baseUrl = '{clean_url}';
-  static const Duration timeout = Duration(seconds: 20);
+    return f"""import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+/// Configuración de la API. Los valores salen del archivo `.env` (ver README):
+///   API_BASE_URL, API_TIMEOUT_SECONDS
+/// Prioridad: --dart-define=API_BASE_URL  >  .env  >  valor de respaldo.
+class ApiConfig {{
+  static const String _urlRespaldo = '{clean_url}';
+  static const String _urlCompilacion = String.fromEnvironment('API_BASE_URL');
+
+  static String? _leer(String clave) {{
+    if (!dotenv.isInitialized) return null;
+    final valor = dotenv.maybeGet(clave)?.trim();
+    return (valor == null || valor.isEmpty) ? null : valor;
+  }}
+
+  /// URL base del backend, sin "/" final.
+  static String get baseUrl {{
+    final url = _urlCompilacion.isNotEmpty ? _urlCompilacion : (_leer('API_BASE_URL') ?? _urlRespaldo);
+    return url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+  }}
+
+  static Duration get timeout =>
+      Duration(seconds: int.tryParse(_leer('API_TIMEOUT_SECONDS') ?? '') ?? 20);
 
   static Map<String, String> defaultHeaders = {{
     'Content-Type': 'application/json',
@@ -98,7 +147,8 @@ def generar_api_config(api_base_url: str) -> str:
 
 
 def generar_api_client() -> str:
-    return """import 'dart:convert';
+    return """import 'dart:async';
+import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 
@@ -117,45 +167,37 @@ class ApiClient {
 
   ApiClient({String? baseUrl}) : baseUrl = baseUrl ?? ApiConfig.baseUrl;
 
-  Future<dynamic> get(String endpoint) async {
-    final uri = Uri.parse('$baseUrl$endpoint');
-    final response = await http
-        .get(uri, headers: ApiConfig.defaultHeaders)
-        .timeout(ApiConfig.timeout);
-    return _handleResponse(response);
+  /// Ejecuta la petición traduciendo fallos de red a un ApiException entendible.
+  Future<dynamic> _enviar(Future<http.Response> Function() peticion) async {
+    try {
+      final response = await peticion().timeout(ApiConfig.timeout);
+      return _handleResponse(response);
+    } on ApiException {
+      rethrow;
+    } on TimeoutException {
+      throw ApiException(0, 'El servidor no respondió a tiempo ($baseUrl). Revisa API_BASE_URL en el archivo .env');
+    } catch (e) {
+      throw ApiException(0, 'No se pudo conectar con $baseUrl. Revisa API_BASE_URL en el archivo .env ($e)');
+    }
   }
 
-  Future<dynamic> post(String endpoint, Map<String, dynamic> body) async {
-    final uri = Uri.parse('$baseUrl$endpoint');
-    final response = await http
-        .post(
-          uri,
-          headers: ApiConfig.defaultHeaders,
-          body: jsonEncode(body),
-        )
-        .timeout(ApiConfig.timeout);
-    return _handleResponse(response);
-  }
+  Future<dynamic> get(String endpoint) =>
+      _enviar(() => http.get(Uri.parse('$baseUrl$endpoint'), headers: ApiConfig.defaultHeaders));
 
-  Future<dynamic> put(String endpoint, Map<String, dynamic> body) async {
-    final uri = Uri.parse('$baseUrl$endpoint');
-    final response = await http
-        .put(
-          uri,
-          headers: ApiConfig.defaultHeaders,
-          body: jsonEncode(body),
-        )
-        .timeout(ApiConfig.timeout);
-    return _handleResponse(response);
-  }
+  Future<dynamic> post(String endpoint, Map<String, dynamic> body) => _enviar(() => http.post(
+        Uri.parse('$baseUrl$endpoint'),
+        headers: ApiConfig.defaultHeaders,
+        body: jsonEncode(body),
+      ));
 
-  Future<dynamic> delete(String endpoint) async {
-    final uri = Uri.parse('$baseUrl$endpoint');
-    final response = await http
-        .delete(uri, headers: ApiConfig.defaultHeaders)
-        .timeout(ApiConfig.timeout);
-    return _handleResponse(response);
-  }
+  Future<dynamic> put(String endpoint, Map<String, dynamic> body) => _enviar(() => http.put(
+        Uri.parse('$baseUrl$endpoint'),
+        headers: ApiConfig.defaultHeaders,
+        body: jsonEncode(body),
+      ));
+
+  Future<dynamic> delete(String endpoint) =>
+      _enviar(() => http.delete(Uri.parse('$baseUrl$endpoint'), headers: ApiConfig.defaultHeaders));
 
   dynamic _handleResponse(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -165,7 +207,9 @@ class ApiClient {
       String errorMessage = 'Error al comunicarse con el servidor';
       try {
         final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-        if (errorData is Map && errorData.containsKey('message')) {
+        if (errorData is Map && errorData['errors'] is Map) {
+          errorMessage = (errorData['errors'] as Map).values.join(', ');
+        } else if (errorData is Map && errorData.containsKey('message')) {
           errorMessage = errorData['message'].toString();
         } else if (errorData is Map && errorData.containsKey('detail')) {
           errorMessage = errorData['detail'].toString();
@@ -355,13 +399,13 @@ def generar_base_crud_service() -> str:
     return """import '../network/api_client.dart';
 import '../models/base_model.dart';
 
+/// CRUD contra el backend. Los errores (red, 4xx, 5xx) se PROPAGAN como ApiException para que
+/// la vista muestre el estado de error: antes se guardaba en memoria y se fingía éxito, y los
+/// datos "creados" desaparecían al reiniciar la app.
 abstract class BaseCrudService<T extends BaseModel> {
   final ApiClient client;
   final String endpoint;
   final T Function(Map<String, dynamic> json) fromJson;
-
-  // Almacén en memoria de respaldo para persistencia y modo offline
-  static final Map<String, List<Map<String, dynamic>>> _fallbackStorage = {};
 
   BaseCrudService({
     required this.endpoint,
@@ -369,84 +413,34 @@ abstract class BaseCrudService<T extends BaseModel> {
     ApiClient? client,
   }) : client = client ?? ApiClient();
 
+  List<dynamic> _comoLista(dynamic response) {
+    if (response is List) return response;
+    if (response is Map) {
+      final contenido = response['content'] ?? response['items'] ?? response['data'];
+      if (contenido is List) return contenido;
+    }
+    return const [];
+  }
+
+  T _comoModelo(dynamic response) => fromJson(Map<String, dynamic>.from(response as Map));
+
   Future<List<T>> getAll() async {
-    try {
-      final response = await client.get(endpoint);
-      if (response != null) {
-        List rawList = [];
-        if (response is List) {
-          rawList = response;
-        } else if (response is Map) {
-          rawList = response['content'] ?? response['items'] ?? response['data'] ?? [];
-        }
-        final items = rawList.map((item) => fromJson(Map<String, dynamic>.from(item as Map))).toList();
-        if (items.isNotEmpty) {
-          _fallbackStorage[endpoint] = rawList.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-        }
-        return items;
-      }
-    } catch (_) {}
-
-    // Fallback a almacenamiento local para evitar pérdidas de persistencia
-    final cached = _fallbackStorage[endpoint] ?? [];
-    return cached.map((e) => fromJson(e)).toList();
+    final response = await client.get(endpoint);
+    return _comoLista(response).map((item) => _comoModelo(item)).toList();
   }
 
-  Future<T> getById(dynamic id) async {
-    try {
-      final response = await client.get('$endpoint/$id');
-      if (response != null) {
-        return fromJson(Map<String, dynamic>.from(response as Map));
-      }
-    } catch (_) {}
-
-    final cached = _fallbackStorage[endpoint] ?? [];
-    final match = cached.firstWhere((e) => e['id']?.toString() == id.toString(), orElse: () => cached.first);
-    return fromJson(match);
-  }
+  Future<T> getById(dynamic id) async => _comoModelo(await client.get('$endpoint/$id'));
 
   Future<T> create(Map<String, dynamic> data) async {
-    try {
-      final response = await client.post(endpoint, data);
-      if (response != null) {
-        return fromJson(Map<String, dynamic>.from(response as Map));
-      }
-    } catch (_) {}
-
-    // Persistir localmente si el backend no responde
-    final localItem = Map<String, dynamic>.from(data);
-    localItem['id'] = localItem['id'] ?? DateTime.now().millisecondsSinceEpoch;
-    _fallbackStorage.putIfAbsent(endpoint, () => []).insert(0, localItem);
-    return fromJson(localItem);
+    final cuerpo = Map<String, dynamic>.from(data)..removeWhere((k, v) => k == 'id' && (v == null || v == ''));
+    return _comoModelo(await client.post(endpoint, cuerpo));
   }
 
-  Future<T> update(dynamic id, Map<String, dynamic> data) async {
-    try {
-      final response = await client.put('$endpoint/$id', data);
-      if (response != null) {
-        return fromJson(Map<String, dynamic>.from(response as Map));
-      }
-    } catch (_) {}
-
-    final list = _fallbackStorage[endpoint] ?? [];
-    final idx = list.indexWhere((e) => e['id']?.toString() == id.toString());
-    final updated = Map<String, dynamic>.from(data);
-    updated['id'] = id;
-    if (idx != -1) {
-      list[idx] = updated;
-    } else {
-      list.add(updated);
-    }
-    return fromJson(updated);
-  }
+  Future<T> update(dynamic id, Map<String, dynamic> data) async =>
+      _comoModelo(await client.put('$endpoint/$id', data));
 
   Future<void> delete(dynamic id) async {
-    try {
-      await client.delete('$endpoint/$id');
-    } catch (_) {}
-
-    final list = _fallbackStorage[endpoint] ?? [];
-    list.removeWhere((e) => e['id']?.toString() == id.toString());
+    await client.delete('$endpoint/$id');
   }
 }
 """
@@ -821,6 +815,8 @@ def construir_archivos_esqueleto(app_name: str, api_base_url: str) -> Dict[str, 
         "analysis_options.yaml": generar_analysis_options(),
         ".gitignore": generar_flutter_gitignore(),
         "README.md": generar_readme_flutter(app_name, api_base_url),
+        ".env": generar_env(api_base_url),
+        ".env.example": generar_env_example(),
         "lib/core/config/api_config.dart": generar_api_config(api_base_url),
         "lib/core/network/api_client.dart": generar_api_client(),
         "lib/core/theme/app_theme.dart": generar_app_theme(),

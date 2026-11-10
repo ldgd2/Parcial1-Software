@@ -9,6 +9,33 @@ from sqlalchemy import select
 import asyncio
 import json
 
+
+# Fotos y notas de voz del chat viajan dentro del mensaje (data URL). El historial vive en
+# memoria del servidor: se limita cuántos mensajes conservan su archivo.
+MAX_MENSAJES_CHAT = 200
+MAX_MENSAJES_CON_MEDIA = 30
+MAX_BYTES_MEDIA = 3 * 1024 * 1024
+
+
+def guardar_en_historial_chat(history: list, chat_msg: dict) -> None:
+    media = chat_msg.get("media")
+    if isinstance(media, dict) and len(str(media.get("dataUrl", ""))) > MAX_BYTES_MEDIA:
+        chat_msg["media"] = {**media, "dataUrl": "", "expirado": True}
+
+    msg_id = chat_msg.get("id")
+    for idx, existing in enumerate(history):
+        if msg_id and existing.get("id") == msg_id:
+            history[idx] = chat_msg
+            break
+    else:
+        history.append(chat_msg)
+    while len(history) > MAX_MENSAJES_CHAT:
+        history.pop(0)
+
+    con_media = [m for m in history if isinstance(m.get("media"), dict) and m["media"].get("dataUrl")]
+    for viejo in con_media[:-MAX_MENSAJES_CON_MEDIA]:
+        viejo["media"] = {**viejo["media"], "dataUrl": "", "expirado": True}
+
 router = APIRouter(tags=["WebSockets Salas"])
 
 
@@ -391,19 +418,8 @@ async def websocket_endpoint(
                 elif msg_type == "chat_message":
                     chat_msg = message.get("message")
                     if chat_msg and codigo_acceso in manager.salas:
-                        history = manager.salas[codigo_acceso].setdefault("chat_history", [])
-                        msg_id = chat_msg.get("id")
-                        updated = False
-                        if msg_id:
-                            for idx, existing in enumerate(history):
-                                if existing.get("id") == msg_id:
-                                    history[idx] = chat_msg
-                                    updated = True
-                                    break
-                        if not updated:
-                            history.append(chat_msg)
-                        if len(history) > 200:
-                            history.pop(0)
+                        guardar_en_historial_chat(
+                            manager.salas[codigo_acceso].setdefault("chat_history", []), chat_msg)
                     await manager.broadcast_to_sala(message, codigo_acceso, exclude=websocket)
 
                 elif msg_type == "request_chat_history":
@@ -548,19 +564,8 @@ async def websocket_endpoint(
                 elif msg_type == "chat_message":
                     chat_msg = message.get("message")
                     if chat_msg and codigo_acceso in manager.salas:
-                        history = manager.salas[codigo_acceso].setdefault("chat_history", [])
-                        msg_id = chat_msg.get("id")
-                        updated = False
-                        if msg_id:
-                            for idx, existing in enumerate(history):
-                                if existing.get("id") == msg_id:
-                                    history[idx] = chat_msg
-                                    updated = True
-                                    break
-                        if not updated:
-                            history.append(chat_msg)
-                        if len(history) > 200:
-                            history.pop(0)
+                        guardar_en_historial_chat(
+                            manager.salas[codigo_acceso].setdefault("chat_history", []), chat_msg)
                     await manager.broadcast_to_sala(message, codigo_acceso, exclude=websocket)
 
                 elif msg_type == "request_chat_history":

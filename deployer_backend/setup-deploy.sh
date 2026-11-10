@@ -150,7 +150,8 @@ After=network.target
 [Service]
 User=root
 WorkingDirectory=${DEPLOYER_DIR}
-Environment="PATH=${DEPLOYER_DIR}/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PATH=${DEPLOYER_DIR}/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="PYTHONUNBUFFERED=1"
 ExecStart=${DEPLOYER_DIR}/venv/bin/uvicorn main:app --host 127.0.0.1 --port 8001
 Restart=always
 

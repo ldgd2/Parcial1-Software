@@ -30,6 +30,23 @@ export interface ChatMessage {
   correccion?: { nodoId: string; id: string; clase: string };
   /** Tokens reales que gastó este pedido (lo informa el backend) */
   usoTokens?: UsoTokens;
+  /** Foto o nota de voz compartida en el chat. La IA solo la usa si alguien menciona a @diag. */
+  media?: MediaChat;
+}
+
+export interface MediaChat {
+  tipo: 'imagen' | 'audio';
+  /** data URL; vacío si el archivo ya no se conserva (ver `expirado`) */
+  dataUrl: string;
+  mime: string;
+  nombre?: string;
+  /** Segundos (notas de voz) */
+  duracion?: number;
+  /** Texto de la nota de voz */
+  transcripcion?: string;
+  transcribiendo?: boolean;
+  /** El servidor o el navegador ya no guardan el archivo (historial antiguo) */
+  expirado?: boolean;
 }
 
 export interface UsoTokens {

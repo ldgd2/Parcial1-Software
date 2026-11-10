@@ -19,6 +19,21 @@ def ocultar_secretos(texto: str) -> str:
     return re.sub(r"(https?://)[^/@\s]+@", r"\1***@", str(texto))
 
 
+def encontrar_proyecto_maven(project_dir: str) -> str:
+    """Carpeta con el pom.xml: la raíz, backend/ (monorepo exportado por el diagramador) u otra
+    subcarpeta de primer nivel."""
+    candidatos = [project_dir, os.path.join(project_dir, "backend")]
+    try:
+        candidatos += [os.path.join(project_dir, d) for d in sorted(os.listdir(project_dir))
+                       if not d.startswith(".") and os.path.isdir(os.path.join(project_dir, d))]
+    except OSError:
+        pass
+    for carpeta in candidatos:
+        if os.path.isfile(os.path.join(carpeta, "pom.xml")):
+            return carpeta
+    raise RuntimeError(f"No se encontró pom.xml en {project_dir} ni en sus subcarpetas.")
+
+
 def _pg_local() -> bool:
     return settings.PG_HOST in ("localhost", "127.0.0.1", "::1", "")
 
@@ -36,7 +51,13 @@ def psql(sql: str, db_name: str = None, capturar: bool = False) -> subprocess.Co
         opciones += ["-d", db_name]
     env = os.environ.copy()
     if _pg_local() and platform.system() == "Linux":
-        comando = (["runuser", "-u", "postgres", "--"] if os.geteuid() == 0 else ["sudo", "-u", "postgres"]) + ["psql"]
+        if os.geteuid() == 0:
+            # runuser vive en /usr/sbin, que no siempre está en el PATH del servicio systemd
+            runuser = shutil.which("runuser") or next(
+                (r for r in ("/usr/sbin/runuser", "/sbin/runuser") if os.path.exists(r)), None)
+            comando = ([runuser, "-u", "postgres", "--"] if runuser else ["sudo", "-u", "postgres"]) + ["psql"]
+        else:
+            comando = ["sudo", "-u", "postgres", "psql"]
     else:
         comando = ["psql", "-U", "postgres", "-h", settings.PG_HOST]
         env["PGPASSWORD"] = settings.PG_PASSWORD
@@ -227,14 +248,17 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
             print(f"[{project_id}] Error aprovisionando BD PostgreSQL: {e}")
 
     # 3. Build the project using Maven
-    print(f"[{project_id}] Compilando con Maven...")
+    # El diagramador exporta un MONOREPO (backend/ + frontend/): el pom.xml está en backend/,
+    # no en la raíz. Antes Maven corría en la raíz y fallaba al instante ("no POM").
+    build_dir = encontrar_proyecto_maven(project_dir)
+    print(f"[{project_id}] Compilando con Maven en {os.path.relpath(build_dir, project_dir)}/ ...")
     mvn_cmd = "mvn.cmd" if platform.system() == "Windows" else "mvn"
     maven_env = os.environ.copy()
     java17_home = "/usr/lib/jvm/java-17-openjdk-amd64"
     if os.path.isdir(java17_home):
         maven_env["JAVA_HOME"] = java17_home
         maven_env["PATH"] = f"{java17_home}/bin:" + maven_env.get("PATH", "")
-    build = subprocess.run([mvn_cmd, "-B", "clean", "package", "-DskipTests"], cwd=project_dir,
+    build = subprocess.run([mvn_cmd, "-B", "clean", "package", "-DskipTests"], cwd=build_dir,
                            env=maven_env, capture_output=True, text=True)
     if build.returncode != 0:
         # Antes solo decía "returned non-zero exit status 1": se muestran los errores reales
@@ -245,7 +269,7 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
         raise RuntimeError("La compilación con Maven falló (ver errores arriba).")
 
     # Find the generated jar
-    target_dir = os.path.join(project_dir, "target")
+    target_dir = os.path.join(build_dir, "target")
     jar_file = None
     if os.path.exists(target_dir):
         for file in os.listdir(target_dir):
@@ -310,9 +334,9 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
         java_cmd.append(f"--server.servlet.context-path=/host/{owner_prefix}/{db_name}")
     
     if platform.system() == "Windows":
-        process = subprocess.Popen(java_cmd, cwd=project_dir, stdout=log_file, stderr=log_file)
+        process = subprocess.Popen(java_cmd, cwd=build_dir, stdout=log_file, stderr=log_file)
     else:
-        process = subprocess.Popen(java_cmd, cwd=project_dir, stdout=log_file, stderr=log_file, start_new_session=True)
+        process = subprocess.Popen(java_cmd, cwd=build_dir, stdout=log_file, stderr=log_file, start_new_session=True)
         
     print(f"[{project_id}] Esperando a que Spring Boot inicie y escuche en el puerto {deployment.port}...")
     ready = False

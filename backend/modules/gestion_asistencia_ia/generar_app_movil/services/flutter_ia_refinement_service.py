@@ -17,6 +17,32 @@ def _clean_dart_code(text: str) -> str:
     return cleaned
 
 
+# Paquetes que existen en el pubspec generado: cualquier otro import es una alucinación
+PAQUETES_PERMITIDOS = ("flutter", "http", "intl", "flutter_dotenv")
+
+
+def validar_codigo_refinado(original: str, refinado: str) -> str:
+    """'' si el código refinado es aceptable; si no, el motivo para descartarlo."""
+    if not refinado or len(refinado) < 50:
+        return "respuesta vacía"
+    for paquete in re.findall(r"import\s+'package:([a-zA-Z0-9_]+)/", refinado):
+        if paquete not in PAQUETES_PERMITIDOS:
+            return f"usa el paquete '{paquete}', que no está en el proyecto"
+    faltan = set(re.findall(r"\bclass\s+(\w+)", original)) - set(re.findall(r"\bclass\s+(\w+)", refinado))
+    if faltan:
+        return f"eliminó o renombró las clases {', '.join(sorted(faltan))}"
+    if refinado.count("{") != refinado.count("}") or refinado.count("(") != refinado.count(")"):
+        return "llaves o paréntesis desbalanceados (código cortado)"
+    return ""
+
+
+def _aceptar(original: str, refinado: str, vista: str, proveedor: str):
+    motivo = validar_codigo_refinado(original, refinado)
+    if motivo:
+        return None, f"Se descartó la propuesta de {proveedor} para {vista}: {motivo}."
+    return refinado, f"Refinamiento de {vista} aplicado con {proveedor}."
+
+
 async def refinar_codigo_con_ia(
     vista_nombre: str,
     codigo_actual: str,
@@ -29,13 +55,16 @@ async def refinar_codigo_con_ia(
     sin re-generar archivos gigantescos desde cero.
     """
     provider = (settings.AI_PROVIDER or "kimi").lower().strip()
+    descartes = []
 
     prompt_minificado = (
         f"Target: Flutter Widget '{vista_nombre}'\n"
         f"API Endpoint: '{api_endpoint}'\n"
         f"Requirement: {instrucciones}\n"
-        f"Input Dart Code:\n{codigo_actual[:2500]}\n\n"
-        f"Rule: Output ONLY pure updated Dart code. No markdown fences. No yapping."
+        f"Input Dart Code:\n{codigo_actual}\n\n"
+        f"Rules: Output ONLY the full updated Dart file. No markdown fences. No explanations. "
+        f"Keep every existing class name, import path and the API endpoint. "
+        f"Only these packages exist: {', '.join(PAQUETES_PERMITIDOS)}. Do not invent fields, routes or packages."
     )
 
     system_instruction = (
@@ -55,7 +84,7 @@ async def refinar_codigo_con_ia(
                     {"role": "user", "content": prompt_minificado}
                 ],
                 "temperature": 0.1,
-                "max_tokens": 2000,
+                "max_tokens": 8000,
             }
             try:
                 async with httpx.AsyncClient(timeout=45.0) as client:
@@ -68,8 +97,10 @@ async def refinar_codigo_con_ia(
                         data = res.json()
                         raw_content = data["choices"][0]["message"]["content"]
                         refined = _clean_dart_code(raw_content)
-                        if refined and len(refined) > 50:
-                            return refined, f"Refinamiento de {vista_nombre} aplicado exitosamente con Kimi."
+                        codigo, aviso = _aceptar(codigo_actual, refined, vista_nombre, "Kimi")
+                        if codigo:
+                            return codigo, aviso
+                        descartes.append(aviso)
             except Exception:
                 pass
 
@@ -86,7 +117,7 @@ async def refinar_codigo_con_ia(
             ],
             "generationConfig": {
                 "temperature": 0.1,
-                "maxOutputTokens": 2000
+                "maxOutputTokens": 8000
             }
         }
         try:
@@ -97,10 +128,14 @@ async def refinar_codigo_con_ia(
                     parts = data.get("candidates", [])[0].get("content", {}).get("parts", [])
                     if parts and "text" in parts[0]:
                         refined = _clean_dart_code(parts[0]["text"])
-                        if refined and len(refined) > 50:
-                            return refined, f"Refinamiento de {vista_nombre} aplicado con Gemini."
+                        codigo, aviso = _aceptar(codigo_actual, refined, vista_nombre, "Gemini")
+                        if codigo:
+                            return codigo, aviso
+                        descartes.append(aviso)
         except Exception:
             pass
 
+    if descartes:
+        return codigo_actual, " ".join(descartes) + " Se mantuvo el código original."
     return codigo_actual, f"Se mantuvo el código original para {vista_nombre} (IA no disponible)."
 
