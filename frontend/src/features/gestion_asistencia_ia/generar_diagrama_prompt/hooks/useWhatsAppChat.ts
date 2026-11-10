@@ -1066,7 +1066,12 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId, proyecto
     } catch (err: any) {
       if (ctrl.signal.aborted) { finalizarDetenido(); return; }
       cancelacionesRef.current.delete(userPromptMessage.id);
-      const errorMsg = err?.message || 'Error al procesar la solicitud.';
+      const crudo = err?.message || 'Error al procesar la solicitud.';
+      // "Failed to fetch" = el servidor cortó la conexión (p. ej. nginx venció el tiempo de espera
+      // de la IA o el backend se reinició): no es un fallo del diagrama.
+      const errorMsg = /failed to fetch|networkerror|load failed/i.test(crudo)
+        ? 'el servidor no respondió a tiempo o se cortó la conexión. Si pediste algo grande (como optimizar todo el diagrama), prueba por partes o reintenta en un momento.'
+        : crudo;
       const failedAiMessage: ChatMessage = {
         ...pendingAiMessage,
         text: `Error al procesar la solicitud: ${errorMsg}`,
