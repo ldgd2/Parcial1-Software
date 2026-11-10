@@ -362,8 +362,7 @@ async def deploy_project(repo_url: str, project_id: int, db: AsyncSession, db_na
             # Lo útil son las causas, no las 40 líneas de stack trace del final
             claves = [l for l in lineas if re.search(r"Caused by|ERROR|Detail:|Where:|APPLICATION FAILED|Description:|Action:", l)]
             print(f"[{project_id}] --- APP LOG (causas) ---")
-            print("
-".join(claves[-30:] or lineas[-40:]))
+            print("\n".join(claves[-30:] or lineas[-40:]))
             print(f"[{project_id}] --- FIN ---")
             causas = [l for l in claves if "Caused by" in l or "Detail:" in l]
             if causas:
