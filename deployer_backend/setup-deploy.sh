@@ -39,7 +39,7 @@ if $ES_LINUX; then
         fi
     fi
     $APT update
-    $APT install -y python3 python3-venv python3-pip nginx sqlite3 postgresql postgresql-contrib openjdk-17-jdk maven
+    $APT install -y python3 python3-venv python3-pip python3-dev build-essential nginx sqlite3 postgresql postgresql-contrib openjdk-17-jdk maven
     # Asegurar que JAVA_HOME apunta a JDK 17
     export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
     sudo update-alternatives --set java /usr/lib/jvm/java-17-openjdk-amd64/bin/java 2>/dev/null || true
@@ -76,7 +76,7 @@ if [ ! -f ".env" ]; then
     else
         echo "API_V1_STR=/api/v1" > .env
         echo "PROJECT_NAME=\"Deployer API\"" >> .env
-        echo "MAIN_DB_URL=sqlite+aiosqlite:///./deployer.db" >> .env
+        echo "DATABASE_URL=sqlite+aiosqlite:///./deployer.db" >> .env
     fi
 fi
 
@@ -88,68 +88,56 @@ DEPLOYER_DOMAIN=${DEPLOYER_DOMAIN:-host.example.com}
 
 if $ES_LINUX; then
     # -- NGINX --
-    NGINX_SITE=/etc/nginx/sites-available/gerlextech
+    # Sitio PROPIO del deployer (mismo archivo que crea `python manager.py` → Sistema → Dominio).
+    # Solo su subdominio → uvicorn 127.0.0.1:8001 + apps desplegadas. El diagramador tiene sus
+    # propios sitios (diagramador-dominio-*), así que los dos proyectos no se pisan.
+    NGINX_SITE=/etc/nginx/sites-available/deployer.conf
+
+    # Versión anterior de este script: creaba "gerlextech" mezclando el frontend y la API del
+    # diagramador (puerto 8000) dentro del sitio del deployer.
+    if [ -f /etc/nginx/sites-available/gerlextech ] && grep -q "deploy-api" /etc/nginx/sites-available/gerlextech; then
+        echo "Quitando el sitio 'gerlextech' de la versión anterior (mezclaba ambos proyectos)..."
+        sudo rm -f /etc/nginx/sites-enabled/gerlextech /etc/nginx/sites-available/gerlextech
+    fi
+    # Las apps escriben bloques `location`: van DENTRO del server del deployer, nunca en nginx.conf
+    sudo sed -i '\|^[[:space:]]*include /etc/nginx/deploy_apps/\*\.conf;|d' /etc/nginx/nginx.conf
+
     if [ ! -f "$NGINX_SITE" ]; then
-        echo "Creando configuración Nginx para Deployer en $DEPLOYER_DOMAIN..."
+        echo "Creando configuración Nginx para el Deployer en $DEPLOYER_DOMAIN..."
         sudo mkdir -p /etc/nginx/deploy_apps
         sudo chmod 777 /etc/nginx/deploy_apps
 
-        # Asegurar que deploy_apps está incluido en nginx.conf
-        if ! grep -q "include /etc/nginx/deploy_apps/\*.conf;" /etc/nginx/nginx.conf; then
-            sudo sed -i '/include \/etc\/nginx\/conf\.d\/\*\.conf;/a \ \ \ \ include /etc/nginx/deploy_apps/*.conf;' /etc/nginx/nginx.conf
-        fi
-
         TMP_CONF="$(mktemp)"
-        # 'EOF' entre comillas: las variables de nginx ($host, $uri…) quedan literales;
-        # las del script se insertan después con sed.
+        # 'EOF' entre comillas: las variables de nginx ($host…) quedan literales
         cat > "$TMP_CONF" <<'EOF'
 server {
     listen 80;
     server_name __DOMINIO__;
 
-    # Frontend estático
+    # Apps desplegadas (/host/<dueño>/<proyecto>/), las escribe el deployer
+    include /etc/nginx/deploy_apps/*.conf;
+
     location / {
-        root __FRONTEND_DIST__;
-        index index.html;
-        try_files $uri $uri/ /index.html;
-    }
-
-    # API principal
-    location /api/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        # La IA puede tardar más de 60 s (si nginx corta, el navegador solo ve "Failed to fetch")
-        proxy_read_timeout 300s;
-        proxy_send_timeout 300s;
-        client_max_body_size 25m;
-    }
-
-    # API Deployer
-    location /deploy-api/ {
         proxy_pass http://127.0.0.1:8001/;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 300s;
+        # compilar/desplegar un proyecto tarda: sin esto nginx corta a los 60 s
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
         client_max_body_size 100m;
     }
 }
 EOF
-        sed -i "s|__DOMINIO__|${DEPLOYER_DOMAIN}|; s|__FRONTEND_DIST__|${REPO_ROOT}/frontend/dist|" "$TMP_CONF"
+        sed -i "s|__DOMINIO__|${DEPLOYER_DOMAIN}|" "$TMP_CONF"
         sudo cp "$TMP_CONF" "$NGINX_SITE"
         rm -f "$TMP_CONF"
         sudo ln -sf "$NGINX_SITE" /etc/nginx/sites-enabled/
-        sudo nginx -t && sudo systemctl reload nginx
     else
         echo "La configuración de Nginx ($NGINX_SITE) ya existe."
     fi
+    sudo nginx -t && sudo systemctl reload nginx
 
     # -- SYSTEMD --
     if [ ! -f "/etc/systemd/system/deployer-backend.service" ]; then
@@ -163,7 +151,7 @@ After=network.target
 User=root
 WorkingDirectory=${DEPLOYER_DIR}
 Environment="PATH=${DEPLOYER_DIR}/venv/bin:/usr/local/bin:/usr/bin:/bin"
-ExecStart=${DEPLOYER_DIR}/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8001
+ExecStart=${DEPLOYER_DIR}/venv/bin/uvicorn main:app --host 127.0.0.1 --port 8001
 Restart=always
 
 [Install]
