@@ -6,6 +6,7 @@ import { AuthLayout } from '../../shared/AuthLayout';
 import { apiFetch } from '@/shared/lib/api';
 import { TokenService } from '@/shared/lib/TokenService';
 import { limpiarDatosDeSesion } from '@/shared/lib/session';
+import { AVISO_SESION_VENCIDA } from '@/shared/lib/sesionVencida';
 import './login.css';
 
 export const LoginView: React.FC = () => {
@@ -13,7 +14,16 @@ export const LoginView: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+  // Llegó aquí porque su sesión venció (ver shared/lib/sesionVencida): se le explica
+  const [errorMsg, setErrorMsg] = useState(() => {
+    try {
+      if (sessionStorage.getItem(AVISO_SESION_VENCIDA)) {
+        sessionStorage.removeItem(AVISO_SESION_VENCIDA);
+        return 'Tu sesión venció. Inicia sesión de nuevo para continuar.';
+      }
+    } catch { /* sin almacenamiento */ }
+    return '';
+  });
   const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {

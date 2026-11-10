@@ -50,7 +50,13 @@ export const ExportModal: React.FC<Props> = ({
         }
       }
     } catch (err: any) {
-      setErrorMsg(err.message || "Ocurrió un error al exportar el proyecto.");
+      const msg = err.message || "Ocurrió un error al exportar el proyecto.";
+      setErrorMsg(msg);
+      // El aviso está arriba del formulario y el botón abajo: con scroll no se veía y parecía
+      // que "cargaba y moría". Se muestra también como notificación y se sube hasta el aviso.
+      onSuccessNotification?.('error', msg);
+      requestAnimationFrame(() =>
+        document.querySelector('.export-error-banner')?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
     }
   };
 

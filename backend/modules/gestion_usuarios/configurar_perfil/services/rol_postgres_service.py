@@ -49,8 +49,11 @@ async def asegurar_rol(db: AsyncSession, email: Optional[str], password: str) ->
         async with db.begin_nested():
             await db.execute(sql)
     except Exception as e:
-        mensaje = str(e)
-        if "CREATEROLE" in mensaje or "permission denied" in mensaje.lower():
+        # Por tipo (SQLSTATE 42501), no por texto: el mensaje cambia con el idioma del servidor.
+        # Cubre crear sin CREATEROLE y, en PostgreSQL 16+, alterar un rol creado por otro sin ADMIN OPTION.
+        causa = getattr(e, "orig", None)
+        if "InsufficientPrivilege" in type(causa).__name__ + type(e).__name__ + str(e) \
+                or getattr(causa, "sqlstate", None) == "42501" or getattr(causa, "pgcode", None) == "42501":
             raise SinPermisoCreateRole(rol) from None
         raise
     return rol

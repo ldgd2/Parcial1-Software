@@ -28,6 +28,41 @@ def _dar_createrole_con_sudo(db_user: str) -> bool:
     return subprocess.run(comando).returncode == 0
 
 
+async def _roles_existentes_de_usuarios():
+    """Roles de PostgreSQL que ya existen para cuentas de la plataforma."""
+    import backend.main  # noqa: F401
+    from sqlalchemy import select, text
+    from backend.core.database import AsyncSessionLocal
+    from backend.modules.gestion_usuarios.models import Usuario
+    from backend.modules.gestion_usuarios.configurar_perfil.services.rol_postgres_service import nombre_rol
+    async with AsyncSessionLocal() as db:
+        emails = (await db.execute(select(Usuario.email).where(Usuario.email.isnot(None)))).scalars().all()
+        nombres = sorted({nombre_rol(e) for e in emails})
+        if not nombres:
+            return []
+        filas = await db.execute(
+            text("SELECT rolname FROM pg_roles WHERE rolname = ANY(:n) AND NOT rolsuper AND rolname <> current_user"),
+            {"n": nombres},
+        )
+        return [r[0] for r in filas]
+
+
+def _dar_admin_sobre_roles(db_user: str, roles: list) -> None:
+    """PostgreSQL 16+: con CREATEROLE solo se pueden ALTERAR los roles que uno mismo creó. Los que
+    creó otro (p. ej. el deployer como `postgres` al desplegar) necesitan ADMIN OPTION; si no, el
+    usuario no puede volver a cambiar su contraseña desde la plataforma."""
+    seguros = [r for r in roles if re.fullmatch(r"[A-Za-z0-9_]+", r)]
+    if not seguros:
+        return
+    sql = "".join(f'GRANT "{r}" TO "{db_user}" WITH ADMIN OPTION; ' for r in seguros)
+    resultado = subprocess.run(["sudo", "-u", "postgres", "psql", "-q", "-c", sql],
+                               capture_output=True, text=True)
+    if resultado.returncode == 0:
+        console.print(f"[green]✔ Puede administrar los roles existentes: {', '.join(seguros)}[/green]")
+    else:
+        console.print(f"[yellow]No se pudo dar ADMIN OPTION sobre los roles existentes: {resultado.stderr.strip()}[/yellow]")
+
+
 async def _estado():
     from backend.core.database import AsyncSessionLocal
     from backend.modules.gestion_usuarios.configurar_perfil.services.rol_postgres_service import puede_crear_roles
@@ -80,6 +115,10 @@ def reparar_roles():
         console.print("[yellow]Falta CREATEROLE. Ejecuta como superusuario de PostgreSQL:[/yellow]")
         console.print(f'   ALTER ROLE "{settings.DB_USER}" CREATEROLE;')
         return
+
+    if os.name != "nt" and _es_local(settings.DB_IP):
+        roles = ejecutar_async(_roles_existentes_de_usuarios())
+        _dar_admin_sobre_roles(settings.DB_USER, roles)
 
     with console.status("[cyan]Sincronizando roles de las cuentas con contraseña guardada..."):
         ok, fallos = ejecutar_async(_sincronizar())
