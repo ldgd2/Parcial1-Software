@@ -1,6 +1,8 @@
 import os
 import time
+import re
 import subprocess
+import tempfile
 from backend.cli.console import console
 from rich.prompt import Prompt
 from rich.panel import Panel
@@ -21,6 +23,7 @@ def ejecutar(modo):
         console.print("[4] Eliminar TODO")
         console.print("[5] Ver Estado General")
         console.print("[6] Ver Logs")
+        console.print("[7] Ajustar NGINX (tiempos de espera de la IA)")
         console.print("[0] Volver")
         
         op = Prompt.ask("Selecciona una opción", default="1")
@@ -40,6 +43,8 @@ def ejecutar(modo):
             ver_estado()
         elif op == "6":
             menu_logs()
+        elif op == "7":
+            ajustar_nginx()
         elif op == "0":
             break
         else:
@@ -96,6 +101,11 @@ WantedBy=multi-user.target
         proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        # La IA (/prompt/generar, /optimizar…) puede tardar más de 60 s: con el valor por defecto
+        # nginx corta con 504 sin cabeceras CORS y el navegador solo muestra "Failed to fetch".
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        client_max_body_size 25m;   # imágenes / audio / PDF en base64
     }}
 }}
 """
@@ -129,6 +139,11 @@ server {{
         proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        # La IA (/prompt/generar, /optimizar…) puede tardar más de 60 s: con el valor por defecto
+        # nginx corta con 504 sin cabeceras CORS y el navegador solo muestra "Failed to fetch".
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        client_max_body_size 25m;   # imágenes / audio / PDF en base64
     }}
 }}
 """
@@ -197,6 +212,9 @@ def reiniciar_todo():
         os.system(f"sudo rm -rf /var/www/diagramador-frontend")
         os.system(f"sudo cp -r {os.path.join(BASE_DIR, 'frontend', 'dist')} /var/www/diagramador-frontend")
         
+        # Servidores creados antes de este ajuste: se les agregan los tiempos de espera de la IA
+        ajustar_nginx(recargar=False)
+
         console.print("[cyan]Reiniciando servicios...[/cyan]")
         os.system("sudo systemctl restart backend-app nginx")
         console.print("[bold green]✔ Servicios reiniciados.[/bold green]")
@@ -276,3 +294,102 @@ def menu_logs():
             break
         else:
             if os.name == 'nt': console.print("[bold green]✔ Mock logs (Windows).[/bold green]")
+
+
+# ─── Ajuste de NGINX para la IA ──────────────────────────────────────────────
+# Con los valores por defecto nginx corta a los 60 s: una petición larga a la IA (p. ej.
+# "@diag /optimizar todo el diagrama") recibe 504 sin cabeceras CORS y el navegador solo
+# muestra "Failed to fetch". También limita el cuerpo a 1 MB (imágenes/audio/PDF en base64).
+AJUSTES_NGINX_BACKEND = {
+    "proxy_read_timeout": "300s",
+    "proxy_send_timeout": "300s",
+    "client_max_body_size": "25m",
+}
+ARCHIVOS_NGINX_BACKEND = ("diagramador-dominio-back", "diagramador-ip")
+
+
+def _ajustar_texto_nginx(texto: str):
+    """Agrega/actualiza los ajustes en cada `location` que hace proxy al backend (:8000).
+    Devuelve (texto_nuevo, cantidad_de_cambios). Es idempotente."""
+    cambios = 0
+
+    def ajustar_bloque(m):
+        nonlocal cambios
+        cabecera, cuerpo, cierre = m.group(1), m.group(2), m.group(3)
+        if ":8000" not in cuerpo:
+            return m.group(0)
+        sangria = (re.search(r"\n([ \t]+)proxy_pass", cuerpo) or re.search(r"\n([ \t]+)\S", cuerpo))
+        sangria = sangria.group(1) if sangria else "        "
+        for clave, valor in AJUSTES_NGINX_BACKEND.items():
+            patron = re.compile(rf"^([ \t]*){clave}\s+([^;]+);", re.M)
+            actual = patron.search(cuerpo)
+            if actual:
+                if actual.group(2).strip() != valor:
+                    cuerpo = patron.sub(lambda a: f"{a.group(1)}{clave} {valor};", cuerpo, count=1)
+                    cambios += 1
+            else:
+                cuerpo = cuerpo.rstrip() + f"\n{sangria}{clave} {valor};"
+                cambios += 1
+        return cabecera + cuerpo + cierre
+
+    nuevo = re.sub(r"(location\s+[^{]*\{)([^{}]*?)(\n[ \t]*\})", ajustar_bloque, texto)
+    return nuevo, cambios
+
+
+def _ajustar_archivo(ruta: str, con_sudo: bool):
+    """Devuelve la ruta del respaldo si cambió el archivo, '' si ya estaba bien, None si no existe."""
+    if not os.path.exists(ruta):
+        return None
+    with open(ruta, encoding="utf-8") as f:
+        texto = f.read()
+    nuevo, cambios = _ajustar_texto_nginx(texto)
+    if not cambios:
+        return ""
+    respaldo = ruta + ".bak"
+    if con_sudo:
+        with tempfile.NamedTemporaryFile("w", delete=False, encoding="utf-8", suffix=".conf") as tmp:
+            tmp.write(nuevo)
+        os.system(f'sudo cp "{ruta}" "{respaldo}" && sudo cp "{tmp.name}" "{ruta}"')
+        os.remove(tmp.name)
+    else:
+        with open(respaldo, "w", encoding="utf-8") as f: f.write(texto)
+        with open(ruta, "w", encoding="utf-8") as f: f.write(nuevo)
+    return respaldo
+
+
+def ajustar_nginx(recargar: bool = True):
+    """Aplica AJUSTES_NGINX_BACKEND a las configuraciones ya creadas (locales y de /etc/nginx)."""
+    console.print("\n[cyan]⚙️  Ajustando NGINX para respuestas largas de la IA...[/cyan]")
+    # Copias locales (las que se vuelven a copiar a /etc/nginx al crear)
+    for nombre in ARCHIVOS_NGINX_BACKEND:
+        _ajustar_archivo(os.path.join(NGINX_CONF_DIR, nombre), con_sudo=False)
+
+    if os.name == 'nt':
+        return console.print("[bold green]✔ Configuraciones locales ajustadas (en Windows no hay NGINX que recargar).[/bold green]")
+
+    respaldos, encontrados = [], 0
+    for nombre in ARCHIVOS_NGINX_BACKEND:
+        r = _ajustar_archivo(os.path.join("/etc/nginx/sites-available", nombre), con_sudo=True)
+        if r is None:
+            continue
+        encontrados += 1
+        if r:
+            respaldos.append((os.path.join("/etc/nginx/sites-available", nombre), r))
+            console.print(f"[green]  • {nombre}: ajustado (respaldo en {r})[/green]")
+        else:
+            console.print(f"[green]  • {nombre}: ya estaba ajustado[/green]")
+
+    if not encontrados:
+        return console.print("[yellow]No hay configuraciones de NGINX del diagramador. Usa 'Crear e Iniciar TODO'.[/yellow]")
+    if not respaldos:
+        return console.print("[bold green]✔ NGINX ya tenía los tiempos de espera correctos.[/bold green]")
+
+    if os.system("sudo nginx -t") != 0:
+        console.print("[bold red]❌ La configuración nueva no es válida: se restauran los respaldos.[/bold red]")
+        for ruta, respaldo in respaldos:
+            os.system(f'sudo cp "{respaldo}" "{ruta}"')
+        return
+    if recargar:
+        os.system("sudo systemctl reload nginx")
+    console.print("[bold green]✔ NGINX ajustado: la IA tiene hasta 300 s y se aceptan archivos de hasta 25 MB.[/bold green]")
+
