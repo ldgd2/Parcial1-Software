@@ -1,8 +1,41 @@
+import re
+import unicodedata
 from typing import Dict
 
 
+_PALABRAS_RESERVADAS_DART = {
+    "abstract", "as", "assert", "async", "await", "base", "break", "case", "catch", "class", "const",
+    "continue", "covariant", "default", "deferred", "do", "dynamic", "else", "enum", "export",
+    "extends", "extension", "external", "factory", "false", "final", "finally", "for", "function",
+    "get", "hide", "if", "implements", "import", "in", "interface", "is", "late", "library", "mixin",
+    "new", "null", "of", "on", "operator", "part", "required", "rethrow", "return", "sealed", "set",
+    "show", "static", "super", "switch", "sync", "this", "throw", "true", "try", "type", "typedef",
+    "var", "void", "when", "while", "with", "yield",
+}
+# Un paquete no puede llamarse igual que una de sus dependencias
+_PAQUETES_DEL_PUBSPEC = {"flutter", "flutter_test", "flutter_lints", "flutter_dotenv", "http", "intl"}
+
+
+def nombre_paquete_dart(app_name: str) -> str:
+    """Nombre válido para `name:` del pubspec, sea cual sea el nombre del repo.
+
+    Reglas de Dart: solo minúsculas, dígitos y `_`, empezar con letra o `_` y no ser palabra
+    reservada. Antes un repo llamado "6767" generaba `name: 6767` y `flutter pub get` fallaba con
+    'Expected "name" to be a string, but got 6767'.
+    """
+    texto = unicodedata.normalize("NFKD", str(app_name or "")).encode("ascii", "ignore").decode()
+    nombre = re.sub(r"_+", "_", re.sub(r"[^a-z0-9_]", "_", texto.lower())).strip("_")
+    if not nombre:
+        return "app_movil"
+    if nombre[0].isdigit():
+        nombre = f"app_{nombre}"
+    if nombre in _PALABRAS_RESERVADAS_DART or nombre in _PAQUETES_DEL_PUBSPEC:
+        nombre = f"{nombre}_app"
+    return nombre
+
+
 def generar_pubspec_yaml(app_name: str) -> str:
-    safe_name = app_name.lower().replace("-", "_").replace(" ", "_")
+    safe_name = nombre_paquete_dart(app_name)
     return f"""name: {safe_name}
 description: "Aplicación móvil en Flutter generada automáticamente para consumir el backend Spring Boot."
 publish_to: 'none'
