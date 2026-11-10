@@ -32,7 +32,7 @@ async def test_comentarios_avisan_al_resto_pero_no_los_de_la_ia(equipo, eventos_
     await db.commit()
     assert len(eventos_notif) == 1
     notifs = await procesar(eventos_notif, db=db)
-    assert [n["usuario_id"] for n in notifs] == [equipo.ana.id]
+    assert sorted(n["usuario_id"] for n in notifs) == sorted([equipo.ana.id, equipo.lucia.id]), "todos menos el autor"
     assert notifs[0]["titulo"].startswith("Beto Test comentó")
 
 

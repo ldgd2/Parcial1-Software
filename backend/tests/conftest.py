@@ -52,10 +52,10 @@ def eventos_notif(monkeypatch) -> List[Dict[str, Any]]:
 
 
 class Equipo:
-    """Un proyecto con anfitrión (Ana) e invitado (Beto), ambos aprobados."""
+    """Un proyecto con anfitriona (Ana), editor (Beto) y lectora (Lucía), todos aprobados."""
 
-    def __init__(self, proyecto, ana, beto):
-        self.proyecto, self.ana, self.beto = proyecto, ana, beto
+    def __init__(self, proyecto, ana, beto, lucia):
+        self.proyecto, self.ana, self.beto, self.lucia = proyecto, ana, beto, lucia
 
     @property
     def pid(self) -> int:
@@ -67,7 +67,8 @@ async def equipo(db, eventos_notif) -> Equipo:
     sufijo = uuid.uuid4().hex[:8]
     ana = UsuarioRegistrado(nombre="Ana Test", email=f"ana_{sufijo}@test.local")
     beto = UsuarioRegistrado(nombre="Beto Test", email=f"beto_{sufijo}@test.local")
-    db.add_all([ana, beto])
+    lucia = UsuarioRegistrado(nombre="Lucia Test", email=f"lucia_{sufijo}@test.local")
+    db.add_all([ana, beto, lucia])
     await db.flush()
     proyecto = Proyecto(nombre=f"Proyecto test {sufijo}", descripcion="Sistema de ventas de prueba")
     db.add(proyecto)
@@ -75,10 +76,11 @@ async def equipo(db, eventos_notif) -> Equipo:
     db.add_all([
         ColaboradorProyecto(proyecto_id=proyecto.id, usuario_id=ana.id, rol_proyecto="anfitrion", estado="aprobado"),
         ColaboradorProyecto(proyecto_id=proyecto.id, usuario_id=beto.id, rol_proyecto="invitado", estado="aprobado"),
+        ColaboradorProyecto(proyecto_id=proyecto.id, usuario_id=lucia.id, rol_proyecto="invitado", estado="aprobado", permiso="view"),
     ])
     await db.commit()
     eventos_notif.clear()   # crear el equipo no es parte de lo que se prueba
-    return Equipo(proyecto, ana, beto)
+    return Equipo(proyecto, ana, beto, lucia)
 
 
 class Cliente:

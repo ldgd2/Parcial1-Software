@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useRealTimeSync } from '@/features/gestion_concurrencia/sincronizacion_tiempo_real/context/RealTimeSyncContext';
+import { apiFetch } from '@/shared/lib/api';
 import { Modal } from '@/features/gestion_proyectos/administrar_proyecto/components/Modal/Modal';
 import './PermisosModal.css';
 
@@ -8,9 +9,46 @@ interface Props {
   proyectoId: number;
 }
 
+/** CU38: miembro del proyecto con su permiso guardado en la base */
+interface Miembro {
+  usuario_id: number;
+  nombre: string;
+  rol_proyecto: string;
+  permiso: 'edit' | 'view';
+  nivel: 'lector' | 'editor' | 'anfitrion';
+}
+
 export const PermisosModal: React.FC<Props> = ({ onClose, proyectoId }) => {
   const { pendingGuests, roomUsers, approveGuest, requestRoomUsers, kickUser, changeUserRole } = useRealTimeSync();
   const [activeTab, setActiveTab] = useState<'pending' | 'users'>('pending');
+  const [miembros, setMiembros] = useState<Miembro[]>([]);
+  const [errorPermiso, setErrorPermiso] = useState<string | null>(null);
+
+  const cargarMiembros = useCallback(() => {
+    apiFetch<Miembro[]>(`/api/proyectos/${proyectoId}/miembros`).then(setMiembros).catch(() => {});
+  }, [proyectoId]);
+
+  useEffect(() => { cargarMiembros(); }, [cargarMiembros]);
+
+  // El permiso se GUARDA en el proyecto (CU38): sigue igual al reconectarse o reiniciar el servidor
+  const cambiarPermiso = async (m: Miembro, permiso: 'edit' | 'view') => {
+    setErrorPermiso(null);
+    setMiembros(prev => prev.map(x => (x.usuario_id === m.usuario_id ? { ...x, permiso } : x)));
+    try {
+      await apiFetch(`/api/proyectos/${proyectoId}/miembros/${m.usuario_id}/permiso`, {
+        method: 'PUT',
+        body: JSON.stringify({ permiso }),
+      });
+      requestRoomUsers();
+    } catch (e) {
+      setErrorPermiso(e instanceof Error ? e.message : 'No se pudo cambiar el permiso');
+      cargarMiembros();
+    }
+  };
+
+  const enLinea = (usuarioId: number) => roomUsers.some((u: any) => u.id === `auth_${usuarioId}` && u.isOnline);
+  // Invitados sin cuenta conectados ahora: su permiso no se puede guardar (solo dura la sesión)
+  const sinCuenta = roomUsers.filter((u: any) => !miembros.some(m => u.id === `auth_${m.usuario_id}`));
 
   useEffect(() => {
     requestRoomUsers();
@@ -60,7 +98,7 @@ export const PermisosModal: React.FC<Props> = ({ onClose, proyectoId }) => {
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
               <circle cx="12" cy="7" r="4" />
             </svg>
-            <span>Conectados ({roomUsers.length})</span>
+            <span>Miembros ({miembros.length + sinCuenta.length})</span>
           </button>
         </div>
 
@@ -119,46 +157,83 @@ export const PermisosModal: React.FC<Props> = ({ onClose, proyectoId }) => {
 
           {activeTab === 'users' && (
             <div className="permisos-list">
-              {roomUsers.length === 0 ? (
+              {errorPermiso && <div className="permisos-error" role="alert">{errorPermiso}</div>}
+              {miembros.length === 0 && sinCuenta.length === 0 ? (
                 <div className="permisos-empty">
                   <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                     <circle cx="9" cy="7" r="4" />
                   </svg>
-                  <p>No hay colaboradores activos en este momento.</p>
+                  <p>Todavía no hay miembros en el proyecto.</p>
                 </div>
               ) : (
-                roomUsers.map((user: any) => (
-                  <div key={user.id} className="permisos-item">
-                    <div className="permisos-user-info">
-                      <span className={`permisos-status ${user.isOnline ? 'online' : 'offline'}`} title={user.isOnline ? 'Conectado' : 'Desconectado'} />
-                      <div className="permisos-avatar">
-                        {user.nickname?.charAt(0).toUpperCase() || 'U'}
+                <>
+                  {miembros.map(m => {
+                    const online = enLinea(m.usuario_id);
+                    const esAnfitrion = m.rol_proyecto === 'anfitrion';
+                    return (
+                      <div key={m.usuario_id} className="permisos-item">
+                        <div className="permisos-user-info">
+                          <span className={`permisos-status ${online ? 'online' : 'offline'}`} title={online ? 'Conectado' : 'Desconectado'} />
+                          <div className="permisos-avatar">{m.nombre?.charAt(0).toUpperCase() || 'U'}</div>
+                          <div className="permisos-user-details">
+                            <span className="permisos-name">{m.nombre}</span>
+                            <span className="permisos-sub">
+                              {esAnfitrion ? 'Anfitrión' : m.permiso === 'view' ? 'Lector: ve y comenta' : 'Editor: cambia el diagrama y aprueba a la IA'}
+                              {online ? ' · en línea' : ''}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="permisos-actions">
+                          {esAnfitrion ? (
+                            <span className="permisos-fijo">Siempre edita</span>
+                          ) : (
+                            <select
+                              value={m.permiso}
+                              onChange={e => cambiarPermiso(m, e.target.value as 'edit' | 'view')}
+                              className="permisos-role-select"
+                              aria-label={`Permiso de ${m.nombre}`}
+                            >
+                              <option value="edit">Editor</option>
+                              <option value="view">Lector</option>
+                            </select>
+                          )}
+                          {!esAnfitrion && online && (
+                            <button className="btn-kick" onClick={() => kickUser(`auth_${m.usuario_id}`)} title="Expulsar usuario de la sala">
+                              Expulsar
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <div className="permisos-user-details">
-                        <span className="permisos-name">{user.nickname}</span>
-                        <span className="permisos-sub">{user.isOnline ? 'En línea' : 'Desconectado'}</span>
+                    );
+                  })}
+                  {sinCuenta.map((user: any) => (
+                    <div key={user.id} className="permisos-item">
+                      <div className="permisos-user-info">
+                        <span className={`permisos-status ${user.isOnline ? 'online' : 'offline'}`} />
+                        <div className="permisos-avatar">{user.nickname?.charAt(0).toUpperCase() || 'U'}</div>
+                        <div className="permisos-user-details">
+                          <span className="permisos-name">{user.nickname}</span>
+                          <span className="permisos-sub">Invitado sin cuenta · el permiso dura solo esta sesión</span>
+                        </div>
+                      </div>
+                      <div className="permisos-actions">
+                        <select
+                          value={user.role}
+                          onChange={(e) => changeUserRole(user.id, e.target.value)}
+                          className="permisos-role-select"
+                          aria-label={`Permiso de ${user.nickname}`}
+                        >
+                          <option value="edit">Editor</option>
+                          <option value="view">Lector</option>
+                        </select>
+                        <button className="btn-kick" onClick={() => kickUser(user.id)} title="Expulsar usuario de la sala">
+                          Expulsar
+                        </button>
                       </div>
                     </div>
-                    <div className="permisos-actions">
-                      <select 
-                        value={user.role} 
-                        onChange={(e) => changeUserRole(user.id, e.target.value)}
-                        className="permisos-role-select"
-                      >
-                        <option value="edit">Editor</option>
-                        <option value="view">Lector</option>
-                      </select>
-                      <button 
-                        className="btn-kick" 
-                        onClick={() => kickUser(user.id)}
-                        title="Expulsar usuario de la sala"
-                      >
-                        Expulsar
-                      </button>
-                    </div>
-                  </div>
-                ))
+                  ))}
+                </>
               )}
             </div>
           )}

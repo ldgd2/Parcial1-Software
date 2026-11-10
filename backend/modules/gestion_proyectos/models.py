@@ -17,6 +17,9 @@ class ColaboradorProyecto(Base):
     # 'pendiente', 'aprobado', 'rechazado'
     estado = Column(String, nullable=False, default="pendiente")
 
+    # CU38: permiso de un miembro (no anfitrión) dentro del proyecto: 'edit' (editor) | 'view' (lector).
+    # Se guarda aquí para que no se pierda al reiniciar el servidor ni al reconectarse a la sala.
+    permiso = Column(String(10), nullable=False, default="edit", server_default="edit")
     # CU38: Permisos persistentes por colaborador
     permiso_rol = Column(String(20), nullable=False, default="editor", server_default="editor")  # 'editor' | 'lector'
     puede_editar = Column(Boolean, nullable=False, default=True, server_default=text("true"))

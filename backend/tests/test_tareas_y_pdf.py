@@ -15,7 +15,7 @@ def test_estimacion_de_esfuerzo():
 
 
 async def _repartir(cliente, equipo, monkeypatch, persistir):
-    from backend.modules.gestion_proyectos_asistida.repartir_tareas.services import tareas_service
+    from backend.modules.gestion_asistencia_ia.repartir_tareas.services import tareas_service
 
     async def ia_tareas(prompt, provider=None, api_key=None):
         assert "Ana Test" in prompt and "Beto Test" in prompt, "la IA recibe al equipo"
@@ -73,7 +73,8 @@ def _pdf_con_texto(linea: str) -> bytes:
     return bytes(salida)
 
 
-async def test_extraer_texto_de_pdf(cliente):
+async def test_extraer_texto_de_pdf(cliente, equipo):
+    cliente.como(equipo.ana)   # sesión obligatoria: la ruta usa recursos del servidor
     pdf = base64.b64encode(_pdf_con_texto("El sistema registra ventas y clientes")).decode()
     r = await cliente.post("/prompt/extraer-texto-pdf", json={"pdf_base64": f"data:application/pdf;base64,{pdf}"})
     assert r.status_code == 200, r.text

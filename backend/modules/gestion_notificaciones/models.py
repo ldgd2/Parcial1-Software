@@ -31,3 +31,53 @@ class DispositivoPush(Base):
     token = Column(String(512), nullable=False, unique=True)
     plataforma = Column(String(20), nullable=False, default="web", server_default="web")   # web | android | ios
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+# ─── Módulo móvil del líder (antes en gestion_notificaciones) ──
+# Tokens FCM enviados por la app Flutter, bitácora de envíos y preferencias por usuario.
+from datetime import datetime  # noqa: E402
+
+from sqlalchemy.orm import relationship  # noqa: E402
+
+
+class NotificationToken(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    device_token = Column(String, nullable=False, unique=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    logs = relationship("NotificationLog", back_populates="notification", cascade="all, delete-orphan")
+
+
+class NotificationLog(Base):
+    __tablename__ = "notifications_log"
+
+    id = Column(Integer, primary_key=True, index=True)
+    notification_id = Column(Integer, ForeignKey("notifications.id"), nullable=False)
+    title = Column(String, nullable=False)
+    body = Column(Text, nullable=False)
+    data = Column(Text)  # JSON string
+    sent = Column(Boolean, default=False)
+    sent_at = Column(DateTime, default=datetime.utcnow)
+    priority = Column(Integer, default=3)  # 1 low - 5 critical
+    type = Column(String, nullable=False, default="generic")
+
+    notification = relationship("NotificationToken", back_populates="logs")
+
+
+class NotificationPreference(Base):
+    """Qué tipos de aviso quiere recibir el usuario y si está en modo silencioso."""
+    __tablename__ = "notification_preferences"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=False, index=True, unique=True)
+    receive_position_updates = Column(Boolean, default=False)
+    receive_semantic_changes = Column(Boolean, default=True)
+    receive_comments = Column(Boolean, default=False)
+    receive_invitations = Column(Boolean, default=True)
+    receive_task_assignments = Column(Boolean, default=True)
+    quiet_mode = Column(Boolean, default=False)
+    quiet_mode_until = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)

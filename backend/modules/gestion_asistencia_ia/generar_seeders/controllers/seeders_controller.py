@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.core.database import get_db
+from backend.core.permissions.proyecto import requiere_proyecto, usuario_requerido, verificar_permiso
 from backend.modules.gestion_usuarios.dependencies import get_current_user
 from backend.modules.gestion_usuarios.models import Usuario
 from backend.modules.gestion_asistencia_ia.generar_seeders.schemas.request import GenerarSeedersRequest
@@ -21,6 +22,8 @@ async def generar_seeders_endpoint(
     Genera seeders con datos randómicos coherentes y ordenamiento topológico
     para poblar la base de datos PostgreSQL generada en Spring Boot.
     """
+    if req.proyecto_id:
+        await verificar_permiso(db, current_user, req.proyecto_id, "lector")
     try:
         nodes = []
         relations = []

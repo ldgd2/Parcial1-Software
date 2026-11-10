@@ -3,6 +3,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.core.database import get_db
+from backend.core.permissions.proyecto import requiere_proyecto, usuario_requerido, verificar_permiso
 from backend.core.config import settings
 from ..schemas.prompt_schemas import PromptRequest, PromptResponse, AudioRequest
 from ..services.prompt_service import generar_diagrama_desde_prompt, transcribe_audio_with_gemini
@@ -33,8 +34,11 @@ async def generar_diagrama(
     request: PromptRequest,
     http_request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user = Depends(get_current_user_optional)
+    current_user = Depends(usuario_requerido())
 ):
+    if request.proyecto_id:
+        # CU43: el pedido queda como propuesta del proyecto → solo editores (y con sesión)
+        await verificar_permiso(db, current_user, request.proyecto_id, "editor")
     try:
         # "Detener" en el chat corta la petición: si el cliente se desconecta, se cancela la
         # llamada a la IA (deja de generar y de gastar) y no se registra ninguna propuesta.
@@ -48,7 +52,8 @@ async def generar_diagrama(
             proyecto_id=request.proyecto_id,
             db=db,
             estado_antes=request.estado_antes,
-            autor=request.autor or getattr(current_user, "nombre", None),
+            # quién pidió el cambio lo dice la sesión; `autor` del cliente solo sin proyecto
+            autor=getattr(current_user, "nombre", None) or request.autor,
             cancelado=http_request.is_disconnected,
             correcciones=request.correcciones,
         ))
@@ -82,7 +87,7 @@ async def generar_diagrama(
 @router.post("/transcribe-audio")
 async def transcribe_audio(
     request: AudioRequest,
-    current_user = Depends(get_current_user_optional)
+    current_user = Depends(usuario_requerido())
 ):
     transcripcion = await transcribe_audio_with_gemini(
         request.audio_base64,
@@ -107,7 +112,7 @@ class ExtraerPdfRequest(_BaseModel):
 
 
 @router.post("/extraer-texto-pdf")
-async def extraer_texto_pdf(req: ExtraerPdfRequest, current_user = Depends(get_current_user_optional)):
+async def extraer_texto_pdf(req: ExtraerPdfRequest, current_user = Depends(usuario_requerido())):
     """Extrae el texto de un PDF de requisitos (sin IA). Límite: 10 MB y 40 páginas."""
     import base64
     import io

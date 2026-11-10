@@ -83,7 +83,9 @@ Thumbs.db
 .agent/
 .gemini/
 # Backend Firebase service account (no versionar)
-backend/modules/gestion_asistencia_ia/notificaciones/config/diagramador-firebase-service.json
+backend/modules/gestion_notificaciones/config/*.json
+# ruta anterior (antes de mover el módulo): se sigue ignorando por si alguien aún tiene ahí su JSON
+backend/modules/gestion_asistencia_ia/notificaciones/config/
 # Flutter Firebase config JSON (no versionar)
 Movil/lib/assets/google-services.json
 Movil/android/app/google-services.json
@@ -92,3 +94,7 @@ docs/
 # CU39: credenciales de Firebase (nunca al repo)
 *firebase-service-account*.json
 backend/firebase*.json
+
+# Volcados del repo para herramientas de IA y respaldos comprimidos (no versionar)
+repomix*.xml
+*.rar

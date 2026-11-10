@@ -30,8 +30,8 @@ from backend.modules.gestion_proyectos.administrar_proyecto.controllers.admin_co
 from backend.modules.gestion_proyectos.compartir_proyecto.controllers.compartir_controller import router as compartir_proyecto_router
 from backend.modules.gestion_proyectos.notificar_despliegue.controllers.callback_controller import router as callback_router
 from backend.modules.gestion_salas.unirse_sala.controllers.unirse_controller import router as unirse_sala_router
-from backend.modules.gestion_asistencia_ia.notificaciones.controllers.notifications_controller import router as notifications_router
-from backend.modules.gestion_asistencia_ia.notificaciones.controllers.token_controller import router as token_router
+from backend.modules.gestion_notificaciones.controllers.notifications_controller import router as notifications_router
+from backend.modules.gestion_notificaciones.controllers.token_controller import router as token_router
 from backend.modules.gestion_salas.cargar_lienzo.controllers.cargar_controller import router as cargar_lienzo_router
 from backend.modules.gestion_salas.guardar_lienzo.controllers.guardar_controller import router as guardar_lienzo_router
 from backend.modules.gestion_concurrencia.sincronizacion_tiempo_real.controllers.ws_sync_controller import router as ws_router
@@ -54,11 +54,12 @@ from backend.modules.gestion_asistencia_ia.digitalizar_desde_imagen.controllers.
 from backend.modules.gestion_asistencia_ia.exportar_github.controllers.exportar_controller import router as exportar_github_router
 from backend.modules.gestion_asistencia_ia.gestionar_equipo_ia.controllers.equipo_controller import router as equipo_ia_router
 from backend.modules.gestion_asistencia_ia.generar_app_movil.controllers.app_movil_controller import router as app_movil_router
-from backend.modules.gestion_proyectos_asistida.repartir_roles.controllers.roles_controller import router as repartir_roles_router
-from backend.modules.gestion_proyectos_asistida.repartir_tareas.controllers.tareas_controller import router as repartir_tareas_router
+from backend.modules.gestion_asistencia_ia.repartir_roles.controllers.roles_controller import router as repartir_roles_router
+from backend.modules.gestion_asistencia_ia.repartir_tareas.controllers.tareas_controller import router as repartir_tareas_router
 from backend.modules.gestion_asistencia_ia.gestionar_contexto_persistente.controllers.contexto_controller import router as contexto_ia_router
 from backend.modules.gestion_proyectos.plantillas.controllers.plantillas_controller import router as plantillas_router
 from backend.modules.gestion_notificaciones.controllers.notificaciones_controller import router as notificaciones_router
+from backend.modules.gestion_proyectos.permisos_proyecto.permisos_controller import router as permisos_proyecto_router
 import backend.modules.gestion_notificaciones.services.notificaciones_service  # noqa: F401  CU39: eventos que generan notificaciones
 from backend.modules.gestion_asistencia_ia.generar_seeders.controllers.seeders_controller import router as seeders_ia_router
 
@@ -135,6 +136,7 @@ app.include_router(contexto_ia_router)
 app.include_router(seeders_ia_router)
 app.include_router(plantillas_router)
 app.include_router(notificaciones_router)
+app.include_router(permisos_proyecto_router)
 
 
 @app.get("/")

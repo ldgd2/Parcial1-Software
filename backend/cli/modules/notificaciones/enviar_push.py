@@ -1,7 +1,7 @@
 from rich.prompt import Prompt
 from backend.cli.console import console
 from backend.cli.async_runner import ejecutar_async
-from backend.modules.gestion_asistencia_ia.notificaciones.firebase_init import send_fcm_message
+from backend.modules.gestion_notificaciones.firebase_init import send_fcm_message
 from .db_executor import (
     obtener_token_por_usuario,
     obtener_todos_los_tokens_unicos,
