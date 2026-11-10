@@ -70,8 +70,11 @@ export const LoginView: React.FC = () => {
       <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
         {errorMsg && <div style={{ color: 'var(--accent)', fontSize: '0.9rem', textAlign: 'center' }}>{errorMsg}</div>}
         <Widget.Input.Primary 
-          type="email" 
-          placeholder="correo@ejemplo.com" 
+          type="email"
+          id="login-email"
+          name="email"
+          autoComplete="username"
+          placeholder="correo@ejemplo.com"
           label="CORREO ELECTRÓNICO"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -83,6 +86,8 @@ export const LoginView: React.FC = () => {
           <div className="password-input-wrapper">
             <input
               id="login-password"
+              name="password"
+              autoComplete="current-password"
               className="widget-input widget-input-secondary password-input"
               type={showPassword ? 'text' : 'password'}
               placeholder="••••••••"

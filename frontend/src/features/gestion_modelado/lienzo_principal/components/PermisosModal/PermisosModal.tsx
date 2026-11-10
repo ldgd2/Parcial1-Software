@@ -18,6 +18,13 @@ interface Miembro {
   nivel: 'lector' | 'editor' | 'anfitrion';
 }
 
+/** Persona a la que se rechazó la solicitud (el rechazo queda guardado) */
+interface Rechazado {
+  usuario_id: number;
+  nombre: string;
+  email: string;
+}
+
 export const PermisosModal: React.FC<Props> = ({ onClose, proyectoId }) => {
   const { pendingGuests, roomUsers, approveGuest, requestRoomUsers, kickUser, changeUserRole } = useRealTimeSync();
   const [activeTab, setActiveTab] = useState<'pending' | 'users'>('pending');
@@ -29,6 +36,30 @@ export const PermisosModal: React.FC<Props> = ({ onClose, proyectoId }) => {
   }, [proyectoId]);
 
   useEffect(() => { cargarMiembros(); }, [cargarMiembros]);
+
+  // Rechazados: el rechazo se guarda; el anfitrión puede volver a permitirlos cuando quiera
+  const [rechazados, setRechazados] = useState<Rechazado[]>([]);
+  const cargarRechazados = useCallback(() => {
+    apiFetch<Rechazado[]>(`/api/proyectos/${proyectoId}/rechazados`).then(setRechazados).catch(() => setRechazados([]));
+  }, [proyectoId]);
+  useEffect(() => { cargarRechazados(); }, [cargarRechazados]);
+
+  const rechazar = (guestId: string) => {
+    approveGuest(guestId, false, proyectoId);
+    // el servidor guarda el rechazo al recibir el mensaje de la sala
+    setTimeout(cargarRechazados, 800);
+  };
+
+  const permitirDeNuevo = async (r: Rechazado) => {
+    setErrorPermiso(null);
+    try {
+      await apiFetch(`/api/proyectos/${proyectoId}/rechazados/${r.usuario_id}/permitir`, { method: 'POST' });
+      setRechazados(prev => prev.filter(x => x.usuario_id !== r.usuario_id));
+      cargarMiembros();
+    } catch (e) {
+      setErrorPermiso(e instanceof Error ? e.message : 'No se pudo volver a permitir el acceso');
+    }
+  };
 
   // El permiso se GUARDA en el proyecto (CU38): sigue igual al reconectarse o reiniciar el servidor
   const cambiarPermiso = async (m: Miembro, permiso: 'edit' | 'view') => {
@@ -139,7 +170,7 @@ export const PermisosModal: React.FC<Props> = ({ onClose, proyectoId }) => {
 
                       <button 
                         className="btn-reject" 
-                        onClick={() => approveGuest(guest.guest_id, false, proyectoId)}
+                        onClick={() => rechazar(guest.guest_id)}
                         title="Rechazar solicitud"
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -151,6 +182,36 @@ export const PermisosModal: React.FC<Props> = ({ onClose, proyectoId }) => {
                     </div>
                   </div>
                 ))
+              )}
+
+              {rechazados.length > 0 && (
+                <>
+                  <div className="permisos-seccion">Rechazados ({rechazados.length})</div>
+                  {errorPermiso && <div className="permisos-error" role="alert">{errorPermiso}</div>}
+                  {rechazados.map(r => (
+                    <div key={r.usuario_id} className="permisos-item">
+                      <div className="permisos-user-info">
+                        <div className="permisos-avatar">{r.nombre?.charAt(0).toUpperCase() || 'U'}</div>
+                        <div className="permisos-user-details">
+                          <span className="permisos-name">{r.nombre}</span>
+                          <span className="permisos-sub">{r.email} · solicitud rechazada</span>
+                        </div>
+                      </div>
+                      <div className="permisos-actions">
+                        <button
+                          className="btn-approve"
+                          onClick={() => permitirDeNuevo(r)}
+                          title="Darle acceso al proyecto"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                          <span>Permitir de nuevo</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </>
               )}
             </div>
           )}

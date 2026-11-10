@@ -26,6 +26,30 @@ async def listar_miembros(db: AsyncSession, proyecto_id: int) -> List[Dict[str, 
     } for c, nombre in filas]
 
 
+async def listar_rechazados(db: AsyncSession, proyecto_id: int) -> List[Dict[str, Any]]:
+    """Personas a las que el anfitrión rechazó la solicitud de entrar (el rechazo queda guardado)."""
+    filas = (await db.execute(
+        select(ColaboradorProyecto.usuario_id, Usuario.nombre, Usuario.email)
+        .join(Usuario, Usuario.id == ColaboradorProyecto.usuario_id)
+        .where(ColaboradorProyecto.proyecto_id == proyecto_id, ColaboradorProyecto.estado == "rechazado")
+        .order_by(Usuario.nombre)
+    )).all()
+    return [{"usuario_id": uid, "nombre": nombre, "email": email} for uid, nombre, email in filas]
+
+
+async def permitir_de_nuevo(db: AsyncSession, proyecto_id: int, usuario_id: int) -> Dict[str, Any]:
+    """El anfitrión se arrepiente de un rechazo: la persona pasa a ser miembro aprobado
+    (con el permiso que tenía guardado, editor por defecto). Le llega el aviso de aprobación."""
+    c = (await db.execute(select(ColaboradorProyecto).where(
+        ColaboradorProyecto.proyecto_id == proyecto_id, ColaboradorProyecto.usuario_id == usuario_id
+    ))).scalar_one_or_none()
+    if c is None or c.estado != "rechazado":
+        raise HTTPException(status_code=404, detail="Esa persona no tiene una solicitud rechazada en este proyecto.")
+    c.estado = "aprobado"
+    await db.commit()
+    return {"usuario_id": usuario_id, "estado": "aprobado"}
+
+
 async def cambiar_permiso(db: AsyncSession, proyecto_id: int, usuario_id: int, permiso: str) -> Dict[str, Any]:
     if permiso not in PERMISOS_VALIDOS:
         raise HTTPException(status_code=400, detail="Permiso inválido: usa 'edit' (editor) o 'view' (lector).")

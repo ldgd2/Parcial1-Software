@@ -197,10 +197,9 @@ async def websocket_endpoint(
                             from backend.modules.gestion_proyectos.administrar_proyecto.repositories.admin_repo import admin_repo
                             solicitud = await admin_repo.get_colaborador(db, proyecto_id, user_id)
                             if solicitud and solicitud.estado == "pendiente":
-                                if approved:
-                                    solicitud.estado = "aprobado"
-                                else:
-                                    await db.delete(solicitud)
+                                # Rechazo guardado (no se borra la fila: si no, la espera del
+                                # invitado volvía a crear la solicitud a los 3 segundos)
+                                solicitud.estado = "aprobado" if approved else "rechazado"
                                 await db.commit()
                             break
                         if approved:
