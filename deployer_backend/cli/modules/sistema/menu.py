@@ -104,6 +104,8 @@ After=network.target
 [Service]
 User=root
 WorkingDirectory={BASE_DIR}
+Environment="PATH={BASE_DIR}/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="PYTHONUNBUFFERED=1"
 ExecStart={comando}
 Restart=always
 

@@ -52,7 +52,8 @@ export const WhatsAppChatPanel: React.FC<WhatsAppChatPanelProps> = ({
     getMentionableUsers,
     decidirPropuesta,
     enviarRequisitosPdf,
-    enviarImagenDiagrama,
+    enviarImagen,
+    enviarAudio,
     detenerIA
   } = useWhatsAppChat({ codigoAcceso, proyectoId, proyectoNombre });
 
@@ -64,12 +65,6 @@ export const WhatsAppChatPanel: React.FC<WhatsAppChatPanelProps> = ({
     setAvisoPdf(error);
     if (!error) setTimeout(() => setAvisoPdf(null), 100);
   }, [enviarRequisitosPdf]);
-
-  // Imagen o bosquejo UML → la IA lo digitaliza y llega como propuesta
-  const handleAttachImage = useCallback(async (archivo: File) => {
-    const error = await enviarImagenDiagrama(archivo);
-    if (error) setAvisoPdf(error);
-  }, [enviarImagenDiagrama]);
 
   // Borrador para la barra de entrada (atajos del chat vacío)
   const [draft, setDraft] = useState<{ text: string; nonce: number } | null>(null);
@@ -331,7 +326,8 @@ export const WhatsAppChatPanel: React.FC<WhatsAppChatPanelProps> = ({
         mentionableUsers={mentionable}
         geminiKey={geminiKey}
         onAttachPdf={proyectoId ? handleAttachPdf : undefined}
-        onImageSelected={handleAttachImage}
+        onSendImage={enviarImagen}
+        onSendAudio={enviarAudio}
         draft={draft}
       />
 

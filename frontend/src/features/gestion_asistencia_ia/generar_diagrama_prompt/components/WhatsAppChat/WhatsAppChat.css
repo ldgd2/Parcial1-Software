@@ -1354,3 +1354,25 @@
 }
 .whatsapp-bubble__estado--error { color: var(--chat-danger); }
 .whatsapp-bubble__estado--idea { color: var(--chat-warn); }
+
+/* ── Fotos y notas de voz ───────────────────────────────────────── */
+.chat-media { margin-top: 6px; display: flex; flex-direction: column; gap: 4px; max-width: 100%; }
+.chat-media__imagen { display: block; max-width: 100%; max-height: 260px; border-radius: 8px; object-fit: contain; background: rgba(0, 0, 0, 0.15); }
+.chat-media__audio { width: 240px; max-width: 100%; height: 36px; }
+.chat-media__transcripcion { font-size: 0.75rem; opacity: 0.75; font-style: italic; white-space: pre-wrap; }
+.chat-media__expirado { font-size: 0.8rem; opacity: 0.6; }
+
+.chat-foto-pendiente { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-top: 1px solid rgba(127, 127, 127, 0.2); }
+.chat-foto-pendiente img { width: 48px; height: 48px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
+.chat-foto-pendiente__texto { display: flex; flex-direction: column; min-width: 0; flex: 1; font-size: 0.8rem; }
+.chat-foto-pendiente__texto strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-foto-pendiente__texto small { opacity: 0.75; }
+
+.chat-grabando { display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.8rem; color: var(--danger-text, #e5534b); }
+.chat-grabando small { color: inherit; opacity: 0.8; }
+.chat-grabando__punto { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: chat-grabando-pulso 1s ease-in-out infinite; }
+@keyframes chat-grabando-pulso { 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .chat-grabando__punto { animation: none; } }
+
+.chat-aviso { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 12px; font-size: 0.8rem; color: var(--danger-text, #e5534b); }
+.chat-aviso button { background: none; border: 0; color: inherit; cursor: pointer; padding: 2px; }

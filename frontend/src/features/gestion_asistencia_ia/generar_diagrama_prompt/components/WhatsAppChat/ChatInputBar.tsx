@@ -3,7 +3,7 @@ import type { QuotedMessage, RoomUserMention } from '../../types/chatTypes';
 import { QuotedPreview } from './QuotedPreview';
 import { MentionList } from './MentionList';
 import { CommandList, AVAILABLE_COMMANDS, type SlashCommand } from './CommandList';
-import { Plus, FileText, Image as ImageIcon } from 'lucide-react';
+import { Plus, FileText, Image as ImageIcon, X } from 'lucide-react';
 import { IconSend, IconMic } from './ChatIcons';
 import { callTranscribeAudioAPI } from '../../services/aiChatService';
 
@@ -13,7 +13,10 @@ interface ChatInputBarProps {
   onCancelReply: () => void;
   mentionableUsers: RoomUserMention[];
   geminiKey?: string;
-  onImageSelected?: (file: File) => void;
+  /** Foto + texto opcional en un mismo mensaje. La IA solo actúa si el texto lleva @diag. */
+  onSendImage?: (file: File, text: string) => Promise<string | null>;
+  /** Nota de voz + texto opcional encima. La IA solo actúa si el texto lleva @diag. */
+  onSendAudio?: (audio: Blob, durationSec: number, text: string) => Promise<string | null>;
   /** Requisitos en PDF (CU36). Si no se pasa, no aparece en el menú "+". */
   onAttachPdf?: (file: File) => void;
   /** Texto para precargar en el campo (p. ej. desde los atajos del chat vacío). */
@@ -26,7 +29,8 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
   onCancelReply,
   mentionableUsers,
   geminiKey,
-  onImageSelected,
+  onSendImage,
+  onSendAudio,
   onAttachPdf,
   draft
 }) => {
@@ -34,7 +38,15 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
   const [showAttach, setShowAttach] = useState(false);
   const attachRef = useRef<HTMLDivElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
-  const hasAttachOptions = !!onImageSelected || !!onAttachPdf;
+  const hasAttachOptions = !!onSendImage || !!onAttachPdf;
+  // Foto elegida, esperando su texto (se envían juntos)
+  const [fotoPendiente, setFotoPendiente] = useState<{ file: File; preview: string } | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const [segundosGrabando, setSegundosGrabando] = useState(0);
+  const inicioGrabacionRef = useRef(0);
+  const textoAlGrabarRef = useRef('');
+
+  useEffect(() => () => { if (fotoPendiente) URL.revokeObjectURL(fotoPendiente.preview); }, [fotoPendiente]);
 
   // Precargar un borrador y dejar el cursor al final
   useEffect(() => {
@@ -191,6 +203,13 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
 
   const handleSubmit = () => {
     const trimmed = text.trim();
+    if (fotoPendiente && onSendImage) {
+      const { file } = fotoPendiente;
+      setFotoPendiente(null);
+      setText('');
+      onSendImage(file, trimmed).then(setAviso);
+      return;
+    }
     if (!trimmed) return;
     onSendMessage(trimmed);
     setText('');
@@ -201,8 +220,60 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
     }
   };
 
-  // Grabación y transcripción de voz
+  // Nota de voz: lo escrito en el campo va encima del audio, en el mismo mensaje
+  const handleToggleVoiceNote = async () => {
+    if (!onSendAudio) return;
+    if (isRecording) {
+      if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      textoAlGrabarRef.current = text.trim();
+      inicioGrabacionRef.current = Date.now();
+      setSegundosGrabando(0);
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach(track => track.stop());
+        const duracion = (Date.now() - inicioGrabacionRef.current) / 1000;
+        if (duracion < 0.8) return; // toque accidental
+        const audio = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        const texto = textoAlGrabarRef.current;
+        setText('');
+        setAviso(await onSendAudio(audio, duracion, texto));
+      };
+      recorder.start();
+      setIsRecording(true);
+      setAviso(null);
+    } catch (err) {
+      console.error('No se pudo acceder al micrófono:', err);
+      setAviso('No se pudo acceder al micrófono.');
+    }
+  };
+
+  // Contador y corte automático de la nota de voz (2 min)
+  useEffect(() => {
+    if (!isRecording) return;
+    const t = setInterval(() => {
+      const s = Math.floor((Date.now() - inicioGrabacionRef.current) / 1000);
+      setSegundosGrabando(s);
+      if (s >= 120 && mediaRecorderRef.current?.state === 'recording') {
+        mediaRecorderRef.current.stop();
+        setIsRecording(false);
+      }
+    }, 250);
+    return () => clearInterval(t);
+  }, [isRecording]);
+
+  // Dictado al campo de texto (solo si el chat no admite notas de voz)
   const handleToggleVoice = async () => {
+    if (onSendAudio) return handleToggleVoiceNote();
     if (isRecording) {
       // Detener y procesar
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
@@ -253,11 +324,15 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && onImageSelected) {
-      onImageSelected(file);
-    }
     if (e.target) e.target.value = '';
+    if (!file || !onSendImage) return;
+    if (!file.type.startsWith('image/')) { setAviso('El archivo debe ser una imagen (PNG, JPG…).'); return; }
+    setAviso(null);
+    setFotoPendiente({ file, preview: URL.createObjectURL(file) });
+    textareaRef.current?.focus();
   };
+
+  const mencionaIA = /@diag\b/i.test(text);
 
   return (
     <div className="whatsapp-input-container">
@@ -268,6 +343,43 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
           isBanner
           onDismiss={onCancelReply}
         />
+      )}
+
+      {/* Foto elegida: se envía junto con el texto */}
+      {fotoPendiente && (
+        <div className="chat-foto-pendiente">
+          <img src={fotoPendiente.preview} alt="" />
+          <span className="chat-foto-pendiente__texto">
+            <strong>{fotoPendiente.file.name}</strong>
+            <small>
+              {mencionaIA
+                ? '@diag la convertirá en diagrama (como propuesta)'
+                : 'Se enviará como foto normal. Escribe @diag si quieres que la IA la convierta en diagrama.'}
+            </small>
+          </span>
+          <button type="button" className="whatsapp-icon-btn" onClick={() => setFotoPendiente(null)} aria-label="Quitar foto" title="Quitar foto">
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {isRecording && (
+        <div className="chat-grabando" role="status">
+          <span className="chat-grabando__punto" aria-hidden="true" />
+          Grabando {Math.floor(segundosGrabando / 60)}:{String(segundosGrabando % 60).padStart(2, '0')}
+          <small>
+            {/@diag\b/i.test(textoAlGrabarRef.current)
+              ? ' · va para @diag'
+              : ' · nota de voz normal (escribe @diag antes de grabar para hablarle a la IA)'}
+          </small>
+        </div>
+      )}
+
+      {aviso && (
+        <div className="chat-aviso" role="alert">
+          <span>{aviso}</span>
+          <button type="button" onClick={() => setAviso(null)} aria-label="Cerrar aviso"><X size={12} /></button>
+        </div>
       )}
 
       {/* Popover de autocompletado de menciones */}
@@ -337,7 +449,7 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
                     </span>
                   </button>
                 )}
-                {onImageSelected && (
+                {onSendImage && (
                   <button
                     type="button"
                     role="menuitem"
@@ -346,8 +458,8 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
                   >
                     <ImageIcon size={16} />
                     <span>
-                      <strong>Imagen o bosquejo UML</strong>
-                      <small>La IA lo digitaliza como propuesta</small>
+                      <strong>Foto</strong>
+                      <small>Con @diag en el texto, la IA la convierte en diagrama</small>
                     </span>
                   </button>
                 )}
@@ -361,8 +473,8 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
           type="button"
           className={`whatsapp-icon-btn ${isRecording ? 'whatsapp-icon-btn--recording' : ''}`}
           onClick={handleToggleVoice}
-          title={isRecording ? 'Detener grabación de voz' : 'Dictar requerimiento por voz'}
-          aria-label={isRecording ? 'Detener grabación de voz' : 'Dictar por voz'}
+          title={isRecording ? 'Detener y enviar nota de voz' : onSendAudio ? 'Grabar nota de voz (escribe @diag antes si es para la IA)' : 'Dictar requerimiento por voz'}
+          aria-label={isRecording ? 'Detener y enviar nota de voz' : onSendAudio ? 'Grabar nota de voz' : 'Dictar por voz'}
           disabled={isTranscribing}
         >
           <IconMic size={20} color={isRecording ? 'var(--danger-text)' : 'currentColor'} />
@@ -385,7 +497,7 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
           type="button"
           className="whatsapp-send-btn"
           onClick={handleSubmit}
-          disabled={!text.trim() || isTranscribing}
+          disabled={(!text.trim() && !fotoPendiente) || isTranscribing}
           title="Enviar mensaje (Enter)"
           aria-label="Enviar mensaje"
         >

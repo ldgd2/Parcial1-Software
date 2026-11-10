@@ -3,12 +3,13 @@ import { useRealTimeSync, getUserIdentity } from '@/features/gestion_concurrenci
 import { useDiagram } from '@/features/gestion_modelado/shared/context/DiagramContext';
 import { getUserColor } from '../utils/chatColors';
 import { calculateSafeNodePositions } from '../utils/layoutMerger';
-import { callGenerateDiagramAPI, fetchAiPromptConfig } from '../services/aiChatService';
+import { callGenerateDiagramAPI, fetchAiPromptConfig, callTranscribeAudioAPI } from '../services/aiChatService';
+import { mencionaADiag, comprimirImagen, leerComoDataUrl, base64DeDataUrl, MAX_IMAGEN_BYTES, MAX_AUDIO_SEGUNDOS } from '../utils/mediaChat';
 import { generateDeterministicHash } from '@/features/gestion_modelado/shared/utils/hashGenerator';
 import { parseUmlAttribute, parseUmlMethod } from '@/features/gestion_modelado/shared/utils/umlParser';
 import { repartirRolesEquipo, asignarRolManual, type ColaboradorRolOut } from '@/features/gestion_asistencia_ia/repartir_roles';
 import { repartirTareasEquipo, crearTareaManual, type TareaItem } from '@/features/gestion_asistencia_ia/repartir_tareas';
-import type { ChatMessage, QuotedMessage, AiProvider, RoomUserMention, ParallelAiTask, PropuestaIA, SugerenciaIA } from '../types/chatTypes';
+import type { ChatMessage, MediaChat, QuotedMessage, AiProvider, RoomUserMention, ParallelAiTask, PropuestaIA, SugerenciaIA } from '../types/chatTypes';
 import type { NodeType } from '@/features/gestion_modelado/shared/types/types';
 import { guardarVersionDespues, decidirPropuesta as decidirPropuestaAPI, PropuestaYaDecididaError, crearVersion, crearMemoria } from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente/services/contextoService';
 import { EVENTO_MEMORIA_ACTUALIZADA } from '@/features/gestion_asistencia_ia/gestionar_contexto_persistente/components/MemoriaPanel';
@@ -79,6 +80,11 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId, proyecto
     }
   });
 
+  // Para buscar la foto/audio de un mensaje citado al mencionar a @diag
+  const messagesRef = useRef<ChatMessage[]>(messages);
+  messagesRef.current = messages;
+  const digitalizarRef = useRef<((m: ChatMessage, dataUrl: string, nombre: string, instrucciones?: string) => Promise<void>) | null>(null);
+
   const [provider, setProviderState] = useState<AiProvider>('gemini');
 
   const [geminiKey, setGeminiKeyState] = useState<string>(() => {
@@ -111,7 +117,9 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId, proyecto
   // Guardar historial en localStorage
   useEffect(() => {
     try {
-      localStorage.setItem(`chat_history_${codigoAcceso}`, JSON.stringify(messages.slice(-100)));
+      // Sin los archivos (la cuota es de ~5 MB): al reconectar, el historial del servidor los trae
+      const livianos = messages.slice(-100).map(m => (m.media?.dataUrl ? { ...m, media: { ...m.media, dataUrl: '', expirado: true } } : m));
+      localStorage.setItem(`chat_history_${codigoAcceso}`, JSON.stringify(livianos));
     } catch {}
   }, [messages, codigoAcceso]);
 
@@ -1116,6 +1124,13 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId, proyecto
 
     // Detección de invocación a @diag o comando slash (/roles, /tareas, etc.)
     if (/@diag\b/i.test(text) || /^\/[a-zA-Z0-9_-]+/i.test(text)) {
+      // "@diag ..." respondiendo a una foto: la mención es explícita, la IA usa esa foto
+      const citado = replyingTo ? messagesRef.current.find(m => m.id === replyingTo.id) : undefined;
+      const esComando = /@diag\s+\//i.test(text) || /^\//.test(text);
+      if (!esComando && citado?.media?.tipo === 'imagen' && citado.media.dataUrl && digitalizarRef.current) {
+        digitalizarRef.current(newMessage, citado.media.dataUrl, citado.media.nombre || 'imagen', text.replace(/@diag/gi, '').trim());
+        return;
+      }
       executeParallelAi(newMessage);
     }
   }, [replyingTo, sendChatMessage, executeParallelAi]);
@@ -1173,8 +1188,6 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId, proyecto
   // ── Propuestas de la IA: aprobar / rechazar ───────────────────────────
   const injectRef = useRef(injectDiagramResult);
   injectRef.current = injectDiagramResult;
-  const messagesRef = useRef(messages);
-  messagesRef.current = messages;
 
   const updateNodeRef = useRef(updateNode);
   updateNodeRef.current = updateNode;
@@ -1437,36 +1450,17 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId, proyecto
     return mentions;
   }, [roomUsers, cursors]);
 
-  // ── Digitalizar un diagrama desde una imagen o bosquejo (menú "+" del chat) ──
-  // Mismo flujo que el resto de la IA: llega como PROPUESTA y nadie la aplica sin aprobar.
-  const enviarImagenDiagrama = useCallback(async (archivo: File): Promise<string | null> => {
-    if (!archivo.type.startsWith('image/')) return 'El archivo debe ser una imagen (PNG, JPG…).';
-    if (archivo.size > 8 * 1024 * 1024) return 'La imagen supera los 8 MB.';
+  // ── Fotos y notas de voz en el chat ──────────────────────────────────────────
+  // Se comparten con la sala como cualquier mensaje. La IA NO se mete: solo actúa si alguien
+  // menciona a @diag (en el texto de la foto, dicho en el audio o respondiendo a la foto/audio).
 
-    let base64: string;
-    try {
-      base64 = await new Promise<string>((ok, mal) => {
-        const lector = new FileReader();
-        lector.onload = () => ok(String(lector.result));
-        lector.onerror = () => mal(lector.error);
-        lector.readAsDataURL(archivo);
-      });
-    } catch {
-      return 'No se pudo leer la imagen.';
-    }
-
-    const identity = getUserIdentity();
-    const mensaje: ChatMessage = {
-      id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      senderId: identity.id,
-      senderName: identity.nickname,
-      senderColor: getUserColor(identity.id || identity.nickname),
-      text: `Digitalizar diagrama desde imagen: ${archivo.name}`,
-      timestamp: Date.now(),
-    };
-    setMessages(prev => [...prev, mensaje]);
-    sendChatMessage(mensaje);
-
+  /** Digitaliza la foto de un mensaje. Llega como PROPUESTA: nadie la aplica sin aprobar. */
+  const digitalizarParaMensaje = useCallback(async (
+    mensaje: ChatMessage,
+    dataUrl: string,
+    nombre: string,
+    instrucciones?: string,
+  ): Promise<void> => {
     const aiMessageId = `ai_reply_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const pendiente: ChatMessage = {
       id: aiMessageId,
@@ -1475,7 +1469,7 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId, proyecto
       senderColor: '#25D366',
       text: '',
       timestamp: Date.now(),
-      replyTo: { id: mensaje.id, senderName: mensaje.senderName, text: mensaje.text, senderColor: mensaje.senderColor },
+      replyTo: { id: mensaje.id, senderName: mensaje.senderName, text: mensaje.text || `📷 ${nombre}`, senderColor: mensaje.senderColor },
       isAi: true,
       aiStatus: 'pending',
       provider,
@@ -1490,24 +1484,25 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId, proyecto
 
     try {
       const apiKey = provider === 'gemini' ? geminiKey : provider === 'openrouter' ? openrouterKey : provider === 'kimi' ? kimiKey : '';
-      const result = await digitalizarImagen(base64, undefined, provider, apiKey || undefined);
+      const result = await digitalizarImagen(dataUrl, instrucciones || undefined, provider, apiKey || undefined);
       const nodos = result.nodes || [];
       const relaciones = result.relations || [];
 
       if (nodos.length === 0) {
         publicar({ ...pendiente, text: 'No encontré clases ni tablas en la imagen. Prueba con una foto más nítida o un recorte del diagrama.', aiStatus: 'error', timestamp: Date.now() });
-        return null;
+        return;
       }
 
-      const resumen = `Encontré ${nodos.length} ${nodos.length === 1 ? 'elemento' : 'elementos'} y ${relaciones.length} ${relaciones.length === 1 ? 'relación' : 'relaciones'} en «${archivo.name}».`;
+      const resumen = `Encontré ${nodos.length} ${nodos.length === 1 ? 'elemento' : 'elementos'} y ${relaciones.length} ${relaciones.length === 1 ? 'relación' : 'relaciones'} en «${nombre}».`;
       const offset = parallelCounterRef.current++;
       const propuestaDatos = { tipo: 'diagrama', nodes: nodos, relations: relaciones, summary: resumen };
+      const pedido = `Digitalizar imagen ${nombre}${instrucciones ? `: ${instrucciones}` : ''}`;
 
       if (proyectoId && proyectoId > 0) {
-        const registrada = await registrarPropuesta('IMAGEN', mensaje.text, resumen, propuestaDatos);
+        const registrada = await registrarPropuesta('IMAGEN', pedido, resumen, propuestaDatos);
         if (!registrada) {
           publicar({ ...pendiente, text: 'Digitalicé la imagen, pero no pude registrar la propuesta en el historial, así que no se aplicó nada.', aiStatus: 'error', timestamp: Date.now() });
-          return null;
+          return;
         }
         const existentes = new Set(estadoActualRef.current.nodes.map(n => (n.nombre || '').toLowerCase()));
         const nombres = nodos.map((n: any) => n.name || n.nombre).filter(Boolean) as string[];
@@ -1529,17 +1524,94 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId, proyecto
         });
       } else {
         // Fuera de un proyecto no hay historial ni aprobación: se aplica directamente
-        marcarOrigenProximosCambios({ intent: 'IMAGEN', cmd: mensaje.text });
+        marcarOrigenProximosCambios({ intent: 'IMAGEN', cmd: pedido });
         await injectDiagramResult(propuestaDatos, offset, false);
         publicar({ ...pendiente, text: `${resumen} Ya están en la pizarra.`, aiStatus: 'success', timestamp: Date.now() });
       }
-      return null;
     } catch (err) {
       const motivo = err instanceof Error ? err.message : 'Error al digitalizar la imagen';
       publicar({ ...pendiente, text: `No pude digitalizar la imagen: ${motivo}`, aiStatus: 'error', timestamp: Date.now() });
-      return null;
     }
   }, [provider, geminiKey, openrouterKey, kimiKey, proyectoId, sendChatMessage, registrarPropuesta, injectDiagramResult]);
+  digitalizarRef.current = digitalizarParaMensaje;
+
+  const nuevoMensajePropio = (text: string, media: MediaChat): ChatMessage => {
+    const identity = getUserIdentity();
+    return {
+      id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      senderId: identity.id,
+      senderName: identity.nickname,
+      senderColor: getUserColor(identity.id || identity.nickname),
+      text,
+      timestamp: Date.now(),
+      replyTo: replyingTo || undefined,
+      media,
+    };
+  };
+
+  /** Foto al chat (con texto opcional). Solo si el texto menciona a @diag, la IA la digitaliza. */
+  const enviarImagen = useCallback(async (archivo: File, texto: string = ''): Promise<string | null> => {
+    if (!archivo.type.startsWith('image/')) return 'El archivo debe ser una imagen (PNG, JPG…).';
+    if (archivo.size > MAX_IMAGEN_BYTES) return 'La imagen supera los 8 MB.';
+
+    let foto: { dataUrl: string; mime: string };
+    try {
+      foto = await comprimirImagen(archivo);
+    } catch {
+      return 'No se pudo leer la imagen.';
+    }
+
+    const mensaje = nuevoMensajePropio(texto.trim(), { tipo: 'imagen', dataUrl: foto.dataUrl, mime: foto.mime, nombre: archivo.name });
+    setMessages(prev => [...prev, mensaje]);
+    sendChatMessage(mensaje);
+    setReplyingTo(null);
+
+    if (mencionaADiag(texto)) {
+      const instrucciones = texto.replace(/@diag/gi, '').trim();
+      await digitalizarParaMensaje(mensaje, foto.dataUrl, archivo.name, instrucciones);
+    }
+    return null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sendChatMessage, digitalizarParaMensaje, replyingTo]);
+
+  /**
+   * Nota de voz, con texto opcional encima (en el mismo mensaje: texto arriba, audio abajo).
+   * - Sin "@diag" escrito en ese texto: es un audio normal para la sala; la IA no lo toca
+   *   (ni siquiera lo transcribe).
+   * - Con "@diag": va directo a la IA (se transcribe y se atiende como un "@diag ..." escrito).
+   */
+  const enviarAudio = useCallback(async (audio: Blob, duracion: number, texto: string = ''): Promise<string | null> => {
+    if (duracion > MAX_AUDIO_SEGUNDOS + 1) return `La nota de voz supera los ${MAX_AUDIO_SEGUNDOS / 60} minutos.`;
+    let dataUrl: string;
+    try {
+      dataUrl = await leerComoDataUrl(audio);
+    } catch {
+      return 'No se pudo leer el audio.';
+    }
+    const paraLaIA = mencionaADiag(texto);
+    const mime = audio.type || 'audio/webm';
+    const base = nuevoMensajePropio(texto.trim(), { tipo: 'audio', dataUrl, mime, duracion: Math.round(duracion), transcribiendo: paraLaIA });
+    setMessages(prev => [...prev, base]);
+    sendChatMessage(base);
+    setReplyingTo(null);
+    if (!paraLaIA) return null;
+
+    let transcripcion = '';
+    try {
+      transcripcion = (await callTranscribeAudioAPI(base64DeDataUrl(dataUrl), mime.split(';')[0], geminiKey || null)).trim();
+    } catch {
+      transcripcion = '';
+    }
+    const actualizado: ChatMessage = { ...base, media: { ...base.media!, transcribiendo: false, transcripcion: transcripcion || undefined } };
+    setMessages(prev => prev.map(m => (m.id === base.id ? actualizado : m)));
+    sendChatMessage(actualizado);
+    if (!transcripcion) return 'No pude entender la nota de voz para la IA (el audio se envió igual).';
+
+    // Mismo flujo que un "@diag ..." escrito: el texto con la mención + lo dicho en el audio
+    executeParallelAi({ ...actualizado, text: `${texto.trim()} ${transcripcion}` });
+    return null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sendChatMessage, executeParallelAi, geminiKey, replyingTo]);
 
   return {
     messages,
@@ -1558,7 +1630,8 @@ export function useWhatsAppChat({ codigoAcceso = 'default', proyectoId, proyecto
     getMentionableUsers,
     decidirPropuesta,
     enviarRequisitosPdf,
-    enviarImagenDiagrama,
+    enviarImagen,
+    enviarAudio,
     detenerIA
   };
 }

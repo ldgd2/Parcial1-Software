@@ -8,6 +8,10 @@ from typing import Dict, List, Any, Tuple
 from backend.modules.gestion_asistencia_ia.generar_app_movil.services.flutter_skeleton_service import (
     construir_archivos_esqueleto,
 )
+from backend.modules.gestion_asistencia_ia.exportar_github.services.parser_service import (
+    map_java_type,
+    sanitize_identifier,
+)
 
 
 def _to_snake_case(name: str) -> str:
@@ -39,20 +43,30 @@ def _to_camel_case(name: str) -> str:
     return res
 
 
+_CAMPOS_DE_AUDITORIA = {"id", "createdat", "updatedat", "isactive"}
+
+# Tipo Java del backend generado -> (tipo Dart declarado, tipo base)
+_JAVA_A_DART = {
+    "Integer": ("int", "int"), "Long": ("int", "int"), "Short": ("int", "int"),
+    "Double": ("double", "double"), "java.math.BigDecimal": ("double", "double"),
+    "Boolean": ("bool", "bool"),
+    "java.time.LocalDate": ("DateTime?", "DateTime"),
+    "java.time.LocalDateTime": ("DateTime?", "DateTime"),
+}
+
+
 def _map_to_dart_type(tipo_uml: str) -> Tuple[str, str]:
-    t = str(tipo_uml or "").lower().strip()
-    if any(k in t for k in ["int", "integer", "entero", "long", "short", "bigint", "number"]):
-        return "int", "int"
-    if any(k in t for k in ["double", "float", "decimal", "numeric", "real"]):
-        return "double", "double"
-    if any(k in t for k in ["bool", "boolean", "logico", "bit"]):
-        return "bool", "bool"
-    if any(k in t for k in ["date", "fecha", "time", "timestamp"]):
-        return "DateTime?", "DateTime"
-    return "String", "String"
+    """Mismo criterio que el backend Spring (parser_service.map_java_type): así el JSON encaja."""
+    return _JAVA_A_DART.get(map_java_type(tipo_uml or ""), ("String", "String"))
 
 
 def _extraer_clases_diagrama(diagram_json: dict) -> List[dict]:
+    """Clases del diagrama con los MISMOS nombres que usa el backend generado:
+    - endpoint  = /api/<NombreClaseSinSimbolos en minúsculas>s  (Controller.java.jinja)
+    - campos    = sanitize_identifier(nombre) (claves del JSON de Jackson)
+    - id        = siempre `id` (UUID en el backend, String aquí); createdAt/updatedAt/isActive
+                  y los atributos marcados PK los gestiona el backend, no el formulario.
+    """
     nodos = diagram_json.get("nodes", []) if isinstance(diagram_json, dict) else []
     clases = []
 
@@ -62,37 +76,50 @@ def _extraer_clases_diagrama(diagram_json: dict) -> List[dict]:
             raw_nombre = str(nodo.get("nombre") or nodo.get("name") or "Entidad").strip()
             pascal = _to_pascal_case(raw_nombre)
             snake = _to_snake_case(raw_nombre)
+            nombre_backend = re.sub(r"[^a-zA-Z0-9]", "", raw_nombre).capitalize() or "Entidad"
 
-            atributos = []
+            atributos = [{"nombre": "id", "tipo": "String", "base_tipo": "String",
+                          "java_tipo": "UUID", "es_pk": True}]
+            vistos = {"id"}
             for a in nodo.get("atributos", []):
                 nombre_raw = a.get("nombre") or a.get("name") or ""
+                attr_name = sanitize_identifier(nombre_raw)
+                if attr_name.lower() in _CAMPOS_DE_AUDITORIA or attr_name in vistos:
+                    continue
+                if a.get("visibilidad") == "PK":
+                    continue  # en el backend es un UUID interno, no un dato que el usuario escriba
                 tipo_raw = a.get("tipo") or a.get("type") or "String"
-                attr_name = _to_camel_case(nombre_raw)
                 dart_type, base_type = _map_to_dart_type(tipo_raw)
                 atributos.append({
                     "nombre": attr_name,
                     "tipo": dart_type,
                     "base_tipo": base_type,
-                    "es_pk": a.get("visibilidad") == "PK" or attr_name.lower() in ["id", "uuid", "codigo"]
+                    "java_tipo": map_java_type(tipo_raw),
+                    "es_pk": False,
                 })
-
-            if not any(a["es_pk"] for a in atributos):
-                atributos.insert(0, {
-                    "nombre": "id",
-                    "tipo": "String",
-                    "base_tipo": "String",
-                    "es_pk": True
-                })
+                vistos.add(attr_name)
 
             clases.append({
                 "id": nodo.get("id"),
                 "nombre_pascal": pascal,
                 "nombre_snake": snake,
-                "endpoint": f"/api/{raw_nombre.lower()}s",
+                "endpoint": f"/api/{nombre_backend.lower()}s",
                 "atributos": atributos
             })
 
     return clases
+
+
+def _campo_to_json(a: dict) -> str:
+    """Entrada del toJson() tal como la espera el backend Spring (Jackson)."""
+    n = a["nombre"]
+    if a.get("es_pk"):
+        return f"      if ({n}.isNotEmpty) '{n}': {n},"  # al crear, el backend asigna el UUID
+    if a["base_tipo"] == "DateTime":
+        if a.get("java_tipo") == "java.time.LocalDate":
+            return f"      '{n}': {n}?.toIso8601String().substring(0, 10),"  # yyyy-MM-dd
+        return f"      '{n}': {n}?.toIso8601String(),"
+    return f"      '{n}': {n},"
 
 
 def _generar_modelo_dart(clase: dict) -> str:
@@ -139,10 +166,7 @@ def _generar_modelo_dart(clase: dict) -> str:
     for a in attrs:
         n = a["nombre"]
         t = a["base_tipo"]
-        if t == "DateTime":
-            to_json_fields.append(f"      '{n}': {n}?.toIso8601String(),")
-        else:
-            to_json_fields.append(f"      '{n}': {n},")
+        to_json_fields.append(_campo_to_json(a))
     to_json_body = "\n".join(to_json_fields)
 
     copy_params = ",\n".join(f"    {a['tipo'].rstrip('?')}? {a['nombre']}" for a in attrs)
@@ -205,10 +229,7 @@ def _generar_dto_dart(clase: dict) -> str:
     for a in attrs:
         n = a["nombre"]
         t = a["base_tipo"]
-        if t == "DateTime":
-            to_json_fields.append(f"      '{n}': {n}?.toIso8601String(),")
-        else:
-            to_json_fields.append(f"      '{n}': {n},")
+        to_json_fields.append(_campo_to_json(a))
     to_json_body = "\n".join(to_json_fields)
 
     return f"""import '../core/dto/base_dto.dart';
@@ -1198,11 +1219,18 @@ class _ModuleItem {{
 def _generar_main_dart(app_name: str, clases: List[dict]) -> str:
     title = app_name.replace("_", " ").title()
     return f"""import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/theme/app_theme.dart';
 import 'views/home/home_view.dart';
 
-void main() {{
+Future<void> main() async {{
   WidgetsFlutterBinding.ensureInitialized();
+  // API_BASE_URL y demás ajustes salen de .env (ver README / .env.example)
+  try {{
+    await dotenv.load(fileName: '.env');
+  }} catch (e) {{
+    debugPrint('No se pudo leer .env, se usa la URL de respaldo de ApiConfig: $e');
+  }}
   runApp(const MainApp());
 }}
 

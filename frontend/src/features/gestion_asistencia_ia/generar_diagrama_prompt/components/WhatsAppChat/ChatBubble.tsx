@@ -139,10 +139,33 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({
               {message.sugerencias && message.sugerencias.length > 0 && (
                 <Lightbulb size={14} className="whatsapp-bubble__estado whatsapp-bubble__estado--idea" aria-hidden="true" />
               )}
-              {renderFormattedText(message.text)}
+              {message.text && renderFormattedText(message.text)}
             </>
           )}
         </div>
+
+        {/* Foto o nota de voz: debajo del texto, en el mismo mensaje */}
+        {message.media && (
+          <div className={`chat-media chat-media--${message.media.tipo}`}>
+            {!message.media.dataUrl ? (
+              <span className="chat-media__expirado">
+                {message.media.tipo === 'imagen' ? '📷 Foto' : '🎤 Nota de voz'} (ya no disponible)
+              </span>
+            ) : message.media.tipo === 'imagen' ? (
+              <a href={message.media.dataUrl} target="_blank" rel="noreferrer" download={message.media.nombre || 'foto'}>
+                <img className="chat-media__imagen" src={message.media.dataUrl} alt={message.media.nombre || 'Foto'} loading="lazy" />
+              </a>
+            ) : (
+              <audio className="chat-media__audio" controls preload="metadata" src={message.media.dataUrl} />
+            )}
+            {message.media.tipo === 'audio' && message.media.transcribiendo && (
+              <small className="chat-media__transcripcion">Enviando a @diag…</small>
+            )}
+            {message.media.tipo === 'audio' && message.media.transcripcion && (
+              <small className="chat-media__transcripcion">«{message.media.transcripcion}»</small>
+            )}
+          </div>
+        )}
 
         {message.archivo && (
           <button

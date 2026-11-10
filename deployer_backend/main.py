@@ -1,3 +1,13 @@
+import sys
+
+# Bajo systemd stdout va con búfer: los print() del despliegue (errores de Maven, BD…) no
+# aparecían en el journal o salían mucho después. Una línea = un registro inmediato.
+for _flujo in (sys.stdout, sys.stderr):
+    try:
+        _flujo.reconfigure(line_buffering=True)
+    except Exception:
+        pass
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
