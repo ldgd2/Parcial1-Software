@@ -1,7 +1,10 @@
 from typing import Any, Dict, List
 from backend.modules.gestion_asistencia_ia.generar_seeders.schemas.response import GenerarSeedersResponse
-from backend.modules.gestion_asistencia_ia.generar_seeders.services.topological_sorter import ordenar_topologicamente
-from backend.modules.gestion_asistencia_ia.generar_seeders.services.sql_seeder_builder import construir_seeders_sql
+from backend.modules.gestion_asistencia_ia.generar_seeders.services.sql_seeder_builder import (
+    construir_seeders_sql,
+    ordenar_por_dependencias,
+)
+from backend.modules.gestion_asistencia_ia.exportar_github.services.migrations_service import referencias
 from backend.modules.gestion_asistencia_ia.generar_seeders.services.java_runner_builder import construir_java_runner
 
 
@@ -27,13 +30,14 @@ def generar_script_seeders(
         )
 
     # 1. Ordenamiento topológico
-    orden_tablas = ordenar_topologicamente(nodes, relations)
+    orden_tablas = ordenar_por_dependencias(nodes, referencias(nodes, relations))
     orden_nombres = [str(n.get("name") or n.get("nombre")) for n in orden_tablas]
 
     # 2. Construcción del dataset SQL con integridad referencial
     final_sql, _, registros_por_tabla, total_registros = construir_seeders_sql(
         orden_tablas=orden_tablas,
-        cantidad_por_tabla=cantidad_por_tabla
+        cantidad_por_tabla=cantidad_por_tabla,
+        relaciones=relations,
     )
 
     # 3. Construcción del Runner Java si se solicita

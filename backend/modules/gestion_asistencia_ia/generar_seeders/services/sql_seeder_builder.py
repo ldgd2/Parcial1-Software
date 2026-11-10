@@ -1,18 +1,28 @@
+"""
+Seeders SQL coherentes con el esquema REAL del backend generado (migrations_service / entidades JPA):
+  - mismas tablas y columnas (detallepedidos, idcliente…)
+  - id siempre UUID; los atributos PK/FK llevan el id de un registro que EXISTE en la tabla destino
+  - tablas padre antes que las hijas; en ciclos la FK queda NULL
+  - cada valor ajustado al tipo de la columna (antes iban ids 1, 2… en columnas UUID y Flyway abortaba)
+"""
+import datetime
+import random
 import re
 import uuid
 from typing import Any, Dict, List, Tuple
-from backend.modules.gestion_asistencia_ia.generar_seeders.services.topological_sorter import extraer_info_columna
+
+from backend.modules.gestion_asistencia_ia.exportar_github.services.migrations_service import (
+    _clases,
+    _columnas,
+    nombre_tabla,
+    referencias,
+)
 from backend.modules.gestion_asistencia_ia.generar_seeders.services.domain_data_generators import generar_valor_campo
 
 
 def sanitizar_nombre_tabla(nombre_crudo: str) -> str:
-    """Normaliza el nombre a minúsculas pluralizado acorde a Spring Boot y JPA."""
-    limpio = re.sub(r"[^a-zA-Z0-9_]", "_", str(nombre_crudo)).strip("_").lower()
-    if not limpio:
-        limpio = "entidad"
-    if not limpio.endswith("s"):
-        limpio = f"{limpio}s"
-    return limpio
+    """Mismo nombre de tabla que la entidad JPA y la migración."""
+    return nombre_tabla(nombre_crudo)
 
 
 def formatear_valor_sql(val: Any) -> str:
@@ -27,112 +37,135 @@ def formatear_valor_sql(val: Any) -> str:
     return f"'{val_str}'"
 
 
+def _fecha_aleatoria() -> datetime.datetime:
+    return datetime.datetime(2026, 1, 1) + datetime.timedelta(minutes=random.randint(0, 60 * 24 * 300))
+
+
+def ajustar_al_tipo(valor: Any, tipo_sql: str) -> Any:
+    """Convierte el valor sugerido al tipo de la columna; si no se puede, genera uno válido."""
+    try:
+        if tipo_sql in ("INTEGER", "BIGINT"):
+            if isinstance(valor, bool):
+                return int(valor)
+            return int(float(valor))
+        if tipo_sql == "DOUBLE PRECISION":
+            return round(float(valor), 2)
+        if tipo_sql == "BOOLEAN":
+            if isinstance(valor, bool):
+                return valor
+            return str(valor).strip().lower() in ("true", "1", "si", "sí", "t")
+        if tipo_sql == "DATE":
+            texto = str(valor)
+            datetime.date.fromisoformat(texto[:10])
+            return texto[:10]
+        if tipo_sql == "TIMESTAMP":
+            texto = str(valor).replace("T", " ")
+            datetime.datetime.fromisoformat(texto[:19])
+            return texto[:19]
+        if tipo_sql == "TIME":
+            texto = str(valor)
+            datetime.time.fromisoformat(texto[:8])
+            return texto[:8]
+        if tipo_sql == "UUID":
+            return str(uuid.UUID(str(valor)))
+        texto = "" if valor is None else str(valor)
+        return texto[:255]
+    except (TypeError, ValueError):
+        f = _fecha_aleatoria()
+        return {
+            "INTEGER": random.randint(1, 100), "BIGINT": random.randint(1, 100),
+            "DOUBLE PRECISION": round(random.uniform(1, 500), 2), "BOOLEAN": random.random() < 0.8,
+            "DATE": f.date().isoformat(), "TIMESTAMP": f.strftime("%Y-%m-%d %H:%M:%S"),
+            "TIME": f.strftime("%H:%M:%S"), "UUID": str(uuid.uuid4()),
+        }.get(tipo_sql, str(valor)[:255] if valor is not None else "")
+
+
+def ordenar_por_dependencias(nodos: list, refs: Dict[str, Dict[str, str]]) -> List[dict]:
+    """Padres primero (tablas referenciadas por FK); lo que forma ciclos va al final."""
+    clases = _clases(nodos)
+    por_tabla = {nombre_tabla(n.get("nombre", "")): n for n in clases}
+    pendientes = list(por_tabla)
+    orden: List[str] = []
+    while pendientes:
+        listos = [t for t in pendientes
+                  if all(d == t or d in orden or d not in por_tabla for d in refs.get(t, {}).values())]
+        if not listos:  # ciclo: se rompe con la primera pendiente (sus FK irán NULL si hace falta)
+            listos = [pendientes[0]]
+        for t in listos:
+            orden.append(t)
+            pendientes.remove(t)
+    return [por_tabla[t] for t in orden]
+
+
 def construir_seeders_sql(
     orden_tablas: List[Dict[str, Any]],
-    cantidad_por_tabla: int = 10
+    cantidad_por_tabla: int = 10,
+    relaciones: List[Dict[str, Any]] = None,
 ) -> Tuple[str, Dict[str, List[Any]], Dict[str, int], int]:
-    """
-    Construye las sentencias SQL con integridad referencial e idempotencia
-    mediante ON CONFLICT (id) DO NOTHING para PostgreSQL / Spring Boot.
-    """
-    parent_ids_map: Dict[str, List[Any]] = {}
-    registros_por_tabla: Dict[str, int] = {}
-    total_registros = 0
+    """INSERTs idempotentes (ON CONFLICT (id) DO NOTHING) con integridad referencial real."""
+    refs = referencias(orden_tablas, relaciones or [])
+    orden = ordenar_por_dependencias(orden_tablas, refs)
 
-    sql_lines = [
+    ids_por_tabla: Dict[str, List[str]] = {}
+    registros_por_tabla: Dict[str, int] = {}
+    total = 0
+    lineas = [
         "-- ===========================================================================",
         "-- SEEDERS DE PRUEBA GENERADOS AUTOMÁTICAMENTE PARA SPRING BOOT / POSTGRESQL",
         f"-- Registros generados por tabla: {cantidad_por_tabla}",
-        "-- Integridad Referencial: Garantizada por Ordenamiento Topológico",
+        "-- Integridad referencial: las FK usan ids de registros insertados antes",
         "-- Idempotencia: ON CONFLICT (id) DO NOTHING",
         "-- ===========================================================================\n",
-        "BEGIN;\n"
     ]
 
-    for node in orden_tablas:
-        t_name = str(node.get("name") or node.get("nombre") or "").strip()
-        if not t_name:
-            continue
-
-        table_sql_name = sanitizar_nombre_tabla(t_name)
-        attrs = node.get("attributes") or node.get("atributos") or []
-
-        # Extraer información de columnas
-        columnas_info: List[Tuple[str, str, bool]] = []
-        has_id = False
-        has_created_at = False
-        has_updated_at = False
-        has_is_active = False
-
-        for a in attrs:
-            c_name, c_type, es_fk = extraer_info_columna(a)
-            c_low = c_name.lower().lstrip("*")
-            if c_low == "id":
-                has_id = True
-                columnas_info.insert(0, (c_name, c_type, es_fk))
-            elif c_low in ["created_at", "createdat"]:
-                has_created_at = True
-                columnas_info.append((c_name, c_type, es_fk))
-            elif c_low in ["updated_at", "updatedat"]:
-                has_updated_at = True
-                columnas_info.append((c_name, c_type, es_fk))
-            elif c_low in ["is_active", "isactive"]:
-                has_is_active = True
-                columnas_info.append((c_name, c_type, es_fk))
-            else:
-                columnas_info.append((c_name, c_type, es_fk))
-
-        # Garantizar compatibilidad con BaseEntity de Spring Boot
-        if not has_id:
-            columnas_info.insert(0, ("id", "uuid", False))
-        if not has_created_at:
-            columnas_info.append(("created_at", "timestamp", False))
-        if not has_updated_at:
-            columnas_info.append(("updated_at", "timestamp", False))
-        if not has_is_active:
-            columnas_info.append(("is_active", "boolean", False))
-
-        generated_ids: List[Any] = []
-        sql_lines.append(f"-- Población de datos para la entidad '{t_name}' (Tabla: {table_sql_name})")
-
-        col_names = [f'"{re.sub(r"[^a-zA-Z0-9_]", "_", c[0].lower().lstrip("*"))}"' for c in columnas_info]
-        cols_header = ", ".join(col_names)
-
+    for nodo in orden:
+        nombre = str(nodo.get("nombre") or nodo.get("name") or "")
+        tabla = nombre_tabla(nombre)
+        columnas = _columnas(nodo)
+        fk_tabla = refs.get(tabla, {})
+        encabezado = ", ".join(['"id"'] + [f'"{c["col"]}"' for c in columnas]
+                               + ['"created_at"', '"updated_at"', '"is_active"'])
+        lineas.append(f"-- {nombre} (tabla {tabla})")
+        ids = []
         for i in range(cantidad_por_tabla):
-            row_values: List[str] = []
-            current_row_id: Any = None
+            fila_id = str(uuid.uuid4())
+            valores = [fila_id]
+            for c in columnas:
+                if c["es_ref"]:
+                    destino = fk_tabla.get(c["col"])
+                    if destino:
+                        candidatos = ids_por_tabla.get(destino) or (ids if destino == tabla else [])
+                        valores.append(random.choice(candidatos) if candidatos else None)
+                    else:
+                        valores.append(str(uuid.uuid4()))
+                    continue
+                tipo_raw = c["raw"].split(":", 1)[1] if ":" in c["raw"] else c["tipo_sql"].lower()
+                nombre_attr = c["raw"].split(":", 1)[0]
+                try:
+                    sugerido = generar_valor_campo(nombre_attr, tipo_raw.strip().lower(), i, {}, nombre, False)
+                except Exception:
+                    sugerido = None
+                valores.append(ajustar_al_tipo(sugerido, c["tipo_sql"]))
+            creado = _fecha_aleatoria()
+            valores += [creado.strftime("%Y-%m-%d %H:%M:%S"), creado.strftime("%Y-%m-%d %H:%M:%S"), True]
+            lineas.append(f"INSERT INTO {tabla} ({encabezado}) VALUES "
+                          f"({', '.join(formatear_valor_sql(v) for v in valores)}) ON CONFLICT (id) DO NOTHING;")
+            ids.append(fila_id)
+        ids_por_tabla[tabla] = ids
+        registros_por_tabla[nombre] = cantidad_por_tabla
+        total += cantidad_por_tabla
+        lineas.append("")
 
-            for col_name, col_type, es_fk in columnas_info:
-                c_low = col_name.lower().lstrip("*")
-                if c_low == "id":
-                    val = current_row_id or generar_valor_campo(col_name, col_type, i, parent_ids_map, t_name, es_fk)
-                    current_row_id = val
-                else:
-                    val = generar_valor_campo(col_name, col_type, i, parent_ids_map, t_name, es_fk)
+    return "\n".join(lineas), ids_por_tabla, registros_por_tabla, total
 
-                row_values.append(formatear_valor_sql(val))
 
-            if current_row_id is not None:
-                generated_ids.append(current_row_id)
-
-            vals_str = ", ".join(row_values)
-            sql_lines.append(
-                f"INSERT INTO {table_sql_name} ({cols_header}) VALUES ({vals_str}) ON CONFLICT (id) DO NOTHING;"
-            )
-
-        # Registrar IDs generados para que las tablas dependientes los usen como FKs
-        parent_ids_map[t_name] = generated_ids
-        parent_ids_map[t_name.lower()] = generated_ids
-        parent_ids_map[table_sql_name] = generated_ids
-        if t_name.lower().endswith("s"):
-            parent_ids_map[t_name.lower()[:-1]] = generated_ids
-
-        registros_por_tabla[t_name] = cantidad_por_tabla
-        total_registros += cantidad_por_tabla
-        sql_lines.append("")
-
-    sql_lines.append("COMMIT;\n")
-    final_sql = "\n".join(sql_lines)
-
-    return final_sql, parent_ids_map, registros_por_tabla, total_registros
-
+def sql_tolerante(sql: str) -> str:
+    """Versión para Flyway: cada INSERT en su propio bloque; si uno falla se avisa y la app arranca igual."""
+    salida = []
+    for linea in sql.splitlines():
+        if linea.startswith("INSERT INTO "):
+            salida.append("DO $$ BEGIN " + linea +
+                          " EXCEPTION WHEN others THEN RAISE NOTICE 'Seeder omitido: %', SQLERRM; END $$;")
+        else:
+            salida.append(linea)
+    return "\n".join(salida) + "\n"

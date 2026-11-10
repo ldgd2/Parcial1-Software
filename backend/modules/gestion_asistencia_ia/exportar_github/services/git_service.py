@@ -73,9 +73,20 @@ async def actualizar_codigo_en_github(carpeta_temporal: str, url_repo: str, toke
 
                 temp_v1 = os.path.join(mig_dir_temp, "V1__Esquema_Inicial.sql")
                 if os.path.exists(temp_v1):
+                    # Las migraciones de esquema anteriores pudieron quedar rotas (antes las FK las escribía
+                    # una IA: `fk_tu_nombre_unico`, columna INTEGER -> id UUID). En una BD nueva Flyway
+                    # las ejecuta todas desde V1 y la app no arrancaba. El esquema nuevo es idempotente
+                    # (IF NOT EXISTS, FK tolerantes) y validate-on-migrate=false, así que se reescriben
+                    # con él: las BD que ya las aplicaron no las vuelven a correr.
+                    with open(temp_v1, "r", encoding="utf-8") as f:
+                        esquema_nuevo = f.read()
                     next_mig_name = f"V{next_version}__Actualizacion_Diagrama.sql"
                     next_mig_path = os.path.join(mig_dir_temp, next_mig_name)
                     os.rename(temp_v1, next_mig_path)
+                    for m in existing_migs:
+                        if re.match(r"^V\d+__(Esquema_Inicial|Actualizacion_Diagrama)\.sql$", m):
+                            with open(os.path.join(mig_dir_temp, m), "w", encoding="utf-8") as f:
+                                f.write(esquema_nuevo)
 
         # 3. Copiar archivos nuevos SOBRE el clon manteniendo archivos nativos y configuraciones
         # Esto previene pérdida de carpetas nativas (android, ios, windows, web) y configs locales

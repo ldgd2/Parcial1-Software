@@ -144,8 +144,9 @@ async def generar_spring_boot(
         mig_dir = os.path.join(backend_dir, "src", "main", "resources", "db", "migration")
         os.makedirs(mig_dir, exist_ok=True)
         seeders_path = os.path.join(mig_dir, "V2__Carga_Seeders_Prueba.sql")
+        from backend.modules.gestion_asistencia_ia.generar_seeders.services.sql_seeder_builder import sql_tolerante
         with open(seeders_path, "w", encoding="utf-8") as f:
-            f.write(seeders_res.sql_script)
+            f.write(sql_tolerante(seeders_res.sql_script))  # un seeder malo nunca impide arrancar
             
         data_sql_path = os.path.join(backend_dir, "src", "main", "resources", "data.sql")
         with open(data_sql_path, "w", encoding="utf-8") as f:
