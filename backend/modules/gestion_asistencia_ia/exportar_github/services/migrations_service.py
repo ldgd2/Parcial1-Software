@@ -72,20 +72,26 @@ def mapear_tipo_sql(tipo_java: str) -> str:
     return 'VARCHAR(255)'
 
 
+def _nombre(n: dict) -> str:
+    return str(n.get("nombre") or n.get("name") or "")
+
+
 def _clases(nodos: list) -> list:
-    return [n for n in nodos if n.get("type") in ("class", "interface")]
+    return [n for n in (nodos or []) if str(n.get("type") or "class").lower() in ("class", "interface", "clase", "table", "entity")]
 
 
 def _columnas(nodo: dict) -> List[dict]:
     """[{col, tipo_sql, es_ref, raw}] sin id ni auditoría, sin duplicados."""
     cols, vistos = [], set()
-    for attr in nodo.get("atributos", []) or []:
-        raw = attr.get("nombre", "")
+    for attr in (nodo.get("atributos") or nodo.get("attributes") or []):
+        if not isinstance(attr, dict):
+            attr = {"nombre": str(attr)}
+        raw = attr.get("nombre") or attr.get("name") or ""
         col = nombre_columna(raw)
         if col in _AUDITORIA or col in vistos or col == "unnamed":
             continue
         vistos.add(col)
-        raw_tipo = attr.get("tipo", "")
+        raw_tipo = attr.get("tipo") or attr.get("type") or ""
         if not raw_tipo and ':' in str(raw):
             raw_tipo = str(raw).split(':', 1)[1].strip()
         es_ref = str(attr.get("visibilidad") or "").upper() in ("PK", "FK")
@@ -105,7 +111,7 @@ END;
 $$ language 'plpgsql';\n\n'''
 
     for nodo in _clases(nodos):
-        tabla = nombre_tabla(nodo.get("nombre", ""))
+        tabla = nombre_tabla(_nombre(nodo))
         cols = _columnas(nodo)
         lineas = ["    id UUID PRIMARY KEY DEFAULT gen_random_uuid()"]
         lineas += [f"    {c['col']} {c['tipo_sql']}" for c in cols]
@@ -159,19 +165,17 @@ END $$;
 """
 
 
-def generar_claves_foraneas(nodos: list, relaciones: list) -> str:
-    """FK para cada atributo PK/FK que referencia a otra clase (por nombre o por la relación dibujada)."""
+def referencias(nodos: list, relaciones: list) -> Dict[str, Dict[str, str]]:
+    """{tabla: {columna: tabla_destino}} para cada atributo PK/FK que referencia a otra clase
+    (por su nombre, p. ej. id_cliente -> clientes, o por la única relación dibujada que le queda)."""
     clases = _clases(nodos)
     por_id = {str(n.get("id")): n for n in clases}
-    # nombre normalizado de la clase (singular, sin símbolos) -> tabla
     tablas = {}
     for n in clases:
-        t = nombre_tabla(n.get("nombre", ""))
-        base = re.sub(r"[^a-zA-Z0-9]", "", str(n.get("nombre", ""))).lower()
-        tablas[base] = t
+        t = nombre_tabla(_nombre(n))
+        tablas[re.sub(r"[^a-zA-Z0-9]", "", _nombre(n)).lower()] = t
         tablas[t] = t
 
-    # Vecinos por relaciones que implican FK: tabla -> tablas relacionadas
     vecinos: Dict[str, List[str]] = {}
     for r in relaciones or []:
         tipo = str(r.get("type") or r.get("tipo") or "").lower()
@@ -181,27 +185,36 @@ def generar_claves_foraneas(nodos: list, relaciones: list) -> str:
         b = por_id.get(str(r.get("targetId") or r.get("target") or r.get("destino") or ""))
         if not a or not b:
             continue
-        ta, tb = nombre_tabla(a.get("nombre", "")), nombre_tabla(b.get("nombre", ""))
+        ta, tb = nombre_tabla(_nombre(a)), nombre_tabla(_nombre(b))
         vecinos.setdefault(ta, []).append(tb)
         vecinos.setdefault(tb, []).append(ta)
 
-    sql, usados = "", set()
+    res: Dict[str, Dict[str, str]] = {}
     for n in clases:
-        tabla = nombre_tabla(n.get("nombre", ""))
+        tabla = nombre_tabla(_nombre(n))
         refs = [c for c in _columnas(n) if c["es_ref"]]
         candidatos = [v for v in dict.fromkeys(vecinos.get(tabla, [])) if v != tabla]
         sin_destino = []
         for c in refs:
             destino = _destino_por_nombre(c["col"], tablas)
             if destino:
-                sql += _bloque_fk(tabla, c["col"], destino, usados)
+                res.setdefault(tabla, {})[c["col"]] = destino
                 if destino in candidatos:
                     candidatos.remove(destino)
             else:
                 sin_destino.append(c)
         # Un único atributo FK sin nombre reconocible y una única relación pendiente: es esa
         if len(sin_destino) == 1 and len(candidatos) == 1:
-            sql += _bloque_fk(tabla, sin_destino[0]["col"], candidatos[0], usados)
+            res.setdefault(tabla, {})[sin_destino[0]["col"]] = candidatos[0]
+    return res
+
+
+def generar_claves_foraneas(nodos: list, relaciones: list) -> str:
+    """FK para cada atributo PK/FK que referencia a otra clase."""
+    sql, usados = "", set()
+    for tabla, cols in referencias(nodos, relaciones).items():
+        for col, destino in cols.items():
+            sql += _bloque_fk(tabla, col, destino, usados)
     return sql
 
 
