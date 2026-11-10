@@ -239,3 +239,4 @@
 /* CU38: permisos guardados */
 .permisos-error { padding: 8px 10px; margin-bottom: 8px; font-size: 0.8rem; color: #d48a8a; background: rgba(212, 138, 138, 0.12); border-radius: 4px; }
 .permisos-fijo { font-size: 0.75rem; color: var(--secondary, #948979); padding: 0 6px; }
+.permisos-seccion { margin: 14px 0 6px; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--secondary, #948979); }

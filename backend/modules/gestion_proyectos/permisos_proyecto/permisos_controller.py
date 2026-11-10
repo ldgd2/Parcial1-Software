@@ -26,6 +26,19 @@ async def mi_permiso(proyecto_id: int, db: AsyncSession = Depends(get_db), usuar
     return {"nivel": await nivel_en_proyecto(db, proyecto_id, usuario.id)}
 
 
+@router.get("/{proyecto_id}/rechazados")
+async def rechazados(proyecto_id: int, db: AsyncSession = Depends(get_db), _=Depends(requiere_proyecto("anfitrion"))) -> List[Dict[str, Any]]:
+    return await permisos_service.listar_rechazados(db, proyecto_id)
+
+
+@router.post("/{proyecto_id}/rechazados/{usuario_id}/permitir")
+async def permitir(
+    proyecto_id: int, usuario_id: int,
+    db: AsyncSession = Depends(get_db), _=Depends(requiere_proyecto("anfitrion")),
+) -> Dict[str, Any]:
+    return await permisos_service.permitir_de_nuevo(db, proyecto_id, usuario_id)
+
+
 @router.put("/{proyecto_id}/miembros/{usuario_id}/permiso")
 async def cambiar_permiso(
     proyecto_id: int, usuario_id: int, req: CambiarPermisoRequest,

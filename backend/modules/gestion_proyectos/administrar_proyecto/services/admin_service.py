@@ -62,7 +62,8 @@ async def resolver_solicitud(proyecto_id: int, solicitante_id: int, data: Resolv
         await db.commit()
         return {"detail": "Solicitud aprobada"}
     else:
-        # Si la rechaza, simplemente podemos eliminar el registro
-        await db.delete(solicitud)
+        # El rechazo se GUARDA. Antes se borraba la fila y la pantalla de espera del invitado
+        # (que consulta cada 3 s) volvía a crear la solicitud: el rechazo no duraba nada.
+        solicitud.estado = "rechazado"
         await db.commit()
         return {"detail": "Solicitud rechazada"}

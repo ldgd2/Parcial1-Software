@@ -39,9 +39,13 @@ class UnirseSalaService:
             )
 
         if colaborador.estado == "rechazado":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Tu solicitud fue rechazada. Contacta al anfitrión del proyecto."
+            # Respuesta normal (no error) para que la pantalla de espera muestre el rechazo y deje
+            # de consultar; tampoco se vuelve a avisar al anfitrión.
+            return UnirseSalaResponse(
+                acceso="rechazado",
+                mensaje="El anfitrión rechazó tu solicitud. Contacta al anfitrión del proyecto.",
+                proyecto_id=proyecto.id,
+                proyecto_nombre=proyecto.nombre
             )
 
         if colaborador.estado == "pendiente":
