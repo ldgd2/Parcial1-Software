@@ -169,5 +169,7 @@ export interface SalaInfo {
   lienzo_json: string | null;
   github_repo_url?: string | null;
   rol_proyecto?: string;
+  /** CU38: nivel en el proyecto que devuelve el backend: lector | editor | anfitrion */
+  permiso?: 'lector' | 'editor' | 'anfitrion' | null;
 }
 

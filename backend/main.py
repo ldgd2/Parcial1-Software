@@ -57,6 +57,7 @@ from backend.modules.gestion_proyectos_asistida.repartir_tareas.controllers.tare
 from backend.modules.gestion_asistencia_ia.gestionar_contexto_persistente.controllers.contexto_controller import router as contexto_ia_router
 from backend.modules.gestion_proyectos.plantillas.controllers.plantillas_controller import router as plantillas_router
 from backend.modules.gestion_notificaciones.controllers.notificaciones_controller import router as notificaciones_router
+from backend.modules.gestion_proyectos.permisos_proyecto.permisos_controller import router as permisos_proyecto_router
 import backend.modules.gestion_notificaciones.services.notificaciones_service  # noqa: F401  CU39: eventos que generan notificaciones
 from backend.modules.gestion_asistencia_ia.generar_seeders.controllers.seeders_controller import router as seeders_ia_router
 
@@ -131,6 +132,7 @@ app.include_router(contexto_ia_router)
 app.include_router(seeders_ia_router)
 app.include_router(plantillas_router)
 app.include_router(notificaciones_router)
+app.include_router(permisos_proyecto_router)
 
 
 @app.get("/")

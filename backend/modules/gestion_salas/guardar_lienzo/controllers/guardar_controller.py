@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.core.database import get_db
+from backend.core.permissions.proyecto import requiere_proyecto, usuario_requerido, verificar_permiso
 from backend.modules.gestion_usuarios.dependencies import get_current_user
 from backend.modules.gestion_usuarios.models import Usuario
 from backend.modules.gestion_salas.guardar_lienzo.schemas.request import GuardarLienzoRequest
@@ -21,4 +22,5 @@ async def guardar_lienzo(
     CU8 - Guardar Lienzo.
     Persiste el estado del diagrama. Solo colaboradores aprobados.
     """
+    await verificar_permiso(db, user, proyecto_id, "editor")   # CU43: un lector no guarda
     return await guardar_lienzo_service.guardar_lienzo(proyecto_id, payload, user, db)

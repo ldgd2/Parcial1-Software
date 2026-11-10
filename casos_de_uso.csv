@@ -1,48 +1,49 @@
-Ciclo,NRO,CASO DE USO,ESTADO,PRIORIDAD,RIESGO,ACTOR
-Ciclo 1,CU01,Registrar usuario,APROBADO,ALTA,NORMAL,Usuario
-Ciclo 1,CU02,Iniciar sesión,APROBADO,ALTA,NORMAL,Usuario
-Ciclo 1,CU03,Cerrar sesión,APROBADO,NORMAL,NORMAL,Usuario
-Ciclo 1,CU04,Recuperar password,APROBADO,NORMAL,NORMAL,Usuario
-Ciclo 1,CU05,Configurar perfil,APROBADO,NORMAL,NORMAL,Usuario
-Ciclo 1,CU06,Crear proyecto,APROBADO,CRÍTICA,NORMAL,Usuario
-Ciclo 1,CU07,Administrar proyecto,APROBADO,MEDIA,NORMAL,Anfitrión
-Ciclo 1,CU08,Compartir proyecto,APROBADO,ALTA,NORMAL,Anfitrión
+Ciclo,NRO,CASO DE USO,ESTADO,PRIORIDAD,RIESGO,ACTOR,MÓDULO
+Ciclo 1,CU01,Registrar usuario,APROBADO,ALTA,NORMAL,Usuario,gestion_usuarios/registrar_usuario
+Ciclo 1,CU02,Iniciar sesión,APROBADO,ALTA,NORMAL,Usuario,gestion_usuarios/iniciar_sesion
+Ciclo 1,CU03,Cerrar sesión,APROBADO,NORMAL,NORMAL,Usuario,gestion_usuarios/cerrar_sesion
+Ciclo 1,CU04,Recuperar password,APROBADO,NORMAL,NORMAL,Usuario,gestion_usuarios/recuperar_password
+Ciclo 1,CU05,Configurar perfil,APROBADO,NORMAL,NORMAL,Usuario,gestion_usuarios/configurar_perfil
+Ciclo 1,CU06,Crear proyecto,APROBADO,CRÍTICA,NORMAL,Usuario,gestion_proyectos/crear_proyecto
+Ciclo 1,CU07,Administrar proyecto,APROBADO,MEDIA,NORMAL,Anfitrión,gestion_proyectos/administrar_proyecto
+Ciclo 1,CU08,Compartir proyecto,APROBADO,ALTA,NORMAL,Anfitrión,gestion_proyectos/compartir_proyecto
 
-Ciclo 2,CU11,Cargar lienzo,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador
-Ciclo 2,CU12,Guardar lienzo,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador
-Ciclo 2,CU13,Unirse a sala,APROBADO,CRÍTICA,NORMAL,Colaborador
-Ciclo 2,CU14,Insertar elemento,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador
-Ciclo 2,CU15,Conectar elemento,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador
-Ciclo 2,CU16,Editar elemento,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador
-Ciclo 2,CU17,Eliminar elemento,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador
-Ciclo 2,CU18,Bloquear elemento,APROBADO,CRÍTICA,ALTO,Anfitrión / Colaborador
-Ciclo 2,CU19,Sincronización en tiempo real,APROBADO,CRÍTICA,ALTO,Anfitrión / Colaborador
+Ciclo 2,CU11,Cargar lienzo,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador,gestion_salas/cargar_lienzo
+Ciclo 2,CU12,Guardar lienzo,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador,gestion_salas/guardar_lienzo
+Ciclo 2,CU13,Unirse a sala,APROBADO,CRÍTICA,NORMAL,Colaborador,gestion_salas/unirse_sala
+Ciclo 2,CU14,Insertar elemento,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador,gestion_modelado/insertar_elemento
+Ciclo 2,CU15,Conectar elemento,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador,gestion_modelado/conectar_elemento
+Ciclo 2,CU16,Editar elemento,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador,gestion_modelado/editar_elemento
+Ciclo 2,CU17,Eliminar elemento,APROBADO,CRÍTICA,NORMAL,Anfitrión / Colaborador,gestion_modelado/eliminar_elemento
+Ciclo 2,CU18,Bloquear elemento,APROBADO,CRÍTICA,ALTO,Anfitrión / Colaborador,gestion_concurrencia/bloquear_elemento
+Ciclo 2,CU19,Sincronización en tiempo real,APROBADO,CRÍTICA,ALTO,Anfitrión / Colaborador,gestion_concurrencia/sincronizacion_tiempo_real
 
-Ciclo 3,CU09,Control de versiones (Versioning),APROBADO,CRÍTICA,ALTO,Anfitrión / Colaborador
-Ciclo 3,CU20,Sincronizar estado local (Offline),APROBADO,CRÍTICA,ALTO,Anfitrión / Colaborador
-Ciclo 3,CU21,Digitalizar desde imagen,APROBADO,ALTA,ALTO,Usuario / API IA
-Ciclo 3,CU22,Generar diagrama desde prompt,APROBADO,ALTA,ALTO,Usuario / API IA
-Ciclo 3,CU23,Exportar a GitHub (Código fuente),APROBADO,CRÍTICA,ALTO,Anfitrión / API Github
-Ciclo 3,CU24,Repartición de tareas mediante IA,APROBADO,ALTA,ALTO,Anfitrión / API IA
-Ciclo 3,CU27,Asignación estructurada por roles,APROBADO,ALTA,ALTO,Anfitrión / API IA
-Ciclo 3,CU10,Notificar despliegue,APROBADO,ALTA,ALTO,API Deployer / Anfitrión
-Ciclo 3,CU25,Exportar a XML,APROBADO,NORMAL,NORMAL,Anfitrión
-Ciclo 3,CU26,Importar desde XML,APROBADO,NORMAL,NORMAL,Anfitrión
+Ciclo 3,CU09,Control de versiones (Versioning),APROBADO,CRÍTICA,ALTO,Anfitrión / Colaborador,gestion_proyectos/versioning
+Ciclo 3,CU20,Sincronizar estado local (Offline),APROBADO,CRÍTICA,ALTO,Anfitrión / Colaborador,(solo frontend) gestion_concurrencia/sincronizar_estado_local
+Ciclo 3,CU21,Digitalizar desde imagen,APROBADO,ALTA,ALTO,Usuario / API IA,gestion_asistencia_ia/digitalizar_desde_imagen
+Ciclo 3,CU22,Generar diagrama desde prompt,APROBADO,ALTA,ALTO,Usuario / API IA,gestion_asistencia_ia/generar_diagrama_prompt
+Ciclo 3,CU23,Exportar a GitHub (Código fuente),APROBADO,CRÍTICA,ALTO,Anfitrión / API Github,gestion_asistencia_ia/exportar_github
+Ciclo 3,CU24,Repartición de tareas mediante IA,APROBADO,ALTA,ALTO,Anfitrión / API IA,gestion_proyectos_asistida/repartir_tareas + gestion_asistencia_ia/gestionar_equipo_ia
+Ciclo 3,CU27,Asignación estructurada por roles,APROBADO,ALTA,ALTO,Anfitrión / API IA,gestion_proyectos_asistida/repartir_roles
+Ciclo 3,CU10,Notificar despliegue,APROBADO,ALTA,ALTO,API Deployer / Anfitrión,gestion_proyectos/notificar_despliegue
+Ciclo 3,CU25,Exportar a XML,APROBADO,NORMAL,NORMAL,Anfitrión,gestion_interoperabilidad/exportar_a_xml
+Ciclo 3,CU26,Importar desde XML,APROBADO,NORMAL,NORMAL,Anfitrión,gestion_interoperabilidad/importar_desde_xml
 
-Ciclo 4,CU28,Aprobar propuestas de la IA,EN PRUEBAS,CRÍTICA,ALTO,Anfitrión / Colaborador / API IA
-Ciclo 4,CU29,Historial de versiones y restauración,EN PRUEBAS,ALTA,ALTO,Anfitrión / Colaborador
-Ciclo 4,CU30,Chat privado con asistente IA,DESCARTADO,ALTA,NORMAL,Usuario / API IA
-Ciclo 4,CU31,Memoria persistente del proyecto (IA),EN PRUEBAS,ALTA,ALTO,API IA
-Ciclo 4,CU32,Revisión del diagrama por IA,EN PRUEBAS,ALTA,NORMAL,Anfitrión / Colaborador / API IA
-Ciclo 4,CU33,Sugerencias de IA en el chat y comentarios de cambios,EN PRUEBAS,ALTA,NORMAL,Anfitrión / Colaborador / API IA
-Ciclo 4,CU34,Resumen de cambios en lenguaje natural,EN PRUEBAS,NORMAL,NORMAL,Usuario / API IA
-Ciclo 4,CU35,Generar documentación del modelo,EN PRUEBAS,NORMAL,NORMAL,Anfitrión / API IA
-Ciclo 4,CU36,Generar diagrama desde requisitos,EN PRUEBAS,ALTA,ALTO,Usuario / API IA
-Ciclo 4,CU37,Estimar esfuerzo de tareas,EN PRUEBAS,NORMAL,NORMAL,Anfitrión / API IA
+Ciclo 4,CU28,Aprobar propuestas de la IA,EN PRUEBAS,CRÍTICA,ALTO,Anfitrión / Colaborador / API IA,gestion_asistencia_ia/gestionar_contexto_persistente (versiones y decisión) + generar_diagrama_prompt
+Ciclo 4,CU29,Historial de versiones y restauración,EN PRUEBAS,ALTA,ALTO,Anfitrión / Colaborador,gestion_asistencia_ia/gestionar_contexto_persistente (versiones)
+Ciclo 4,CU30,Memoria persistente del proyecto (IA),EN PRUEBAS,ALTA,ALTO,API IA,gestion_asistencia_ia/gestionar_contexto_persistente (memoria_service)
+Ciclo 4,CU31,Revisión del diagrama por IA,EN PRUEBAS,ALTA,NORMAL,Anfitrión / Colaborador / API IA,gestion_asistencia_ia/generar_diagrama_prompt (/revisar)
+Ciclo 4,CU32,Sugerencias de IA en el chat y comentarios de cambios,EN PRUEBAS,ALTA,NORMAL,Anfitrión / Colaborador / API IA,gestion_asistencia_ia/generar_diagrama_prompt (sugerencias)
+Ciclo 4,CU33,Resumen de cambios en lenguaje natural,EN PRUEBAS,NORMAL,NORMAL,Usuario / API IA,gestion_asistencia_ia/generar_diagrama_prompt (/resumen)
+Ciclo 4,CU34,Generar documentación del modelo,EN PRUEBAS,NORMAL,NORMAL,Anfitrión / API IA,gestion_asistencia_ia/generar_diagrama_prompt (/documentar)
+Ciclo 4,CU35,Generar diagrama desde requisitos,EN PRUEBAS,ALTA,ALTO,Usuario / API IA,gestion_asistencia_ia/generar_diagrama_prompt (/requisitos)
+Ciclo 4,CU36,Estimar esfuerzo de tareas,EN PRUEBAS,NORMAL,NORMAL,Anfitrión / API IA,gestion_proyectos_asistida/repartir_tareas (estimar_tarea)
 
-Ciclo 5,CU38,Permisos persistentes por colaborador,PENDIENTE,CRÍTICA,ALTO,Anfitrión
-Ciclo 5,CU39,Notificaciones (Firebase),EN PRUEBAS,MEDIA,NORMAL,Usuario / API Firebase
-Ciclo 5,CU40,Actividad y contribución por miembro,EN PRUEBAS,MEDIA,NORMAL,Anfitrión
-Ciclo 5,CU41,Exportar diagrama a imagen o PDF,EN PRUEBAS,NORMAL,NORMAL,Anfitrión / Colaborador
-Ciclo 5,CU42,Plantillas de proyecto,EN PRUEBAS,NORMAL,NORMAL,Usuario
-Ciclo 5,CU43,Validar permisos en el backend,PENDIENTE,ALTA,ALTO,Sistema
+Ciclo 5,CU37,Permisos persistentes por colaborador,EN PRUEBAS,CRÍTICA,ALTO,Anfitrión,gestion_proyectos/permisos_proyecto
+Ciclo 5,CU38,Notificaciones (Firebase),EN PRUEBAS,MEDIA,NORMAL,Usuario / API Firebase,gestion_notificaciones
+Ciclo 5,CU39,Actividad y contribución por miembro,EN PRUEBAS,MEDIA,NORMAL,Anfitrión,gestion_asistencia_ia/gestionar_contexto_persistente (actividad_service)
+Ciclo 5,CU40,Exportar diagrama a imagen o PDF,EN PRUEBAS,NORMAL,NORMAL,Anfitrión / Colaborador,(solo frontend) gestion_modelado/shared/utils/exportarDiagrama
+Ciclo 5,CU41,Plantillas de proyecto,EN PRUEBAS,NORMAL,NORMAL,Usuario,gestion_proyectos/plantillas
+Ciclo 5,CU42,Validar permisos en el backend,EN PRUEBAS,ALTA,ALTO,Sistema,core/permissions/proyecto (aplicado en todos los módulos)
+Ciclo 5,CU43,Generar seeders con datos randómicos,EN PRUEBAS,ALTA,NORMAL,Anfitrión / API IA,gestion_asistencia_ia/generar_seeders
+Ciclo 5,CU44,Generar frontend móvil (Flutter),EN PRUEBAS,ALTA,ALTO,Anfitrión / API IA,gestion_asistencia_ia/generar_app_movil

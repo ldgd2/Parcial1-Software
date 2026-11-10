@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.core.database import get_db
+from backend.core.permissions.proyecto import requiere_proyecto, usuario_requerido, verificar_permiso
 from backend.modules.gestion_usuarios.dependencies import get_current_user
 from backend.modules.gestion_usuarios.models import Usuario
 from backend.modules.gestion_salas.cargar_lienzo.schemas.response import LienzoResponse
@@ -20,4 +21,7 @@ async def cargar_lienzo(
     Retorna el estado actual del diagrama del proyecto.
     Solo colaboradores aprobados pueden acceder.
     """
-    return await cargar_lienzo_service.cargar_lienzo(proyecto_id, user, db)
+    nivel = await verificar_permiso(db, user, proyecto_id, "lector")   # CU43: antes cargaba cualquier proyecto
+    respuesta = await cargar_lienzo_service.cargar_lienzo(proyecto_id, user, db)
+    respuesta.permiso = nivel   # CU38: lector | editor | anfitrion (el frontend ajusta la sala)
+    return respuesta

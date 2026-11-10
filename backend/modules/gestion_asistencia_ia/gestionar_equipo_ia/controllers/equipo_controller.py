@@ -4,6 +4,7 @@ from sqlalchemy.future import select
 from typing import List, Optional
 
 from backend.core.database import get_db
+from backend.core.permissions.proyecto import requiere_proyecto, usuario_requerido, verificar_permiso
 from backend.modules.gestion_usuarios.dependencies import get_current_user, get_current_user_optional
 from backend.modules.gestion_usuarios.models import Usuario, TareaIA
 from backend.modules.gestion_asistencia_ia.gestionar_equipo_ia.schemas.request import (
@@ -28,8 +29,9 @@ from backend.core.websockets.connection_manager import manager
 async def generar_tareas_equipo(
     req: GenerarEquipoRequest,
     db: AsyncSession = Depends(get_db),
-    _ = Depends(get_current_user_optional),
+    usuario = Depends(usuario_requerido()),
 ) -> List[TareaIA]:
+    await verificar_permiso(db, usuario, req.proyecto_id, "editor")
     nuevas_tareas = await generar_y_persistir_tareas(req, db)
     
     # Notificar por WebSocket a la sala para que refresquen tareas
@@ -45,7 +47,7 @@ async def generar_tareas_equipo(
 async def mis_tareas(
     proyecto_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[Usuario] = Depends(get_current_user_optional),
+    current_user: Optional[Usuario] = Depends(requiere_proyecto("lector")),
 ) -> List[TareaIA]:
     if not current_user:
         return await obtener_tareas_proyecto(proyecto_id, db)
@@ -62,7 +64,7 @@ async def mis_tareas(
 async def todas_las_tareas_proyecto(
     proyecto_id: int,
     db: AsyncSession = Depends(get_db),
-    _ = Depends(get_current_user_optional),
+    _ = Depends(requiere_proyecto("lector")),
 ) -> List[TareaIA]:
     return await obtener_tareas_proyecto(proyecto_id, db)
 
@@ -72,8 +74,15 @@ async def completar_tarea(
     tarea_id: int,
     completada: bool = True,
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[Usuario] = Depends(get_current_user_optional),
+    current_user: Optional[Usuario] = Depends(usuario_requerido()),
 ) -> TareaIA:
+    from backend.modules.gestion_usuarios.models import TareaIA as _Tarea
+    tarea = await db.get(_Tarea, tarea_id)
+    if tarea is not None:
+        nivel = await verificar_permiso(db, current_user, tarea.proyecto_id, "lector")
+        if nivel == "lector" and tarea.usuario_id != current_user.id:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=403, detail="Solo puedes marcar tus propias tareas.")
     uid = current_user.id if current_user else None
     return await marcar_tarea(tarea_id, uid, completada, db)
 
@@ -82,10 +91,8 @@ async def completar_tarea(
 async def actualizar_habilidades(
     body: ActualizarHabilidadesRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[Usuario] = Depends(get_current_user_optional),
+    current_user: Optional[Usuario] = Depends(usuario_requerido()),
 ) -> dict:
-    if not current_user:
-        return {"ok": True, "etiquetas": body.etiquetas}
 
     result = await db.execute(select(Usuario).where(Usuario.id == current_user.id))
     usuario = result.scalar_one_or_none()

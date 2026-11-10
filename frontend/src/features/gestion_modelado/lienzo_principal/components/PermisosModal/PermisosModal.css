@@ -235,3 +235,7 @@
 .permisos-role-select:focus {
   border-color: var(--primary);
 }
+
+/* CU38: permisos guardados */
+.permisos-error { padding: 8px 10px; margin-bottom: 8px; font-size: 0.8rem; color: #d48a8a; background: rgba(212, 138, 138, 0.12); border-radius: 4px; }
+.permisos-fijo { font-size: 0.75rem; color: var(--secondary, #948979); padding: 0 6px; }

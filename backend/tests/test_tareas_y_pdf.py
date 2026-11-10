@@ -73,7 +73,8 @@ def _pdf_con_texto(linea: str) -> bytes:
     return bytes(salida)
 
 
-async def test_extraer_texto_de_pdf(cliente):
+async def test_extraer_texto_de_pdf(cliente, equipo):
+    cliente.como(equipo.ana)   # sesión obligatoria: la ruta usa recursos del servidor
     pdf = base64.b64encode(_pdf_con_texto("El sistema registra ventas y clientes")).decode()
     r = await cliente.post("/prompt/extraer-texto-pdf", json={"pdf_base64": f"data:application/pdf;base64,{pdf}"})
     assert r.status_code == 200, r.text

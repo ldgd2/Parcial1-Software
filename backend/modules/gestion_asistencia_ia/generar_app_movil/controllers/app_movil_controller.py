@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import re
 
 from backend.core.database import get_db
+from backend.core.permissions.proyecto import requiere_proyecto, usuario_requerido, verificar_permiso
 from backend.modules.gestion_usuarios.dependencies import get_current_user_optional
 from backend.modules.gestion_asistencia_ia.generar_app_movil.schemas.request import (
     GenerarAppMovilRequest,
@@ -24,6 +25,7 @@ from backend.modules.gestion_asistencia_ia.generar_app_movil.services.flutter_ia
     refinar_codigo_con_ia,
 )
 
+
 router = APIRouter(prefix="/api/ia/app-movil", tags=["IA - Generar App Móvil Flutter"])
 
 
@@ -31,8 +33,9 @@ router = APIRouter(prefix="/api/ia/app-movil", tags=["IA - Generar App Móvil Fl
 async def generar_app_movil(
     req: GenerarAppMovilRequest,
     db: AsyncSession = Depends(get_db),
-    _ = Depends(get_current_user_optional),
+    usuario = Depends(usuario_requerido()),
 ) -> AppMovilResponse:
+    await verificar_permiso(db, usuario, req.proyecto_id, "lector")
     diagram_json = req.diagram_json
     if not diagram_json:
         diagram_json = await obtener_diagrama_proyecto(req.proyecto_id, db)
@@ -67,7 +70,7 @@ async def generar_app_movil(
 @router.post("/refinar", response_model=RefinarVistaResponse)
 async def refinar_vista(
     req: RefinarVistaRequest,
-    _ = Depends(get_current_user_optional),
+    _ = Depends(usuario_requerido()),
 ) -> RefinarVistaResponse:
     codigo_refinado, resumen = await refinar_codigo_con_ia(
         vista_nombre=req.vista_nombre,
@@ -86,7 +89,7 @@ async def refinar_vista(
 async def preview_app_movil(
     proyecto_id: int,
     db: AsyncSession = Depends(get_db),
-    _ = Depends(get_current_user_optional),
+    _ = Depends(requiere_proyecto("lector")),
 ) -> AppMovilResponse:
     diagram_json = await obtener_diagrama_proyecto(proyecto_id, db)
     if not diagram_json:
@@ -116,7 +119,7 @@ async def descargar_zip_app_movil(
     proyecto_id: int,
     api_base_url: str = "http://10.0.2.2:8080/api",
     db: AsyncSession = Depends(get_db),
-    _ = Depends(get_current_user_optional),
+    _ = Depends(requiere_proyecto("lector")),
 ):
     diagram_json = await obtener_diagrama_proyecto(proyecto_id, db)
     if not diagram_json or not diagram_json.get("nodes"):
