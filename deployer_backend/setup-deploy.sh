@@ -22,8 +22,14 @@ echo "==================================================="
 # 1. Dependencias del sistema (igual que setup-diag)
 echo -e "\n[1/4] Verificando dependencias del sistema..."
 if $ES_LINUX; then
-    sudo apt-get update
-    sudo apt-get install -y python3 python3-venv python3-pip nginx sqlite3 postgresql postgresql-contrib openjdk-17-jdk maven
+    # En un VPS recién creado `unattended-upgrades` suele tener tomado el candado de dpkg unos
+    # minutos: se espera (hasta 15 min) en vez de fallar con "Could not get lock".
+    APT="sudo apt-get -o DPkg::Lock::Timeout=900"
+    if pgrep -x unattended-upgr > /dev/null || pgrep -f unattended-upgrade > /dev/null; then
+        echo "⏳ Ubuntu está instalando actualizaciones automáticas; se espera a que termine..."
+    fi
+    $APT update
+    $APT install -y python3 python3-venv python3-pip nginx sqlite3 postgresql postgresql-contrib openjdk-17-jdk maven
     # Asegurar que JAVA_HOME apunta a JDK 17
     export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
     sudo update-alternatives --set java /usr/lib/jvm/java-17-openjdk-amd64/bin/java 2>/dev/null || true
