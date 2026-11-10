@@ -30,6 +30,16 @@ def fijar_env_backend(clave: str, valor: str) -> None:
     console.print(f"[green]backend/.env: {nueva}[/green]")
 
 
+def _reparar_roles_postgres():
+    """CREATEROLE para el usuario de BD del backend + roles de las cuentas (ver db/roles_postgres)."""
+    console.print("[cyan]Verificando permisos de PostgreSQL para los roles de usuarios...[/cyan]")
+    try:
+        from backend.cli.modules.db.roles_postgres import reparar_roles
+        reparar_roles()
+    except Exception as e:
+        console.print(f"[yellow]No se pudieron revisar los roles de PostgreSQL: {e}[/yellow]")
+
+
 def existe_servicio():
     return os.path.exists(os.path.join(SERVICE_DIR, "backend-app.service"))
 
@@ -204,7 +214,8 @@ server {{
 
         console.print("[cyan]Inicializando esquema de base de datos...[/cyan]")
         os.system(f"{BASE_DIR}/backend/venv/bin/python -c \"import asyncio; import backend.main; from backend.core.database import init_db; asyncio.run(init_db())\" 2>/dev/null || true")
-        
+        _reparar_roles_postgres()
+
         console.print("[cyan]Aplicando configuraciones NGINX y Systemd...[/cyan]")
         os.system(f"sudo cp {SERVICE_DIR}/*.service /etc/systemd/system/")
         os.system("sudo systemctl daemon-reload")
@@ -241,6 +252,7 @@ def reiniciar_todo():
         
         # Servidores creados antes de este ajuste: se les agregan los tiempos de espera de la IA
         ajustar_nginx(recargar=False)
+        _reparar_roles_postgres()
 
         console.print("[cyan]Reiniciando servicios...[/cyan]")
         os.system("sudo systemctl restart backend-app nginx")

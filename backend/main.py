@@ -71,7 +71,20 @@ async def lifespan(app: FastAPI):
     # Ejecutar seeders
     async with AsyncSessionLocal() as db:
         await runner.run_all(db)
-        
+
+    # Sin CREATEROLE ninguna cuenta puede configurar su contraseña de PostgreSQL: avisar al arrancar
+    try:
+        from backend.modules.gestion_usuarios.configurar_perfil.services.rol_postgres_service import puede_crear_roles
+        async with AsyncSessionLocal() as db:
+            if not await puede_crear_roles(db):
+                import logging
+                logging.getLogger("uvicorn.error").warning(
+                    "El usuario de BD '%s' no tiene CREATEROLE: los usuarios no podrán configurar su "
+                    "contraseña de PostgreSQL. Arréglalo en el gestor: Base de Datos → Roles PostgreSQL.",
+                    settings.DB_USER)
+    except Exception:
+        pass
+
     yield
 
 from fastapi.middleware.cors import CORSMiddleware
