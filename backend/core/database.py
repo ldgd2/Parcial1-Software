@@ -46,3 +46,5 @@ async def init_db():
         await conn.execute(text("ALTER TABLE colaboradores_proyecto ADD COLUMN IF NOT EXISTS puede_exportar BOOLEAN DEFAULT TRUE;"))
         await conn.execute(text("ALTER TABLE colaboradores_proyecto ADD COLUMN IF NOT EXISTS puede_usar_ia BOOLEAN DEFAULT TRUE;"))
         await conn.execute(text("ALTER TABLE tareas_ia ADD COLUMN IF NOT EXISTS area VARCHAR DEFAULT 'general';"))
+        await conn.execute(text("ALTER TABLE tareas_ia ADD COLUMN IF NOT EXISTS estimacion_horas INTEGER;"))
+        await conn.execute(text("ALTER TABLE tareas_ia ADD COLUMN IF NOT EXISTS complejidad VARCHAR;"))

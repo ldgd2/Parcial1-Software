@@ -1,15 +1,20 @@
 /**
- * VersionManager – Lógica de versionado tipo Git.
+ * VersionManager – sincronización al volver a tener conexión (CU20).
  *
- * Reglas:
- *  - Versión 0 → recién creado.
- *  - Cada edición semántica (nombre, tipo, atributo, método) sube la versión.
- *  - Posición (x, y) NO sube la versión.
- *  - Al entrar en offline se congela la versión en `offlineVersion`.
- *  - Al volver online: se hace el diff y se aplican los cambios del servidor que no tenías.
+ * Al perder la red se guarda en cada clase su estado de ese momento (`offlineBase`).
+ * Al reconectar se hace un merge de 3 vías por campo (nombre de la clase, nombre/tipo de cada
+ * atributo, nombre de cada método) entre: base (al desconectarse), local (mis cambios) y servidor
+ * (lo que hicieron los demás, incluido lo que aún no se guardó: el servidor mantiene el estado
+ * vivo de la sala).
+ *   - Solo cambió el servidor → se aplica el valor del servidor.
+ *   - Solo cambié yo → se conserva el mío y se envía a la sala.
+ *   - Cambiamos los dos a valores distintos → CONFLICTO: lo resuelve el usuario en el modal.
+ *
+ * Antes solo se comparaban versiones de atributos/métodos (nunca el nombre de la clase), el
+ * resultado no se enviaba a nadie ni se guardaba, y "Aceptar servidor" no hacía nada (CP22/CP23).
  */
 
-import type { ClassNode, Atributo, Metodo } from '../types/types';
+import type { ClassNode, Atributo, Metodo, OfflineBase } from '../types/types';
 
 // ─── Tipos del sistema de versiones ─────────────────────────────────────────
 
@@ -19,174 +24,178 @@ export interface ClassVersionSnapshot {
   hash: string;
   atributos: Atributo[];
   metodos: Metodo[];
+  nombre?: string;
+  type?: string;
+  x?: number;
+  y?: number;
+  width?: number;
+  color?: string;
 }
 
 export interface ConflictItem {
   nodeId: string;
   nodeName: string;
-  field: string;          // "nombre", "color", attrId, metId
+  field: string;          // "nombre" | "attr:<id>:nombre" | "attr:<id>:tipo" | "met:<id>:nombre"
   localValue: any;
   serverValue: any;
 }
 
 export interface SyncResult {
-  applied: ClassNode[];         // Clases que se actualizaron automáticamente
-  conflicts: ConflictItem[];    // Conflictos que el usuario debe resolver
+  applied: ClassNode[];       // estado resultante de todas las clases
+  conflicts: ConflictItem[];  // decisiones pendientes del usuario
+  paraEnviar: string[];       // clases con cambios offline sin conflicto: se envían a la sala
+  nuevos: string[];           // clases creadas sin conexión
 }
 
-// ─── Algoritmo principal de sincronización ──────────────────────────────────
+/** Foto de la clase al perder la conexión. */
+export function baseOffline(n: ClassNode): OfflineBase {
+  return {
+    nombre: n.nombre,
+    atributos: Object.fromEntries((n.atributos || []).map(a => [a.id, { nombre: a.nombre, tipo: a.tipo }])),
+    metodos: Object.fromEntries((n.metodos || []).map(m => [m.id, { nombre: m.nombre }])),
+  };
+}
 
-/**
- * syncOnReconnect
- * Se llama cuando el cliente vuelve a estar online.
- *
- * Recibe las snapshots del servidor y las clases locales actuales.
- * Aplica el algoritmo:
- *   1. Si hash local === hash servidor → sin cambios, ignorar.
- *   2. Si solo el servidor tiene cambios nuevos (yo estaba offline sin editar) → aplicar.
- *   3. Si ambos cambiaron → hacer diff field-by-field y detectar conflictos.
- */
-export function syncOnReconnect(
-  localNodes: ClassNode[],
-  serverSnapshots: ClassVersionSnapshot[]
-): SyncResult {
-  const result: SyncResult = { applied: [], conflicts: [] };
-  const serverMap = new Map<string, ClassVersionSnapshot>(
-    serverSnapshots.map(s => [s.nodeId, s])
-  );
+type Merge<T> = { valor: T; local: boolean; conflicto: boolean };
+
+/** Merge de 3 vías de un valor. */
+function tresVias<T>(base: T, local: T, servidor: T): Merge<T> {
+  if (local === servidor) return { valor: local, local: false, conflicto: false };
+  if (local === base) return { valor: servidor, local: false, conflicto: false };
+  if (servidor === base) return { valor: local, local: true, conflicto: false };
+  return { valor: local, local: true, conflicto: true };
+}
+
+function limpiar(n: ClassNode): ClassNode {
+  return { ...n, offlineBase: undefined, offlineVersion: undefined, isOfflineDirty: false };
+}
+
+export function syncOnReconnect(localNodes: ClassNode[], serverSnapshots: ClassVersionSnapshot[]): SyncResult {
+  const result: SyncResult = { applied: [], conflicts: [], paraEnviar: [], nuevos: [] };
+  const serverMap = new Map(serverSnapshots.map(s => [s.nodeId, s]));
 
   for (const local of localNodes) {
     const server = serverMap.get(local.id);
+    serverMap.delete(local.id);
+    const base = local.offlineBase;
 
     if (!server) {
-      // La clase solo existe en local → es nueva offline, aplicar tal cual
-      result.applied.push(local);
+      // Sin base: la creé sin conexión. Con base: otro la eliminó mientras yo no estaba;
+      // se conserva la mía (no se vuelve a enviar).
+      result.applied.push(limpiar(local));
+      if (!base) result.nuevos.push(local.id);
       continue;
     }
 
-    // Mismo hash semántico → nadie cambió nada
-    if (local.hash === server.hash) {
-      result.applied.push(local);
-      serverMap.delete(local.id);
+    if (!base) {
+      // No estuve desconectado con esta clase: manda el servidor
+      result.applied.push(buildMergedNode(local, server));
       continue;
     }
 
-    // Si la clase NO tenía cambios offline (offlineVersion === undefined o !isOfflineDirty)
-    // → el servidor manda los cambios, aplicar todos sin preguntar
-    if (!local.isOfflineDirty) {
-      const merged = buildMergedNode(local, server);
-      result.applied.push(merged);
-      serverMap.delete(local.id);
-      continue;
-    }
-
-    // Ambos cambiaron → diff granular
-    const { merged, conflicts } = diffAndMerge(local, server);
+    const { merged, conflicts, cambioLocal } = mergeTresVias(local, server, base);
     result.applied.push(merged);
     result.conflicts.push(...conflicts);
-    serverMap.delete(local.id);
+    if (cambioLocal && conflicts.length === 0) result.paraEnviar.push(local.id);
   }
 
-  // Clases que existen en el servidor pero no en local → agregar
-  for (const [, snap] of serverMap) {
-    result.applied.push(buildNodeFromSnapshot(snap));
-  }
+  // Clases que solo existen en el servidor (las crearon otros)
+  for (const [, snap] of serverMap) result.applied.push(buildNodeFromSnapshot(snap));
 
   return result;
 }
 
-// ─── Diff granular ──────────────────────────────────────────────────────────
-
-function diffAndMerge(local: ClassNode, server: ClassVersionSnapshot): { merged: ClassNode; conflicts: ConflictItem[] } {
+function mergeTresVias(local: ClassNode, server: ClassVersionSnapshot, base: OfflineBase) {
   const conflicts: ConflictItem[] = [];
-  let merged = { ...local, isOfflineDirty: false };
+  let cambioLocal = false;
+  const registrar = (m: Merge<any>, field: string, servidorValor: any) => {
+    if (m.local) cambioLocal = true;
+    if (m.conflicto) conflicts.push({ nodeId: local.id, nodeName: local.nombre, field, localValue: m.valor, serverValue: servidorValor });
+  };
 
-  // Diff de atributos: vServer - vLocal (los que el servidor tiene y yo no)
-  const localAttrIds = new Set(local.atributos.map(a => a.id));
-  const serverAttrIds = new Set(server.atributos.map(a => a.id));
+  // Nombre de la clase
+  const servidorNombre = server.nombre ?? base.nombre;
+  const nombre = tresVias(base.nombre, local.nombre, servidorNombre);
+  registrar(nombre, 'nombre', servidorNombre);
 
-  // Nuevos atributos del servidor → agregarlos sin conflicto
-  const newServerAttrs = server.atributos.filter(a => !localAttrIds.has(a.id));
-  merged.atributos = [...local.atributos, ...newServerAttrs];
-
-  // Atributos que ambos tienen → comparar versión por versión
-  for (const localAttr of local.atributos) {
-    if (!serverAttrIds.has(localAttr.id)) continue; // yo lo agregué offline
-    const serverAttr = server.atributos.find(a => a.id === localAttr.id)!;
-
-    if (localAttr.version !== serverAttr.version) {
-      // Misma versión base pero valores distintos → CONFLICTO en cada campo
-      if (localAttr.nombre !== serverAttr.nombre) {
-        conflicts.push({
-          nodeId: local.id,
-          nodeName: local.nombre,
-          field: `attr:${localAttr.id}:nombre`,
-          localValue: localAttr.nombre,
-          serverValue: serverAttr.nombre,
-        });
-      }
-      if (localAttr.tipo !== serverAttr.tipo) {
-        conflicts.push({
-          nodeId: local.id,
-          nodeName: local.nombre,
-          field: `attr:${localAttr.id}:tipo`,
-          localValue: localAttr.tipo,
-          serverValue: serverAttr.tipo,
-        });
-      }
+  // Atributos
+  const attrsServidor = new Map((server.atributos || []).map(a => [a.id, a]));
+  const atributos: Atributo[] = [];
+  for (const a of local.atributos || []) {
+    const s = attrsServidor.get(a.id);
+    const b = base.atributos[a.id];
+    attrsServidor.delete(a.id);
+    if (!s) {
+      if (!b) { atributos.push(a); cambioLocal = true; }                 // lo agregué yo
+      else if (a.nombre !== b.nombre || a.tipo !== b.tipo) {             // otro lo borró y yo lo edité
+        atributos.push(a); cambioLocal = true;
+      }                                                                 // otro lo borró: se quita
+      continue;
     }
+    const bn = b?.nombre ?? s.nombre, bt = b?.tipo ?? s.tipo;
+    const mn = tresVias(bn, a.nombre, s.nombre);
+    const mt = tresVias(bt, a.tipo, s.tipo);
+    registrar(mn, `attr:${a.id}:nombre`, s.nombre);
+    registrar(mt, `attr:${a.id}:tipo`, s.tipo);
+    atributos.push({ ...a, nombre: mn.valor, tipo: mt.valor });
+  }
+  for (const [id, s] of attrsServidor) {
+    if (base.atributos[id]) cambioLocal = true;   // lo borré yo sin conexión
+    else atributos.push(s);                       // lo agregó otro
   }
 
-  // Diff de métodos (igual que atributos)
-  const localMetIds = new Set(local.metodos.map(m => m.id));
-  const serverMetIds = new Set(server.metodos.map(m => m.id));
-
-  const newServerMets = server.metodos.filter(m => !localMetIds.has(m.id));
-  merged.metodos = [...local.metodos, ...newServerMets];
-
-  for (const localMet of local.metodos) {
-    if (!serverMetIds.has(localMet.id)) continue;
-    const serverMet = server.metodos.find(m => m.id === localMet.id)!;
-
-    if (localMet.version !== serverMet.version) {
-      if (localMet.nombre !== serverMet.nombre) {
-        conflicts.push({
-          nodeId: local.id,
-          nodeName: local.nombre,
-          field: `met:${localMet.id}:nombre`,
-          localValue: localMet.nombre,
-          serverValue: serverMet.nombre,
-        });
-      }
+  // Métodos
+  const metsServidor = new Map((server.metodos || []).map(m => [m.id, m]));
+  const metodos: Metodo[] = [];
+  for (const m of local.metodos || []) {
+    const s = metsServidor.get(m.id);
+    const b = base.metodos[m.id];
+    metsServidor.delete(m.id);
+    if (!s) {
+      if (!b || m.nombre !== b.nombre) { metodos.push(m); cambioLocal = true; }
+      continue;
     }
+    const mn = tresVias(b?.nombre ?? s.nombre, m.nombre, s.nombre);
+    registrar(mn, `met:${m.id}:nombre`, s.nombre);
+    metodos.push({ ...m, nombre: mn.valor });
+  }
+  for (const [id, s] of metsServidor) {
+    if (base.metodos[id]) cambioLocal = true;
+    else metodos.push(s);
   }
 
-  return { merged, conflicts };
+  const merged: ClassNode = {
+    ...limpiar(local),
+    nombre: nombre.valor,
+    atributos,
+    metodos,
+    version: Math.max(local.version || 0, server.version || 0),
+  };
+  return { merged, conflicts, cambioLocal };
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function buildMergedNode(local: ClassNode, server: ClassVersionSnapshot): ClassNode {
   return {
-    ...local,
+    ...limpiar(local),
+    nombre: server.nombre ?? local.nombre,
     version: server.version,
     hash: server.hash,
     atributos: server.atributos,
     metodos: server.metodos,
-    isOfflineDirty: false,
-    offlineVersion: undefined,
   };
 }
 
 function buildNodeFromSnapshot(snap: ClassVersionSnapshot): ClassNode {
   return {
     id: snap.nodeId,
-    type: 'class',
-    x: 200,
-    y: 200,
-    width: 220,
-    nombre: 'ClaseRemota',
-    color: '#393E46',
+    type: (snap.type as ClassNode['type']) || 'class',
+    x: snap.x ?? 200,
+    y: snap.y ?? 200,
+    width: snap.width ?? 220,
+    nombre: snap.nombre || 'ClaseRemota',
+    color: snap.color || '#393E46',
     version: snap.version,
     hash: snap.hash,
     atributos: snap.atributos,

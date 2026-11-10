@@ -34,6 +34,8 @@ async def importar_xmi(
             
         diagram_data = await import_service.parsear_xmi(text_content)
         return {"status": "success", "data": diagram_data}
+    except import_service.XmiInvalidoError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         import traceback
         traceback.print_exc()

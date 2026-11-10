@@ -44,6 +44,50 @@ async def _usuario_anfitrion(codigo_acceso: str, token: str | None) -> int | Non
     return None
 
 
+def _usuario_de_guest(guest_id: str | None) -> int | None:
+    """'auth_15' -> 15 (colaborador registrado); invitados anónimos -> None."""
+    if guest_id and str(guest_id).startswith("auth_"):
+        try:
+            return int(str(guest_id).split("_", 1)[1])
+        except ValueError:
+            return None
+    return None
+
+
+async def _proyecto_de_sala(db, codigo_acceso: str) -> int | None:
+    resultado = await db.execute(select(Proyecto.id).where(Proyecto.codigo_acceso == codigo_acceso))
+    return resultado.scalar_one_or_none()
+
+
+async def _guardar_rol(codigo_acceso: str, guest_id: str, lector: bool) -> None:
+    """CU38: el rol elegido en Permisos de Acceso se guarda en colaboradores_proyecto
+    (antes vivía solo en memoria del WebSocket y se perdía al recargar o reiniciar)."""
+    usuario_id = _usuario_de_guest(guest_id)
+    if usuario_id is None:
+        return
+    from backend.core.permissions.proyecto import guardar_permiso
+    async for db in get_db():
+        proyecto_id = await _proyecto_de_sala(db, codigo_acceso)
+        if proyecto_id:
+            await guardar_permiso(db, proyecto_id, usuario_id, lector)
+        break
+
+
+async def _estado_guardado(codigo_acceso: str, guest_id: str) -> tuple[bool, bool]:
+    """(aprobado, lector) del colaborador registrado según colaboradores_proyecto."""
+    usuario_id = _usuario_de_guest(guest_id)
+    if usuario_id is None:
+        return False, False
+    from backend.core.permissions.proyecto import obtener_colaborador, es_lector
+    async for db in get_db():
+        proyecto_id = await _proyecto_de_sala(db, codigo_acceso)
+        if not proyecto_id:
+            return False, False
+        colaborador = await obtener_colaborador(db, proyecto_id, usuario_id)
+        return bool(colaborador and colaborador.estado == "aprobado"), es_lector(colaborador)
+    return False, False
+
+
 async def _save_delta_to_db(new_objects: dict, head_hash: str, author: str):
     """Guarda los nuevos GitObjects y el Commit en PostgreSQL usando inserciones masivas."""
     async for db in get_db():
@@ -92,37 +136,104 @@ async def _save_delta_to_db(new_objects: dict, head_hash: str, author: str):
         break  # Solo una sesión
 
 
-async def _get_snapshots(codigo_acceso: str) -> list:
+async def _estado_vivo(codigo_acceso: str) -> dict:
     """
-    Devuelve la snapshot de versiones de todas las clases del proyecto.
-    Lee el lienzo_json del Proyecto para asegurar aislamiento entre proyectos.
+    Estado vivo de las clases de la sala: el lienzo guardado más los diagram_event recibidos
+    desde entonces. Quien vuelve de estar sin conexión compara contra esto, así ve también los
+    cambios que los demás aún no guardaron (el autoguardado es cada 30 s) y se detectan los
+    conflictos (CP23). Se reinicia con el lienzo cada vez que alguien guarda.
     """
-    from backend.modules.gestion_proyectos.models import Proyecto
-    import json
-    
-    snapshots = []
-    async for db in get_db():
-        result = await db.execute(
-            select(Proyecto).where(Proyecto.codigo_acceso == codigo_acceso)
-        )
-        proyecto = result.scalar_one_or_none()
+    sala = manager.salas.get(codigo_acceso)
+    if sala is not None and sala.get("estado_vivo") is not None:
+        return sala["estado_vivo"]
 
+    nodos = {}
+    async for db in get_db():
+        result = await db.execute(select(Proyecto).where(Proyecto.codigo_acceso == codigo_acceso))
+        proyecto = result.scalar_one_or_none()
         if proyecto and proyecto.lienzo_json:
             try:
                 lienzo = json.loads(proyecto.lienzo_json) if isinstance(proyecto.lienzo_json, str) else proyecto.lienzo_json
-                nodes = lienzo.get("nodes", [])
-                for node in nodes:
-                    snapshots.append({
-                        "nodeId": node.get("id"),
-                        "version": node.get("version", 0),
-                        "hash": node.get("hash", ""),
-                        "atributos": node.get("atributos", []),
-                        "metodos": node.get("metodos", []),
-                    })
+                nodos = {n.get("id"): dict(n) for n in lienzo.get("nodes", []) if isinstance(n, dict) and n.get("id")}
             except Exception:
-                pass
+                nodos = {}
         break
+    if sala is not None:
+        sala["estado_vivo"] = nodos
+    return nodos
 
+
+def _aplicar_en_lista(items: list, item_id, partial: dict | None, borrar: bool = False) -> list:
+    if borrar:
+        return [i for i in items if i.get("id") != item_id]
+    return [{**i, **(partial or {})} if i.get("id") == item_id else i for i in items]
+
+
+async def _aplicar_evento_vivo(codigo_acceso: str, mensaje: dict) -> None:
+    """Refleja un diagram_event (el mismo que se reenvía a la sala) en el estado vivo."""
+    evento = mensaje.get("payload") or {}
+    accion, p = evento.get("action"), evento.get("payload") or {}
+    if not accion:
+        return
+    nodos = await _estado_vivo(codigo_acceso)
+    try:
+        if accion == "addNode" and isinstance(p.get("node"), dict):
+            nodos[p["node"].get("id")] = dict(p["node"])
+        elif accion == "updateNode" and p.get("id") in nodos:
+            nodos[p["id"]].update(p.get("partial") or {})
+            nodos[p["id"]]["version"] = int(nodos[p["id"]].get("version") or 0) + 1
+        elif accion == "moveNode" and p.get("id") in nodos:
+            nodos[p["id"]].update({"x": p.get("x"), "y": p.get("y")})
+        elif accion == "deleteNode":
+            nodos.pop(p.get("id"), None)
+        elif accion in ("addAtributo", "updateAtributo", "deleteAtributo", "addMetodo", "updateMetodo", "deleteMetodo"):
+            nodo = nodos.get(p.get("nodeId"))
+            if nodo is None:
+                return
+            campo = "atributos" if "Atributo" in accion else "metodos"
+            lista = list(nodo.get(campo) or [])
+            if accion.startswith("add"):
+                lista.append(p.get("attr") if campo == "atributos" else p.get("met"))
+            else:
+                item_id = p.get("attrId") if campo == "atributos" else p.get("metodId")
+                lista = _aplicar_en_lista(lista, item_id, p.get("partial"), borrar=accion.startswith("delete"))
+            nodo[campo] = [i for i in lista if isinstance(i, dict)]
+            nodo["version"] = int(nodo.get("version") or 0) + 1
+    except Exception:
+        # Un evento con forma inesperada no debe cortar la sala; el estado se rehace al guardar
+        sala = manager.salas.get(codigo_acceso)
+        if sala is not None:
+            sala["estado_vivo"] = None
+
+
+def reiniciar_estado_vivo(codigo_acceso: str, lienzo: dict | None) -> None:
+    """Al guardar el lienzo, el estado vivo pasa a ser exactamente lo guardado."""
+    sala = manager.salas.get(codigo_acceso)
+    if sala is None:
+        return
+    if not isinstance(lienzo, dict):
+        sala["estado_vivo"] = None  # se vuelve a leer de la BD en la próxima consulta
+        return
+    sala["estado_vivo"] = {n.get("id"): dict(n) for n in lienzo.get("nodes", []) if isinstance(n, dict) and n.get("id")}
+
+
+async def _get_snapshots(codigo_acceso: str) -> list:
+    """Snapshot de cada clase de la sala (estado vivo), con su nombre para detectar conflictos."""
+    snapshots = []
+    for node in (await _estado_vivo(codigo_acceso)).values():
+        snapshots.append({
+            "nodeId": node.get("id"),
+            "version": node.get("version", 0),
+            "hash": node.get("hash", ""),
+            "nombre": node.get("nombre"),
+            "type": node.get("type"),
+            "x": node.get("x"),
+            "y": node.get("y"),
+            "width": node.get("width"),
+            "color": node.get("color"),
+            "atributos": node.get("atributos", []),
+            "metodos": node.get("metodos", []),
+        })
     return snapshots
 
 
@@ -183,6 +294,8 @@ async def websocket_endpoint(
                         if approved:
                             manager.remove_pending_guest(codigo_acceso, target_guest)
                             manager.salas[codigo_acceso]["approved_guests"].add(target_guest)
+                            if target_guest in manager.salas[codigo_acceso]["readonly_guests"]:
+                                await manager.send_personal_message({"type": "role_changed", "role": "view"}, guest_ws)
                             await manager.broadcast_to_sala(
                                 {"type": "user_joined", "nickname": manager.salas[codigo_acceso]["pending_guests"].get(target_guest, "Guest")},
                                 codigo_acceso,
@@ -234,7 +347,8 @@ async def websocket_endpoint(
                         sala["readonly_guests"].add(target_guest)
                     else:
                         sala["readonly_guests"].discard(target_guest)
-                    
+                    await _guardar_rol(codigo_acceso, target_guest, new_role == "view")
+
                     if target_guest in sala["guests"]:
                         await manager.send_personal_message({"type": "role_changed", "role": new_role}, sala["guests"][target_guest])
                     await manager.send_personal_message({"type": "role_updated", "guest_id": target_guest, "role": new_role}, websocket)
@@ -267,13 +381,15 @@ async def websocket_endpoint(
                 elif msg_type == "refresh_lock":
                     from backend.modules.gestion_concurrencia.bloquear_elemento.services.lock_service import lock_service
                     element_id = message.get("element_id")
+                    # Mismo id con el que se tomó el bloqueo (guest_id del anfitrión). Antes se usaba
+                    # "host" y no coincidía: el anfitrión nunca liberaba su candado (CP17).
                     if element_id:
-                        lock_service.refresh_lock(codigo_acceso, element_id, "host")
+                        lock_service.refresh_lock(codigo_acceso, element_id, guest_id or "host")
 
                 elif msg_type == "unlock_element":
                     from backend.modules.gestion_concurrencia.bloquear_elemento.services.lock_service import lock_service
                     element_id = message.get("element_id")
-                    if element_id and lock_service.unlock_element(codigo_acceso, element_id, "host"):
+                    if element_id and lock_service.unlock_element(codigo_acceso, element_id, guest_id or "host"):
                         await manager.broadcast_to_sala(
                             {"type": "element_unlocked", "element_id": element_id},
                             codigo_acceso,
@@ -319,6 +435,8 @@ async def websocket_endpoint(
 
                 # ── Resto (mouse, etc.) ───────────────────────────────────
                 else:
+                    if msg_type == "diagram_event":
+                        await _aplicar_evento_vivo(codigo_acceso, message)
                     await manager.broadcast_to_sala(message, codigo_acceso, exclude=websocket)
 
         except WebSocketDisconnect:
@@ -329,7 +447,16 @@ async def websocket_endpoint(
             await websocket.close(code=1008)
             return
 
-        await manager.connect_guest(websocket, codigo_acceso, guest_id)
+        # Con el nickname: sin él, "Permisos de Acceso" mostraba a todos como "Guest"
+        await manager.connect_guest(websocket, codigo_acceso, guest_id, nickname=nickname)
+
+        # Colaborador registrado ya aprobado en BD: entra sin pasar otra vez por la sala de
+        # espera, y con el rol guardado (un lector sigue siéndolo tras recargar o reconectarse).
+        aprobado_bd, lector_bd = await _estado_guardado(codigo_acceso, guest_id)
+        if aprobado_bd:
+            manager.salas[codigo_acceso]["approved_guests"].add(guest_id)
+        if lector_bd:
+            manager.salas[codigo_acceso]["readonly_guests"].add(guest_id)
 
         if (
             user_type in ("viewer", "observer")
@@ -338,8 +465,13 @@ async def websocket_endpoint(
             or guest_id in manager.salas[codigo_acceso]["approved_guests"]
         ):
             manager.salas[codigo_acceso]["approved_guests"].add(guest_id)
-            manager.salas[codigo_acceso]["readonly_guests"].add(guest_id)
+            # Solo los visores/móviles entran en solo lectura por defecto. Antes TODO invitado ya
+            # aprobado que se reconectaba quedaba como lector, aunque el anfitrión lo hubiera hecho editor.
+            if user_type in ("viewer", "observer") or str(guest_id).startswith(("mob_", "viewer_")):
+                manager.salas[codigo_acceso]["readonly_guests"].add(guest_id)
             await manager.send_personal_message({"type": "admission_status", "approved": True}, websocket)
+            if guest_id in manager.salas[codigo_acceso]["readonly_guests"]:
+                await manager.send_personal_message({"type": "role_changed", "role": "view"}, websocket)
         else:
             manager.add_pending_guest(codigo_acceso, guest_id, nickname)
             await manager.notify_host(codigo_acceso, {
@@ -419,8 +551,9 @@ async def websocket_endpoint(
 
                 # ── Delta del guest: guardar en BD y propagar ─────────────
                 elif msg_type in ("sync_offline", "diagram_delta"):
-                    if guest_id in manager.salas[codigo_acceso]["readonly_guests"]:
-                        continue # Solo lectura
+                    sala_actual = manager.salas[codigo_acceso]
+                    if guest_id in sala_actual["readonly_guests"] or guest_id not in sala_actual["approved_guests"]:
+                        continue # Solo lectura, o invitado aún no admitido por el anfitrión
                         
                     new_objects = message.get("objects", {})
                     head_hash = message.get("head")
@@ -435,8 +568,13 @@ async def websocket_endpoint(
                     )
 
                 else:
-                    if guest_id in manager.salas[codigo_acceso]["readonly_guests"] and msg_type == "diagram_event":
+                    sala_actual = manager.salas[codigo_acceso]
+                    if msg_type == "diagram_event" and (
+                        guest_id in sala_actual["readonly_guests"] or guest_id not in sala_actual["approved_guests"]
+                    ):
                         continue
+                    if msg_type == "diagram_event":
+                        await _aplicar_evento_vivo(codigo_acceso, message)
                     await manager.broadcast_to_sala(message, codigo_acceso, exclude=websocket)
 
         except WebSocketDisconnect:

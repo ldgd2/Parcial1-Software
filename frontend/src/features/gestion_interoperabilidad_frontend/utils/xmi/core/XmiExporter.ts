@@ -6,7 +6,8 @@ import { escapeXml, getDuid } from './utils';
 export class XmiExporter {
     export(state: DiagramState, projectName: string = "LocalProject"): string {
         const id = "local";
-        let xml = `<?xml version="1.0" encoding="windows-1252"?>\n`;
+        // El Blob se descarga en UTF-8: declarar windows-1252 rompía tildes y eñes al abrirlo en EA
+        let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
         xml += `<XMI xmi.version="1.1" xmlns:UML="omg.org/UML1.3">\n`;
         xml += `<XMI.header>
             <XMI.documentation>

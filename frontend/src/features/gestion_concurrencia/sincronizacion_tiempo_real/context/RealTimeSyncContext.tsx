@@ -19,7 +19,16 @@ export const getUserIdentity = (): { id: string; nickname: string; isRegistered:
 
   if (token) {
     const nickname = registeredUser?.nombre || storedName || registeredUser?.email?.split('@')[0] || 'Usuario';
-    const id = registeredUser?.id ? `auth_${registeredUser.id}` : `auth_${nickname.replace(/\s+/g, '_')}`;
+    // El id sale del `sub` del JWT, que siempre está. Antes, si `user` aún no estaba en
+    // localStorage, el colaborador se conectaba como auth_<nombre> en vez de auth_<id>: el
+    // anfitrión lo veía "Desconectado" y el cambio de rol no le llegaba (CP45).
+    let sub: string | undefined;
+    try {
+      const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      sub = JSON.parse(atob(payload)).sub;
+    } catch { sub = undefined; }
+    const userId = sub ?? registeredUser?.id;
+    const id = userId ? `auth_${userId}` : `auth_${nickname.replace(/\s+/g, '_')}`;
     return { id, nickname, isRegistered: true };
   }
 

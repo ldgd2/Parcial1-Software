@@ -80,6 +80,21 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+
+# Las excepciones no controladas llegan a ServerErrorMiddleware, que está FUERA de CORS:
+# el 500 salía sin Access-Control-Allow-Origin y el navegador solo mostraba "Failed to fetch".
+# Este middleware se registra antes que CORS, así que queda dentro de él y el 500 lleva cabeceras CORS.
+@app.middleware("http")
+async def errores_con_cors(request, call_next):
+    try:
+        return await call_next(request)
+    except Exception:
+        import logging
+        from fastapi.responses import JSONResponse
+        logging.getLogger("uvicorn.error").exception("Error no controlado en %s %s", request.method, request.url.path)
+        return JSONResponse(status_code=500, content={"detail": "Error interno del servidor. Intenta nuevamente."})
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[

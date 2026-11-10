@@ -3,7 +3,10 @@ import type { ClassNode, DiagramState, Atributo, Metodo, Relation, RelationType,
 import { useRealTimeSync } from '@/features/gestion_concurrencia/sincronizacion_tiempo_real/context/RealTimeSyncContext';
 import { offlineSyncService } from '@/features/gestion_concurrencia/sincronizar_estado_local/services/OfflineSyncService';
 import { generateDeterministicHash } from '../utils/hashGenerator';
-import { syncOnReconnect, type ConflictItem, type ClassVersionSnapshot } from '../utils/VersionManager';
+import { syncOnReconnect, baseOffline, type ConflictItem, type ClassVersionSnapshot } from '../utils/VersionManager';
+
+/** Se emite al terminar la sincronización tras volver la red: { conflictos, enviados } */
+export const EVENTO_SINCRONIZADO = 'vcs_sincronizado';
 
 function uid() {
   return Math.random().toString(36).substr(2, 9);
@@ -117,6 +120,8 @@ export const DiagramProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const nodesRef = useRef<ClassNode[]>(nodes);
   nodesRef.current = nodes;
   const [relations, setRelations] = useState<Relation[]>([]);
+  const relationsRef = useRef<Relation[]>(relations);
+  relationsRef.current = relations;
   const [correcciones, setCorrecciones] = useState<Record<string, Correccion[]>>({});
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeTool, setActiveTool] = useState<string>('select');
@@ -124,18 +129,27 @@ export const DiagramProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [conflicts, setConflicts] = useState<ConflictItem[]>([]);
   const isDirty = useRef(false);
-  const { broadcastDiagramEvent, broadcastDiagramDelta } = useRealTimeSync();
+  const { broadcastDiagramEvent, broadcastDiagramDelta, isReadOnly } = useRealTimeSync();
 
   const mark = useCallback(() => { isDirty.current = true; }, []);
 
   // ── Detectar cambios de conectividad ─────────────────────────────────────
 
+  // Datos para sincronizar al volver la red: si estuvimos sin conexión y qué relaciones
+  // existían en ese momento (las nuevas se envían a la sala al reconectar).
+  const estuvoOffline = useRef(false);
+  const relacionesAlDesconectar = useRef<Set<string>>(new Set());
+  const nodosPendientesDeConflicto = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     const goOffline = () => {
       setIsOffline(true);
+      estuvoOffline.current = true;
+      relacionesAlDesconectar.current = new Set(relationsRef.current.map(r => r.id));
       setNodes(prev => prev.map(n => ({
         ...n,
         offlineVersion: n.offlineVersion ?? n.version,
+        offlineBase: n.offlineBase ?? baseOffline(n),
       })));
       console.warn('[VCS] Modo offline — versiones congeladas');
     };
@@ -156,40 +170,82 @@ export const DiagramProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // ── Recibir snapshots del servidor y hacer el diff ───────────────────────
 
+  // Envía a la sala el estado de una clase tras sincronizar (lo reciben como updateNode remoto)
+  const enviarClase = useCallback((n: ClassNode) => {
+    broadcastDiagramEvent({
+      action: 'updateNode',
+      payload: { id: n.id, partial: { nombre: n.nombre, atributos: n.atributos, metodos: n.metodos, x: n.x, y: n.y } },
+    });
+  }, [broadcastDiagramEvent]);
+
   useEffect(() => {
     const handleServerSync = (e: any) => {
       const serverSnapshots: ClassVersionSnapshot[] = e.detail?.snapshots ?? [];
-      if (!serverSnapshots.length) return;
-      setNodes(prev => {
-        const result = syncOnReconnect(prev, serverSnapshots);
-        if (result.conflicts.length > 0) setConflicts(result.conflicts);
-        return result.applied;
+      const reconexion = estuvoOffline.current;
+      if (!serverSnapshots.length && !reconexion) return;
+
+      const result = syncOnReconnect(nodesRef.current, serverSnapshots);
+      nodesRef.current = result.applied;
+      setNodes(result.applied);
+      if (result.conflicts.length > 0) setConflicts(result.conflicts);
+      if (!reconexion) return;
+
+      // Volvió la red: enviar a la sala lo hecho sin conexión que no está en conflicto.
+      // Lo que tiene conflicto se envía cuando el usuario lo resuelve (resolveConflict).
+      estuvoOffline.current = false;
+      const porId = new Map(result.applied.map(n => [n.id, n]));
+      result.nuevos.forEach(id => {
+        const n = porId.get(id);
+        if (n) broadcastDiagramEvent({ action: 'addNode', payload: { node: n } });
       });
+      result.paraEnviar.forEach(id => { const n = porId.get(id); if (n) enviarClase(n); });
+      relationsRef.current
+        .filter(r => !relacionesAlDesconectar.current.has(r.id))
+        .forEach(relation => broadcastDiagramEvent({ action: 'addRelation', payload: { relation } }));
+      nodosPendientesDeConflicto.current = new Set(result.conflicts.map(c => c.nodeId));
+      mark();
+      window.dispatchEvent(new CustomEvent(EVENTO_SINCRONIZADO, {
+        detail: { conflictos: result.conflicts.length, enviados: result.nuevos.length + result.paraEnviar.length },
+      }));
     };
 
     window.addEventListener('vcs_server_sync', handleServerSync);
     return () => window.removeEventListener('vcs_server_sync', handleServerSync);
-  }, []);
+  }, [broadcastDiagramEvent, enviarClase, mark]);
 
   // ── Resolver conflicto ───────────────────────────────────────────────────
 
   const resolveConflict = useCallback((nodeId: string, field: string, keepLocal: boolean) => {
     const conflict = conflicts.find(c => c.nodeId === nodeId && c.field === field);
-    if (conflict && keepLocal) {
-      const [kind, itemId, prop] = field.split(':');
-      setNodes(prev => prev.map(n => {
-        if (n.id !== nodeId) return n;
-        if (kind === 'attr') {
-          return { ...n, atributos: n.atributos.map(a => a.id === itemId ? { ...a, [prop]: conflict.localValue } : a) };
-        }
-        if (kind === 'met') {
-          return { ...n, metodos: n.metodos.map(m => m.id === itemId ? { ...m, [prop]: conflict.localValue } : m) };
-        }
-        return n;
-      }));
+    if (!conflict) return;
+    // Antes solo se aplicaba algo con "Conservar el mío"; "Aceptar servidor" no cambiaba nada.
+    const valor = keepLocal ? conflict.localValue : conflict.serverValue;
+    const [kind, itemId, prop] = field.split(':');
+    const aplicar = (n: ClassNode): ClassNode => {
+      if (n.id !== nodeId) return n;
+      if (kind === 'nombre') return { ...n, nombre: valor };
+      if (kind === 'attr') return { ...n, atributos: n.atributos.map(a => a.id === itemId ? { ...a, [prop]: valor } : a) };
+      if (kind === 'met') return { ...n, metodos: n.metodos.map(m => m.id === itemId ? { ...m, [prop]: valor } : m) };
+      return n;
+    };
+    const siguientes = nodesRef.current.map(aplicar);
+    nodesRef.current = siguientes;
+    setNodes(siguientes);
+
+    const restantes = conflicts.filter(c => !(c.nodeId === nodeId && c.field === field));
+    setConflicts(restantes);
+
+    // Resuelto el último conflicto de esta clase: se envía su estado final a la sala
+    if (!restantes.some(c => c.nodeId === nodeId) && nodosPendientesDeConflicto.current.has(nodeId)) {
+      nodosPendientesDeConflicto.current.delete(nodeId);
+      const n = siguientes.find(x => x.id === nodeId);
+      if (n) enviarClase(n);
+      mark();
+      if (restantes.length === 0) {
+        window.dispatchEvent(new CustomEvent(EVENTO_SINCRONIZADO, { detail: { conflictos: 0, enviados: 1 } }));
+      }
     }
-    setConflicts(prev => prev.filter(c => !(c.nodeId === nodeId && c.field === field)));
-  }, [conflicts]);
+  }, [conflicts, enviarClase, mark]);
 
   // ── CRUD — patrón correcto: compute async PRIMERO, luego setNodes sync ───
 
@@ -728,14 +784,23 @@ export const DiagramProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return () => window.removeEventListener('remote_diagram_event', handleRemoteEvent);
   }, [addNode, updateNode, deleteNode, moveNode, addAtributo, updateAtributo, deleteAtributo, addMetodo, updateMetodo, deleteMetodo, addCorreccion, resolveCorreccion]);
 
+  // CU38: un colaborador en modo Lector no puede modificar la pizarra. Se bloquean las acciones
+  // LOCALES; las remotas (último argumento isRemote === true) se siguen aplicando para que vea
+  // los cambios de los demás. Los eventos remotos usan las funciones internas sin este filtro.
+  const soloEditor = <F extends (...args: any[]) => any>(fn: F): F =>
+    ((...args: any[]) => {
+      if (isReadOnly && args[args.length - 1] !== true) return undefined;
+      return fn(...args);
+    }) as F;
+
   return (
     <DiagramContext.Provider value={{
       nodes, relations, correcciones, isOffline, conflicts, selectedIds, connectingSource, activeTool, setSelectedIds, setActiveTool,
-      addNode, updateNode, deleteNode, moveNode,
-      startConnect, finishConnect, cancelConnect,
-      updateRelation, deleteRelation, addRelation,
-      addAtributo, updateAtributo, deleteAtributo,
-      addMetodo, updateMetodo, deleteMetodo,
+      addNode: soloEditor(addNode), updateNode: soloEditor(updateNode), deleteNode: soloEditor(deleteNode), moveNode: soloEditor(moveNode),
+      startConnect: soloEditor(startConnect), finishConnect: soloEditor(finishConnect), cancelConnect,
+      updateRelation: soloEditor(updateRelation), deleteRelation: soloEditor(deleteRelation), addRelation: soloEditor(addRelation),
+      addAtributo: soloEditor(addAtributo), updateAtributo: soloEditor(updateAtributo), deleteAtributo: soloEditor(deleteAtributo),
+      addMetodo: soloEditor(addMetodo), updateMetodo: soloEditor(updateMetodo), deleteMetodo: soloEditor(deleteMetodo),
       addCorreccion, resolveCorreccion,
       resolveConflict,
       getDiagramState, loadDiagram, isDirty,

@@ -33,7 +33,9 @@ export const ClassNode: React.FC<Props> = ({
     correcciones
   } = useDiagram();
 
-  const { lockedElements, lockElement, unlockElement, refreshLock } = useRealTimeSync() || { lockedElements: {} };
+  const { lockedElements, lockElement, unlockElement, refreshLock, isReadOnly } = useRealTimeSync() || { lockedElements: {} };
+  // CU38: un Lector no puede abrir la edición de ningún campo ni mover la clase (CP45)
+  const soloLectura = !!isReadOnly;
 
   const isSelected = selectedIds.includes(node.id);
   // Solo bloqueamos la interacción general si alguien bloqueó el nodo entero (lo cual ya no debería pasar, pero por si acaso).
@@ -56,13 +58,22 @@ export const ClassNode: React.FC<Props> = ({
   const isLocked = (subId: string) => {
     return lockedElements[`${node.id}:${subId}`] !== undefined;
   };
+  const noEditable = (subId: string) => soloLectura || isLocked(subId);
   const lockedBy = (subId: string) => {
     return lockedElements[`${node.id}:${subId}`];
   };
 
+  // lockedElements solo trae candados de OTROS usuarios (el servidor no reenvía los propios).
+  // Si alguien edita cualquier campo de esta clase, no se puede mover hasta que lo libere (CP19).
+  const bloqueadaPorOtro = Object.keys(lockedElements).some(k => k.startsWith(`${node.id}:`));
+  const iniciarArrastre = (e: React.MouseEvent) => {
+    if (bloqueadaPorOtro || soloLectura) return;
+    onDragStart(e);
+  };
+
   const handleTitleDblClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isLocked('nombre')) return;
+    if (noEditable('nombre')) return;
     setEditingTitle(true);
     setTimeout(() => titleRef.current?.select(), 0);
   };
@@ -137,7 +148,7 @@ export const ClassNode: React.FC<Props> = ({
         className={`class-node class-node--note${isSelected ? ' class-node--selected' : ''}${isConnectingMode ? ' class-node--connectable' : ''}${isConnectingSource ? ' class-node--connect-source' : ''}${hasOpenCorrections ? ' class-node--has-corrections' : ''}`}
         style={{ left: node.x, top: node.y, width: node.width }}
         onClick={(e) => { e.stopPropagation(); if (onNodeClick) { onNodeClick(e); } else { setSelectedIds([node.id]); } }}
-        onMouseDown={(e) => { e.stopPropagation(); onDragStart(e); }}
+        onMouseDown={(e) => { e.stopPropagation(); iniciarArrastre(e); }}
       >
         {isLocked('contenido') && (
           <div className="class-node__locked-overlay" style={{ position: 'absolute', top: -12, right: -12, background: 'var(--bg)', padding: '2px 6px', borderRadius: 12, border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 4, zIndex: 10, fontSize: 10, color: 'var(--text-secondary)' }}>
@@ -154,7 +165,7 @@ export const ClassNode: React.FC<Props> = ({
           onMouseDown={e => e.stopPropagation()}
           onClick={e => e.stopPropagation()}
           rows={4}
-          disabled={isLocked('contenido')}
+          disabled={noEditable('contenido')}
         />
         {isSelected && (
           <button className="class-node__delete" onClick={(e) => { e.stopPropagation(); deleteNode(node.id); }} title="Eliminar nota"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
@@ -170,7 +181,7 @@ export const ClassNode: React.FC<Props> = ({
         className={`class-node class-node--constraint${isSelected ? ' class-node--selected' : ''}${isConnectingMode ? ' class-node--connectable' : ''}${isConnectingSource ? ' class-node--connect-source' : ''}${hasOpenCorrections ? ' class-node--has-corrections' : ''}`}
         style={{ left: node.x, top: node.y, width: node.width, backgroundColor: '#fdf3f3', border: '1px solid #d99', borderRadius: 4, padding: '4px 8px', display: 'flex', position: 'absolute', cursor: 'grab' }}
         onClick={(e) => { e.stopPropagation(); if (onNodeClick) { onNodeClick(e); } else { setSelectedIds([node.id]); } }}
-        onMouseDown={(e) => { e.stopPropagation(); onDragStart(e); }}
+        onMouseDown={(e) => { e.stopPropagation(); iniciarArrastre(e); }}
       >
         <span style={{color:'#a44', marginRight: 4}}>{'{'}</span>
         <textarea
@@ -182,7 +193,7 @@ export const ClassNode: React.FC<Props> = ({
           onMouseDown={e => e.stopPropagation()}
           onClick={e => e.stopPropagation()}
           rows={2}
-          disabled={isLocked('contenido')}
+          disabled={noEditable('contenido')}
         />
         <span style={{color:'#a44', marginLeft: 4}}>{'}'}</span>
         {isSelected && (
@@ -199,7 +210,7 @@ export const ClassNode: React.FC<Props> = ({
         className={`class-node class-node--text${isSelected ? ' class-node--selected' : ''}${isConnectingMode ? ' class-node--connectable' : ''}${isConnectingSource ? ' class-node--connect-source' : ''}${hasOpenCorrections ? ' class-node--has-corrections' : ''}`}
         style={{ left: node.x, top: node.y, width: node.width, background: 'transparent', border: isSelected ? '1px dashed #999' : 'none', position: 'absolute', cursor: 'grab' }}
         onClick={(e) => { e.stopPropagation(); if (onNodeClick) { onNodeClick(e); } else { setSelectedIds([node.id]); } }}
-        onMouseDown={(e) => { e.stopPropagation(); onDragStart(e); }}
+        onMouseDown={(e) => { e.stopPropagation(); iniciarArrastre(e); }}
       >
         <textarea
           style={{ width: '100%', border: 'none', background: 'transparent', resize: 'none', outline: 'none' }}
@@ -211,7 +222,7 @@ export const ClassNode: React.FC<Props> = ({
           onClick={e => e.stopPropagation()}
           rows={2}
           placeholder="Texto libre..."
-          disabled={isLocked('contenido')}
+          disabled={noEditable('contenido')}
         />
         {isSelected && (
           <button className="class-node__delete" onClick={(e) => { e.stopPropagation(); deleteNode(node.id); }} style={{ position: 'absolute', top: -10, right: -10 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
@@ -227,7 +238,7 @@ export const ClassNode: React.FC<Props> = ({
         className={`class-node class-node--boundary${isSelected ? ' class-node--selected' : ''}${isConnectingMode ? ' class-node--connectable' : ''}${isConnectingSource ? ' class-node--connect-source' : ''}${hasOpenCorrections ? ' class-node--has-corrections' : ''}`}
         style={{ left: node.x, top: node.y, width: node.width || 200, height: 150, border: '2px dashed #666', background: 'rgba(0,0,0,0.02)', position: 'absolute', cursor: 'grab' }}
         onClick={(e) => { e.stopPropagation(); if (onNodeClick) { onNodeClick(e); } else { setSelectedIds([node.id]); } }}
-        onMouseDown={(e) => { e.stopPropagation(); onDragStart(e); }}
+        onMouseDown={(e) => { e.stopPropagation(); iniciarArrastre(e); }}
       >
         <span style={{ position: 'absolute', top: -20, left: 0, fontWeight: 'bold' }}>{node.nombre || 'Boundary'}</span>
         {isSelected && (
@@ -244,7 +255,7 @@ export const ClassNode: React.FC<Props> = ({
         className={`class-node class-node--part${isSelected ? ' class-node--selected' : ''}${isConnectingMode ? ' class-node--connectable' : ''}${isConnectingSource ? ' class-node--connect-source' : ''}${hasOpenCorrections ? ' class-node--has-corrections' : ''}`}
         style={{ left: node.x, top: node.y, width: node.width, minHeight: 60, borderColor: node.color, backgroundColor: '#cce5ff', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4, position: 'absolute', cursor: 'grab', border: '1px solid var(--info-strong)' }}
         onClick={(e) => { e.stopPropagation(); if (onNodeClick) { onNodeClick(e); } else { setSelectedIds([node.id]); } }}
-        onMouseDown={(e) => { e.stopPropagation(); onDragStart(e); }}
+        onMouseDown={(e) => { e.stopPropagation(); iniciarArrastre(e); }}
       >
         <span style={{ fontWeight: 'bold', color: '#1a1f2e' }}>{node.nombre}</span>
         {isSelected && (
@@ -260,7 +271,7 @@ export const ClassNode: React.FC<Props> = ({
         className={`class-node class-node--port${isSelected ? ' class-node--selected' : ''}${isConnectingMode ? ' class-node--connectable' : ''}${isConnectingSource ? ' class-node--connect-source' : ''}${hasOpenCorrections ? ' class-node--has-corrections' : ''}`}
         style={{ left: node.x, top: node.y, width: 24, height: 24, backgroundColor: '#cce5ff', border: '1px solid var(--info-strong)', position: 'absolute', cursor: 'grab', zIndex: 10 }}
         onClick={(e) => { e.stopPropagation(); if (onNodeClick) { onNodeClick(e); } else { setSelectedIds([node.id]); } }}
-        onMouseDown={(e) => { e.stopPropagation(); onDragStart(e); }}
+        onMouseDown={(e) => { e.stopPropagation(); iniciarArrastre(e); }}
       >
         <span style={{ position: 'absolute', top: -20, left: 30, color: 'var(--text-primary)', fontSize: 12, whiteSpace: 'nowrap' }}>{node.nombre}</span>
         {isSelected && (
@@ -276,7 +287,7 @@ export const ClassNode: React.FC<Props> = ({
         className={`class-node class-node--expose${isSelected ? ' class-node--selected' : ''}${isConnectingMode ? ' class-node--connectable' : ''}${isConnectingSource ? ' class-node--connect-source' : ''}${hasOpenCorrections ? ' class-node--has-corrections' : ''}`}
         style={{ left: node.x, top: node.y, width: 30, height: 30, position: 'absolute', cursor: 'grab', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center' }}
         onClick={(e) => { e.stopPropagation(); if (onNodeClick) { onNodeClick(e); } else { setSelectedIds([node.id]); } }}
-        onMouseDown={(e) => { e.stopPropagation(); onDragStart(e); }}
+        onMouseDown={(e) => { e.stopPropagation(); iniciarArrastre(e); }}
       >
         <div style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid #a8b5c8', backgroundColor: '#e2e8f0' }} />
         <span style={{ position: 'absolute', top: -20, color: 'var(--text-primary)', fontSize: 12, whiteSpace: 'nowrap' }}>{node.nombre}</span>
@@ -294,7 +305,7 @@ export const ClassNode: React.FC<Props> = ({
         className={`class-node class-node--event${isSelected ? ' class-node--selected' : ''}${isConnectingMode ? ' class-node--connectable' : ''}${isConnectingSource ? ' class-node--connect-source' : ''}${hasOpenCorrections ? ' class-node--has-corrections' : ''}`}
         style={{ left: node.x, top: node.y, width: 40, height: 40, position: 'absolute', cursor: 'grab', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
         onClick={(e) => { e.stopPropagation(); if (onNodeClick) { onNodeClick(e); } else { setSelectedIds([node.id]); } }}
-        onMouseDown={(e) => { e.stopPropagation(); onDragStart(e); }}
+        onMouseDown={(e) => { e.stopPropagation(); iniciarArrastre(e); }}
       >
         <svg width="40" height="40" viewBox="0 0 40 40" style={{ position: 'absolute' }}>
           <polygon points="20,2 38,20 20,38 2,20" fill="#6a1b9a" stroke="#4a148c" strokeWidth="2" />
@@ -317,7 +328,7 @@ export const ClassNode: React.FC<Props> = ({
       className={`class-node${isSelected ? ' class-node--selected' : ''}${isConnectingMode ? ' class-node--connectable' : ''}${isConnectingSource ? ' class-node--connect-source' : ''}${hasOpenCorrections ? ' class-node--has-corrections' : ''}`}
       style={{ left: node.x, top: node.y, width: node.width, borderColor: node.color }}
       onClick={(e) => { e.stopPropagation(); if (onNodeClick) { onNodeClick(e); } else { setSelectedIds([node.id]); } }}
-      onMouseDown={(e) => { e.stopPropagation(); onDragStart(e); }}
+      onMouseDown={(e) => { e.stopPropagation(); iniciarArrastre(e); }}
     >
       {isSelected && <div className="class-node__select-bar" />}
 
@@ -400,13 +411,13 @@ export const ClassNode: React.FC<Props> = ({
                     }}
                     onFocus={() => handleFocus(`val_${idx}`)}
                     onBlur={() => handleBlur(`val_${idx}`)}
-                    disabled={isLocked(`val_${idx}`)}
+                    disabled={noEditable(`val_${idx}`)}
                     onMouseDown={e => e.stopPropagation()}
                   />
                   {isLocked(`val_${idx}`) && <span title={lockedBy(`val_${idx}`)}><Lock size={10} /></span>}
                   <button
                     className="class-node__row-delete"
-                    disabled={isLocked(`val_${idx}`)}
+                    disabled={noEditable(`val_${idx}`)}
                     onClick={(e) => { e.stopPropagation(); const v = [...(node.valores || [])]; v.splice(idx, 1); updateNode(node.id, { valores: v }); }}
                   ><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                 </>
@@ -429,7 +440,7 @@ export const ClassNode: React.FC<Props> = ({
                   onChange={e => { updateAtributo(node.id, attr.id, { visibilidad: e.target.value as any }); handleChangeLock(`attr_${attr.id}`); }}
                   onFocus={() => handleFocus(`attr_${attr.id}`)}
                   onBlur={() => handleBlur(`attr_${attr.id}`)}
-                  disabled={isLocked(`attr_${attr.id}`)}
+                  disabled={noEditable(`attr_${attr.id}`)}
                   onMouseDown={e => e.stopPropagation()}
                 >
                   {node.estereotipo === 'table' ? (
@@ -448,7 +459,7 @@ export const ClassNode: React.FC<Props> = ({
                   onChange={e => { updateAtributo(node.id, attr.id, { nombre: e.target.value }); handleChangeLock(`attr_${attr.id}`); }}
                   onFocus={() => handleFocus(`attr_${attr.id}`)}
                   onBlur={() => handleBlur(`attr_${attr.id}`)}
-                  disabled={isLocked(`attr_${attr.id}`)}
+                  disabled={noEditable(`attr_${attr.id}`)}
                   onMouseDown={e => e.stopPropagation()}
                   placeholder={node.estereotipo === 'table' ? 'columna' : 'nombre'}
                 />
@@ -459,14 +470,14 @@ export const ClassNode: React.FC<Props> = ({
                   onChange={e => { updateAtributo(node.id, attr.id, { tipo: e.target.value }); handleChangeLock(`attr_${attr.id}`); }}
                   onFocus={() => handleFocus(`attr_${attr.id}`)}
                   onBlur={() => handleBlur(`attr_${attr.id}`)}
-                  disabled={isLocked(`attr_${attr.id}`)}
+                  disabled={noEditable(`attr_${attr.id}`)}
                   onMouseDown={e => e.stopPropagation()}
                   placeholder={node.estereotipo === 'table' ? 'INT, VARCHAR' : 'tipo'}
                 />
                 {isLocked(`attr_${attr.id}`) && <span title={lockedBy(`attr_${attr.id}`)}><Lock size={10} /></span>}
                 <button
                   className="class-node__row-delete"
-                  disabled={isLocked(`attr_${attr.id}`)}
+                  disabled={noEditable(`attr_${attr.id}`)}
                   onClick={(e) => { e.stopPropagation(); deleteAtributo(node.id, attr.id); }}
                 ><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
               </>
@@ -523,7 +534,7 @@ export const ClassNode: React.FC<Props> = ({
                   onChange={e => { updateMetodo(node.id, met.id, { visibilidad: e.target.value as any }); handleChangeLock(`met_${met.id}`); }}
                   onFocus={() => handleFocus(`met_${met.id}`)}
                   onBlur={() => handleBlur(`met_${met.id}`)}
-                  disabled={isLocked(`met_${met.id}`)}
+                  disabled={noEditable(`met_${met.id}`)}
                   onMouseDown={e => e.stopPropagation()}
                 >
                   {VISIBILIDADES.map(v => <option key={v} value={v}>{v}</option>)}
@@ -534,7 +545,7 @@ export const ClassNode: React.FC<Props> = ({
                   onChange={e => { updateMetodo(node.id, met.id, { nombre: e.target.value }); handleChangeLock(`met_${met.id}`); }}
                   onFocus={() => handleFocus(`met_${met.id}`)}
                   onBlur={() => handleBlur(`met_${met.id}`)}
-                  disabled={isLocked(`met_${met.id}`)}
+                  disabled={noEditable(`met_${met.id}`)}
                   onMouseDown={e => e.stopPropagation()}
                   placeholder="método"
                 />
@@ -545,7 +556,7 @@ export const ClassNode: React.FC<Props> = ({
                   onChange={e => { updateMetodo(node.id, met.id, { parametros: e.target.value }); handleChangeLock(`met_${met.id}`); }}
                   onFocus={() => handleFocus(`met_${met.id}`)}
                   onBlur={() => handleBlur(`met_${met.id}`)}
-                  disabled={isLocked(`met_${met.id}`)}
+                  disabled={noEditable(`met_${met.id}`)}
                   onMouseDown={e => e.stopPropagation()}
                   placeholder="params"
                 />
@@ -556,14 +567,14 @@ export const ClassNode: React.FC<Props> = ({
                   onChange={e => { updateMetodo(node.id, met.id, { retorno: e.target.value }); handleChangeLock(`met_${met.id}`); }}
                   onFocus={() => handleFocus(`met_${met.id}`)}
                   onBlur={() => handleBlur(`met_${met.id}`)}
-                  disabled={isLocked(`met_${met.id}`)}
+                  disabled={noEditable(`met_${met.id}`)}
                   onMouseDown={e => e.stopPropagation()}
                   placeholder="tipo"
                 />
                 {isLocked(`met_${met.id}`) && <span title={lockedBy(`met_${met.id}`)}><Lock size={10} /></span>}
                 <button
                   className="class-node__row-delete"
-                  disabled={isLocked(`met_${met.id}`)}
+                  disabled={noEditable(`met_${met.id}`)}
                   onClick={(e) => { e.stopPropagation(); deleteMetodo(node.id, met.id); }}
                 ><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
               </>
