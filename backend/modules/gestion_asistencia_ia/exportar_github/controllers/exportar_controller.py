@@ -1,7 +1,10 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+import asyncio
 import os
+import time
+import uuid
 
 from backend.modules.gestion_asistencia_ia.exportar_github.schemas.exportar_schemas import GithubAuthCallback, ExportarProyectoRequest, ExportarProyectoResponse
 from backend.modules.gestion_asistencia_ia.exportar_github.services.github_service import vincular_cuenta_github, crear_repo_github
@@ -50,17 +53,8 @@ async def github_callback(
     github_username = await vincular_cuenta_github(current_user.id, payload.code, db)
     return {"mensaje": "Cuenta vinculada con éxito", "github_username": github_username}
 
-@router.post("/exportar", response_model=ExportarProyectoResponse)
-async def exportar_proyecto(
-    payload: ExportarProyectoRequest,
-    request: Request,
-    current_user: Usuario = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    Exporta el proyecto usando el token guardado en la base de datos.
-    Si ya tiene repositorio vinculado, hace commit con IA y push.
-    """
+async def _exportar(payload: ExportarProyectoRequest, cabeceras: dict, db: AsyncSession) -> ExportarProyectoResponse:
+    """Genera el código, lo sube a GitHub y (si se pidió) avisa al deployer."""
     try:
         # 1. Buscamos el proyecto y al anfitrión
         from backend.modules.gestion_proyectos.models import Proyecto, ColaboradorProyecto
@@ -123,10 +117,10 @@ async def exportar_proyecto(
         if payload.auto_deploy:
             from backend.core.config import settings
             domain = settings.EFFECTIVE_HOST_DOMAIN
-            if domain == "http://localhost" and request:
-                host_header = request.headers.get("x-forwarded-host") or request.headers.get("host")
+            if domain == "http://localhost" and cabeceras:
+                host_header = cabeceras.get("x-forwarded-host") or cabeceras.get("host")
                 if host_header and not host_header.startswith("localhost") and not host_header.startswith("127.0.0.1"):
-                    scheme = request.headers.get("x-forwarded-proto", "http")
+                    scheme = cabeceras.get("x-forwarded-proto", "http")
                     domain = f"{scheme}://{host_header}"
             url_base = f"{domain}/host/{owner_prefix}/{db_name}"
         else:
@@ -184,3 +178,71 @@ async def exportar_proyecto(
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error durante la exportación: {str(e)}")
+
+
+@router.post("/exportar", response_model=ExportarProyectoResponse)
+async def exportar_proyecto(
+    payload: ExportarProyectoRequest,
+    request: Request,
+    current_user: Usuario = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Exporta el proyecto esperando el resultado (puede tardar varios minutos: detrás de Cloudflare
+    la petición se corta a los 100 s -> usar /exportar/iniciar + /exportar/estado/{id}).
+    """
+    return await _exportar(payload, dict(request.headers), db)
+
+
+# ── Exportación en segundo plano ──────────────────────────────────────────────
+# Generar + compilar + corregir con IA + push tarda más de 100 s y Cloudflare respondía 524
+# (sin cabeceras CORS) aunque la exportación terminara bien.
+_TRABAJOS: dict = {}
+_MAX_TRABAJOS = 200
+
+
+async def _correr_trabajo(trabajo_id: str, payload: ExportarProyectoRequest, cabeceras: dict):
+    from backend.core.database import AsyncSessionLocal
+    trabajo = _TRABAJOS[trabajo_id]
+    try:
+        async with AsyncSessionLocal() as db:
+            res = await _exportar(payload, cabeceras, db)
+        trabajo.update(estado="ok", resultado=res.model_dump() if hasattr(res, "model_dump") else res.dict())
+    except HTTPException as e:
+        trabajo.update(estado="error", error=str(e.detail))
+    except Exception as e:  # noqa: BLE001
+        trabajo.update(estado="error", error=f"Error durante la exportación: {e}")
+    finally:
+        trabajo["terminado"] = time.time()
+
+
+@router.post("/exportar/iniciar")
+async def iniciar_exportacion(
+    payload: ExportarProyectoRequest,
+    request: Request,
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Inicia la exportación y responde al instante con el id del trabajo."""
+    if len(_TRABAJOS) >= _MAX_TRABAJOS:  # descartar los terminados más antiguos
+        for tid in sorted((t for t, v in _TRABAJOS.items() if v.get("terminado")),
+                          key=lambda t: _TRABAJOS[t]["terminado"])[:50]:
+            _TRABAJOS.pop(tid, None)
+    trabajo_id = uuid.uuid4().hex
+    _TRABAJOS[trabajo_id] = {"estado": "en_proceso", "usuario_id": current_user.id,
+                             "proyecto_id": payload.proyecto_id, "inicio": time.time()}
+    tarea = asyncio.create_task(_correr_trabajo(trabajo_id, payload, dict(request.headers)))
+    _TRABAJOS[trabajo_id]["_tarea"] = tarea  # referencia fuerte: que el GC no la cancele
+    return {"trabajo_id": trabajo_id, "estado": "en_proceso"}
+
+
+@router.get("/exportar/estado/{trabajo_id}")
+async def estado_exportacion(trabajo_id: str, current_user: Usuario = Depends(get_current_user)):
+    trabajo = _TRABAJOS.get(trabajo_id)
+    if not trabajo or trabajo["usuario_id"] != current_user.id:
+        raise HTTPException(status_code=404, detail="Exportación no encontrada (¿se reinició el servidor?).")
+    return {
+        "estado": trabajo["estado"],
+        "segundos": int((trabajo.get("terminado") or time.time()) - trabajo["inicio"]),
+        "resultado": trabajo.get("resultado"),
+        "error": trabajo.get("error"),
+    }
